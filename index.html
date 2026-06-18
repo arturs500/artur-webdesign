@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="de" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Webdesign Chemnitz – Website 649 € + Pflege 79 €/Monat | Artur WebDesign</title>
+<meta name="description" content="Moderne Websites für Betriebe in Chemnitz, Leipzig und Halle – ab 649 € einmalig plus Pflege-Abo 79 €/Monat. Erst die kostenlose Vorschau ansehen, dann entscheiden.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#15181C">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="de_DE">
+<meta property="og:title" content="Website 649 € + Pflege 79 €/Monat – Artur WebDesign Chemnitz">
+<meta property="og:description" content="Individuelle Website für Ihren Betrieb. Website 649 € einmalig plus Pflege-Abo 79 €/Monat, 2 Monate Mindestlaufzeit, danach monatlich kündbar. Erst sehen, dann entscheiden.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2315181C'/%3E%3Ctext x='16' y='23' font-family='Arial,sans-serif' font-size='18' font-weight='700' text-anchor='middle' fill='%23E0A24A'%3EA%3C/text%3E%3C/svg%3E">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"ProfessionalService","name":"Artur WebDesign","description":"Webdesign und Website-Abo für lokale Betriebe in Chemnitz, Leipzig und Halle.","areaServed":["Chemnitz","Leipzig","Halle (Saale)","Sachsen"],"address":{"@type":"PostalAddress","streetAddress":"Paul-Bertz-Straße 187","postalCode":"09120","addressLocality":"Chemnitz","addressCountry":"DE"},"telephone":"+4917663153504","email":"info@artur-webdesign.de","priceRange":"ab 649 € + 79 €/Monat","founder":{"@type":"Person","name":"Artur Stol"}}
+</script>
+<style>
+@font-face{font-family:"Space";src:url("fonts/space-grotesk-700.woff2") format("woff2");font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:"Space";src:url("fonts/space-grotesk-500.woff2") format("woff2");font-weight:500;font-style:normal;font-display:swap}
+@font-face{font-family:"InterL";src:url("fonts/inter-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:"InterL";src:url("fonts/inter-600.woff2") format("woff2");font-weight:600;font-style:normal;font-display:swap}
+
+:root{
+  --ink:#15181C; --paper:#F5F3EE; --card:#FFFFFF; --muted:#5B606A; --line:#E7E1D6;
+  --brass:#B26B1E; --brass-deep:#8F5415; --brass-light:#E0A24A; --ok:#2F8F5B;
+  --dark:#15181C; --dark-soft:#1D2127;
+  --disp:"Space",system-ui,sans-serif; --text:"InterL",system-ui,-apple-system,Arial,sans-serif;
+  --ease-out:cubic-bezier(.23,1,.32,1); --ease-io:cubic-bezier(.77,0,.175,1);
+  --shadow:0 18px 50px -24px rgba(21,24,28,.28); --shadow-sm:0 6px 20px -12px rgba(21,24,28,.30);
+  --r:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{font-family:var(--text);color:var(--ink);background:var(--paper);line-height:1.62;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;overflow-x:hidden}
+.wrap{width:100%;max-width:1140px;margin:0 auto;padding:0 24px}
+h1,h2,h3,.disp{font-family:var(--disp);font-weight:700;letter-spacing:-.02em;line-height:1.05}
+a{color:inherit;text-decoration:none}
+img{max-width:100%;display:block}
+:focus-visible{outline:3px solid var(--brass);outline-offset:3px;border-radius:4px}
+.eyebrow{font-family:var(--text);font-weight:600;font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:var(--brass-deep)}
+
+/* ---------- Buttons (Emil: press feedback) ---------- */
+.btn{display:inline-flex;align-items:center;gap:.55em;font-family:var(--text);font-weight:600;font-size:1rem;border-radius:12px;padding:15px 26px;min-height:52px;cursor:pointer;border:1px solid transparent;transition:transform 160ms var(--ease-out),background 200ms ease,border-color 200ms ease,box-shadow 200ms ease;will-change:transform}
+.btn:active{transform:scale(.97)}
+.btn--primary{background:var(--brass-deep);color:#fff;box-shadow:0 10px 26px -14px rgba(143,84,21,.9)}
+.btn--ghost{background:transparent;color:var(--ink);border-color:rgba(21,24,28,.22)}
+.btn--light{background:var(--brass-light);color:#241a0c}
+.btn--on-dark{background:transparent;color:#fff;border-color:rgba(255,255,255,.3)}
+.btn .ar{transition:transform 200ms var(--ease-out)}
+@media (hover:hover) and (pointer:fine){
+  .btn--primary:hover{background:#7c4810;box-shadow:0 16px 32px -14px rgba(143,84,21,.85)}
+  .btn--ghost:hover{border-color:var(--ink)}
+  .btn--light:hover{background:#d6973d}
+  .btn--on-dark:hover{border-color:#fff;background:rgba(255,255,255,.06)}
+  .btn:hover .ar{transform:translateX(3px)}
+}
+
+/* ---------- Header ---------- */
+.hdr{position:sticky;top:0;z-index:50;background:rgba(245,243,238,.82);backdrop-filter:saturate(140%) blur(10px);border-bottom:1px solid transparent;transition:border-color 250ms ease,box-shadow 250ms ease,background 250ms ease}
+.hdr.compact{border-color:var(--line);box-shadow:0 8px 24px -20px rgba(21,24,28,.5)}
+.hdr .nav{display:flex;align-items:center;justify-content:space-between;gap:1rem;height:72px}
+.brand{display:flex;align-items:center;gap:.6rem;font-family:var(--disp);font-weight:700;font-size:1.12rem;letter-spacing:-.01em}
+.brand .mk{display:grid;place-items:center;width:34px;height:34px;border-radius:9px;background:var(--ink);color:var(--brass-light);font-family:var(--disp);font-weight:700;font-size:1.05rem}
+.brand small{display:block;font-family:var(--text);font-weight:400;font-size:.7rem;letter-spacing:.02em;color:var(--muted);margin-top:1px}
+.menu{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;justify-content:flex-end}
+.menu a.lnk{padding:10px 14px;border-radius:9px;font-weight:600;font-size:.95rem;color:var(--ink);transition:background 160ms ease,color 160ms ease}
+@media (hover:hover){.menu a.lnk:hover{background:rgba(21,24,28,.06)}}
+.menu .btn{padding:11px 18px;min-height:44px}
+.burger{display:none;width:46px;height:46px;border:1px solid var(--line);border-radius:10px;background:var(--card);cursor:pointer;position:relative}
+.burger span,.burger span::before,.burger span::after{content:"";position:absolute;left:11px;width:22px;height:2px;background:var(--ink);transition:transform 250ms var(--ease-out),opacity 200ms ease}
+.burger span{top:22px}.burger span::before{top:-7px}.burger span::after{top:7px}
+body.menu-open .burger span{background:transparent}
+body.menu-open .burger span::before{transform:translateY(7px) rotate(45deg)}
+body.menu-open .burger span::after{transform:translateY(-7px) rotate(-45deg)}
+@media(max-width:760px){
+  .js .burger{display:block}
+  .js .menu{position:fixed;left:0;right:0;top:72px;flex-direction:column;align-items:stretch;gap:.25rem;background:var(--paper);border-bottom:1px solid var(--line);padding:.9rem 24px 1.3rem;box-shadow:0 22px 44px -26px rgba(21,24,28,.55);transform:translateY(-10px);opacity:0;pointer-events:none;transition:opacity .25s var(--ease-out),transform .25s var(--ease-out)}
+  .js body.menu-open .menu{opacity:1;transform:none;pointer-events:auto}
+  .js .menu a.lnk{padding:14px 12px;font-size:1.05rem;border-radius:10px}
+  .js .menu .btn{margin-top:.45rem;justify-content:center;min-height:50px}
+}
+
+/* ---------- Hero (Typo-Bühne) ---------- */
+.hero{padding:clamp(3rem,8vw,6.5rem) 0 clamp(2.5rem,6vw,4.5rem)}
+.hero .pill{display:inline-flex;align-items:center;gap:.5em;font-weight:600;font-size:.82rem;color:var(--ink);background:var(--card);border:1px solid var(--line);padding:7px 14px;border-radius:30px;box-shadow:var(--shadow-sm);margin-bottom:1.4rem}
+.hero .pill .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 0 rgba(47,143,91,.5);animation:pulse 2.4s var(--ease-out) infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(47,143,91,.45)}70%{box-shadow:0 0 0 9px rgba(47,143,91,0)}100%{box-shadow:0 0 0 0 rgba(47,143,91,0)}}
+.hero h1{font-size:clamp(2.6rem,7.2vw,5.3rem);max-width:14ch;margin:.5rem 0 0}
+.hero h1 .kw{position:relative;color:var(--ink);white-space:nowrap}
+.hero h1 .kw svg{position:absolute;left:0;right:0;bottom:-.12em;width:100%;height:.36em;overflow:visible}
+.hero h1 .kw path{fill:none;stroke:var(--brass);stroke-width:7;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;pathLength:1}
+.hero .lead{font-size:clamp(1.08rem,2.3vw,1.32rem);color:var(--muted);max-width:46ch;margin:1.5rem 0 0}
+.hero .cta-row{display:flex;flex-wrap:wrap;gap:.8rem;margin:2rem 0 1.4rem}
+.hero .trust{display:flex;flex-wrap:wrap;gap:.5rem 1.4rem;color:var(--muted);font-size:.92rem}
+.hero .trust b{color:var(--ink);font-weight:600}
+.hero .trust .ck{display:inline-flex;align-items:center;gap:.45em}
+.ck svg{flex:none;width:16px;height:16px;color:var(--ok)}
+
+/* ---------- Sections ---------- */
+section{padding:clamp(3.5rem,9vw,7rem) 0}
+.sec-head{max-width:54ch}
+.sec-head h2{font-size:clamp(2rem,4.6vw,3.1rem);margin:.7rem 0 .6rem}
+.sec-head p{color:var(--muted);font-size:1.08rem}
+
+/* Steps (asymmetric numbered) */
+.steps{display:grid;gap:1.1rem;margin-top:2.6rem}
+.step{display:grid;grid-template-columns:auto 1fr;gap:1.4rem;align-items:start;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:clamp(1.3rem,3vw,1.9rem);box-shadow:var(--shadow-sm)}
+.step .no{font-family:var(--disp);font-weight:700;font-size:clamp(2.2rem,5vw,3.2rem);line-height:1;color:var(--brass);letter-spacing:-.03em}
+.step h3{font-size:1.25rem;margin-bottom:.3rem}
+.step p{color:var(--muted);font-size:1rem;max-width:52ch}
+@media(min-width:740px){.steps{grid-template-columns:1fr 1fr 1fr}.step{grid-template-columns:1fr;gap:.7rem}.step:nth-child(2){transform:translateY(22px)}}
+
+/* Abo (dark, vollfarbige Sektion) */
+.abo{background:var(--dark);color:#EDEAE3}
+.abo .grid{display:grid;gap:2.4rem;align-items:center}
+@media(min-width:880px){.abo .grid{grid-template-columns:1.05fr 1fr;gap:3.4rem}}
+.abo .eyebrow{color:var(--brass-light)}
+.abo h2{color:#fff;font-size:clamp(2.1rem,4.8vw,3.3rem);margin:.7rem 0 1rem}
+.abo .who{color:#B9BEC6;font-size:1.06rem;max-width:46ch}
+.price-card{background:linear-gradient(180deg,#23272E,#1A1E24);border:1px solid rgba(224,162,74,.25);border-radius:22px;padding:clamp(1.6rem,4vw,2.4rem);box-shadow:0 30px 70px -30px rgba(0,0,0,.7)}
+.price-card .ribbon{display:inline-block;font-size:.74rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#241a0c;background:var(--brass-light);padding:5px 12px;border-radius:20px;margin-bottom:1rem}
+.price-card .amount{display:flex;align-items:baseline;gap:.3rem;font-family:var(--disp);font-weight:700;color:#fff}
+.price-card .amount .num{font-size:clamp(3rem,8vw,4.2rem);letter-spacing:-.03em;line-height:1}
+.price-card .amount .per{font-size:1.1rem;color:#B9BEC6;font-family:var(--text);font-weight:400}
+.price-card .terms{color:#9aa0a8;font-size:.96rem;margin:.4rem 0 1.3rem}
+.price-card .terms b{color:#EDEAE3;font-weight:600}
+.feats{list-style:none;display:grid;gap:.7rem;margin:0 0 1.4rem}
+.feats li{display:grid;grid-template-columns:auto 1fr;gap:.7rem;align-items:start;font-size:1rem;color:#E4E1DA}
+.feats li svg{flex:none;width:20px;height:20px;margin-top:2px;color:var(--brass-light)}
+.feats li b{color:#fff;font-weight:600}
+.price-card .note{display:flex;gap:.6rem;align-items:flex-start;font-size:.9rem;color:#9aa0a8;margin-top:1rem;border-top:1px solid rgba(255,255,255,.1);padding-top:1rem}
+.guarantee{display:flex;gap:.8rem;align-items:flex-start;margin-top:1.6rem;background:rgba(224,162,74,.08);border:1px solid rgba(224,162,74,.22);border-radius:14px;padding:1rem 1.1rem}
+.guarantee svg{flex:none;width:22px;height:22px;color:var(--brass-light);margin-top:1px}
+.guarantee p{font-size:.98rem;color:#D7D3CB}.guarantee b{color:#fff}
+
+/* Portfolio (asymmetric) */
+.work{display:grid;gap:1.6rem;margin-top:2.6rem}
+@media(min-width:820px){.work{grid-template-columns:1.25fr .95fr}}
+.shot{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow);transition:transform 300ms var(--ease-out),box-shadow 300ms ease}
+.shot .bar{display:flex;align-items:center;gap:7px;padding:11px 14px;border-bottom:1px solid var(--line);background:#fbfaf7}
+.shot .bar i{width:11px;height:11px;border-radius:50%;background:#e0ddd4;display:block}
+.shot .bar i:nth-child(1){background:#e8b0a0}.shot .bar i:nth-child(2){background:#ecd39a}.shot .bar i:nth-child(3){background:#bcd8b4}
+.shot .bar .u{margin-left:8px;font-size:.78rem;color:var(--muted);font-family:var(--text)}
+.shot img{width:100%;height:auto;aspect-ratio:1200/750;object-fit:cover;object-position:top}
+.shot .cap{padding:1.1rem 1.3rem 1.3rem}
+.shot .cap h3{font-size:1.18rem}
+.shot .cap .tag{display:inline-block;font-size:.76rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--brass-deep);background:#f3ead9;padding:4px 10px;border-radius:20px;margin:.5rem 0 .1rem}
+.shot .cap p{color:var(--muted);font-size:.96rem;margin-top:.5rem}
+@media (hover:hover) and (pointer:fine){.shot:hover{transform:translateY(-4px);box-shadow:0 28px 60px -30px rgba(21,24,28,.4)}}
+
+/* Why (feature rows, not equal cards) */
+.why{display:grid;gap:1px;margin-top:2.4rem;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+@media(min-width:760px){.why{grid-template-columns:1fr 1fr}}
+.feat{background:var(--paper);padding:clamp(1.5rem,3.5vw,2.1rem)}
+.feat .ic{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;background:#f1e7d6;color:var(--brass-deep);margin-bottom:.9rem}
+.feat .ic svg{width:22px;height:22px}
+.feat h3{font-size:1.16rem;margin-bottom:.35rem}
+.feat p{color:var(--muted);font-size:.99rem;max-width:46ch}
+
+/* Founder */
+.founder{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:clamp(1.6rem,4vw,2.6rem);box-shadow:var(--shadow-sm);display:grid;gap:1.4rem;align-items:center;margin-top:2.4rem}
+@media(min-width:720px){.founder{grid-template-columns:auto 1fr;gap:2.2rem}}
+.founder .av{width:96px;height:96px;border-radius:50%;background:linear-gradient(150deg,#23272E,#15181C);display:grid;place-items:center;color:var(--brass-light);font-family:var(--disp);font-weight:700;font-size:2.2rem}
+.founder p{color:var(--muted);font-size:1.05rem;max-width:62ch}
+.founder p b{color:var(--ink);font-weight:600}
+.founder .sig{font-family:var(--disp);font-weight:500;color:var(--ink);margin-top:.7rem}
+
+/* Contact */
+.contact{background:var(--dark);color:#EDEAE3}
+.contact .grid{display:grid;gap:2.4rem}
+@media(min-width:880px){.contact .grid{grid-template-columns:.85fr 1.15fr;gap:3.4rem}}
+.contact .eyebrow{color:var(--brass-light)}
+.contact h2{color:#fff;font-size:clamp(2rem,4.5vw,3rem);margin:.7rem 0 1rem}
+.contact .intro{color:#B9BEC6;font-size:1.06rem;max-width:42ch}
+.contact .direct{margin-top:1.6rem;display:grid;gap:.7rem}
+.contact .direct a,.contact .direct span{display:inline-flex;align-items:center;gap:.7rem;color:#EDEAE3;font-size:1.02rem}
+.contact .direct svg{width:19px;height:19px;color:var(--brass-light);flex:none}
+form{background:#1B1F25;border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:clamp(1.4rem,3.5vw,2rem)}
+.field{margin-bottom:1rem}
+.field label{display:block;font-size:.9rem;font-weight:600;color:#D7D3CB;margin-bottom:.4rem}
+.field input,.field textarea{width:100%;font-family:var(--text);font-size:16px;color:#fff;background:#15181C;border:1px solid rgba(255,255,255,.16);border-radius:11px;padding:13px 15px;transition:border-color 160ms ease,box-shadow 160ms ease}
+.field textarea{min-height:108px;resize:vertical}
+.field input::placeholder,.field textarea::placeholder{color:#6b7079}
+.field input:focus,.field textarea:focus{outline:none;border-color:var(--brass-light);box-shadow:0 0 0 3px rgba(224,162,74,.18)}
+.two{display:grid;gap:1rem}@media(min-width:560px){.two{grid-template-columns:1fr 1fr}}
+.choice{display:grid;gap:.6rem;margin:.4rem 0 1rem}
+.opt{display:flex;gap:.7rem;align-items:flex-start;background:#15181C;border:1px solid rgba(255,255,255,.14);border-radius:11px;padding:12px 14px;cursor:pointer;transition:border-color 160ms ease,background 160ms ease}
+.opt input{margin-top:3px;width:18px;height:18px;accent-color:var(--brass-light);flex:none}
+.opt span{font-size:.97rem;color:#E4E1DA}.opt span b{color:#fff}
+@media(hover:hover){.opt:hover{border-color:rgba(224,162,74,.5)}}
+.consent{display:flex;gap:.6rem;align-items:flex-start;font-size:.9rem;color:#B9BEC6;margin:.2rem 0 1.1rem}
+.consent input{margin-top:3px;width:18px;height:18px;accent-color:var(--brass-light);flex:none}
+.consent a{color:var(--brass-light);text-decoration:underline}
+form .btn{width:100%;justify-content:center}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.form-note{font-size:.82rem;color:#7c818a;margin-top:.9rem;text-align:center}
+
+/* Footer */
+footer{background:#0F1216;color:#9aa0a8;padding:3rem 0 2.4rem;font-size:.92rem}
+footer .top{display:flex;flex-wrap:wrap;justify-content:space-between;gap:1.4rem;align-items:flex-start;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:1.6rem;margin-bottom:1.4rem}
+footer .brand{color:#fff}.footer .brand small{color:#9aa0a8}
+footer a{color:#cfd2d6}@media(hover:hover){footer a:hover{color:#fff}}
+footer .links{display:flex;gap:1.3rem;flex-wrap:wrap}
+footer .bot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:.6rem}
+footer .nocookie{color:var(--brass-light)}
+
+/* ---------- Reveal (no-JS-safe: start states only under .js) ---------- */
+.js .reveal{opacity:0;transform:translateY(14px);transition:opacity .6s var(--ease-out),transform .6s var(--ease-out)}
+.js .reveal.is-in{opacity:1;transform:none}
+/* Hero entrance via @starting-style — content stays visible if unsupported */
+.js .hero .h-stagger{transition:opacity .7s var(--ease-out) var(--d,0s),transform .7s var(--ease-out) var(--d,0s)}
+@starting-style{.js .hero .h-stagger{opacity:0;transform:translateY(16px)}}
+.js .hero .h-stagger:nth-child(2){--d:.08s}
+.js .hero .h-stagger:nth-child(3){--d:.18s}
+.js .hero .h-stagger:nth-child(4){--d:.30s}
+.js .hero .h-stagger:nth-child(5){--d:.40s}
+.js .hero .h-stagger:nth-child(6){--d:.48s}
+.js .hero .kw path{animation:draw 1.1s var(--ease-out) .65s forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+@media (prefers-reduced-motion:reduce){
+  .js .reveal{opacity:1!important;transform:none!important;transition:none!important}
+  .js .hero .h-stagger{transition:none!important}
+  .js .hero .kw path{animation:none;stroke-dashoffset:0}
+  .hero .pill .dot{animation:none}
+}
+.skip{position:absolute;left:-9999px;top:0;background:var(--ink);color:#fff;padding:10px 16px;border-radius:8px;z-index:100}
+.skip:focus{left:12px;top:12px}
+</style>
+</head>
+<body>
+<script>document.documentElement.classList.replace("no-js","js");</script>
+<a class="skip" href="#main">Zum Inhalt springen</a>
+
+<header class="hdr" id="hdr">
+  <div class="wrap nav">
+    <a class="brand" href="#top" aria-label="Artur WebDesign – Startseite">
+      <span class="mk">A</span>
+      <span>Artur WebDesign<small>Websites für Betriebe · Chemnitz</small></span>
+    </a>
+    <nav class="menu" id="menu" aria-label="Hauptnavigation">
+      <a class="lnk" href="#abo">Das Abo</a>
+      <a class="lnk" href="#beispiele">Beispiele</a>
+      <a class="lnk" href="#warum">Warum ich</a>
+      <a class="btn btn--primary" href="#kontakt">Vorschau anfragen</a>
+    </nav>
+    <button class="burger" id="burger" aria-label="Menü öffnen" aria-expanded="false" aria-controls="menu"><span></span></button>
+  </div>
+</header>
+
+<main id="main">
+<a id="top"></a>
+
+<!-- HERO -->
+<section class="hero" id="hero">
+  <div class="wrap">
+    <span class="pill h-stagger"><span class="dot" aria-hidden="true"></span>Aktuell frei für neue Projekte</span>
+    <p class="eyebrow h-stagger">Webdesign · Chemnitz · Leipzig · Halle</p>
+    <h1 class="h-stagger">Eine Website, die <span class="kw">Kunden bringt<svg viewBox="0 0 300 12" preserveAspectRatio="none" aria-hidden="true"><path d="M3 8 C 70 2, 150 2, 297 6" pathLength="1"/></svg></span>.</h1>
+    <p class="lead h-stagger">Für Ihren Betrieb in der Region — modern, blitzschnell und abmahnsicher. Sie sehen zuerst die fertige Vorschau, und entscheiden danach in Ruhe.</p>
+    <div class="cta-row h-stagger">
+      <a class="btn btn--primary" href="#kontakt">Kostenlose Vorschau anfragen <span class="ar" aria-hidden="true">→</span></a>
+      <a class="btn btn--ghost" href="#abo">So funktioniert das Abo</a>
+    </div>
+    <div class="trust h-stagger">
+      <span class="ck"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><b>649 € einmalig + 79 €/Monat Pflege</b></span>
+      <span class="ck"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>2 Monate, dann <b>monatlich kündbar</b></span>
+      <span class="ck"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>DSGVO-fest, <b>kein Cookie-Banner</b></span>
+    </div>
+  </div>
+</section>
+
+<!-- STEPS -->
+<section id="ablauf">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <p class="eyebrow">So einfach geht's</p>
+      <h2>In drei Schritten online — ohne Risiko.</h2>
+      <p>Sie gehen nicht in Vorleistung. Erst sehen Sie Ihre Seite, dann entscheiden Sie.</p>
+    </div>
+    <div class="steps">
+      <div class="step reveal"><div class="no">01</div><div><h3>Vorschau — gratis</h3><p>Ich baue Ihnen vorab eine fertige Vorschau Ihrer Seite. Unverbindlich. Gefällt sie nicht, kostet sie nichts.</p></div></div>
+      <div class="step reveal"><div class="no">02</div><div><h3>Abo starten</h3><p>Passt sie? Wir schalten live. 649 € einmalig + 79 €/Monat Pflege, 2 Monate Mindestlaufzeit.</p></div></div>
+      <div class="step reveal"><div class="no">03</div><div><h3>Zurücklehnen</h3><p>Hosting, Updates, Änderungen und Sichtbarkeit übernehme ich. Sie kümmern sich um Ihre Kunden.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ABO (dark) -->
+<section class="abo" id="abo">
+  <div class="wrap grid">
+    <div>
+      <p class="eyebrow reveal">Das Website-Abo</p>
+      <h2 class="reveal">Alles drin. Ein fester Preis.</h2>
+      <p class="who reveal">Für Gastronomie, Handwerk, Beauty und Garten- &amp; Landschaftsbau in Chemnitz, Leipzig und Halle. Eine Website, die zu Ihrem Betrieb passt — und die ich für Sie aktuell halte.</p>
+      <div class="guarantee reveal">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5l8-3z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M8.5 12l2.5 2.5 4.5-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <p><b>Erst sehen, dann entscheiden.</b> Sie bekommen die fertige Vorschau, bevor Sie sich festlegen. Gefällt sie nicht, kostet sie nichts.</p>
+      </div>
+    </div>
+    <div class="price-card reveal">
+      <span class="ribbon">Website-Abo</span>
+      <div class="amount"><span class="num">649 €</span><span class="per">einmalig + 79 €/Mon.</span></div>
+      <p class="terms"><b>649 € einmalig</b> + 79 €/Monat Pflege. 2 Monate Mindestlaufzeit, danach monatlich kündbar.</p>
+      <ul class="feats">
+        <li><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Individuelle Website</b> — Design, Texte und Technik, gebaut für Ihren Betrieb</span></li>
+        <li><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Hosting, Updates &amp; Sicherheit</b> — immer aktuell, nichts zu tun für Sie</span></li>
+        <li><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Änderungen jeden Monat inklusive</b> — neue Preise, Öffnungszeiten, Aktionen</span></li>
+        <li><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Monatlicher Sichtbarkeits-Report</b> — Sie sehen, was die Seite bringt</span></li>
+        <li><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Bewertungs-Aufsteller</b> — für mehr echte Google-Bewertungen</span></li>
+        <li><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Impressum &amp; Datenschutz</b> nach DSGVO — abmahnsicher</span></li>
+      </ul>
+      <a class="btn btn--light" href="#kontakt" style="width:100%;justify-content:center">Jetzt Website beauftragen</a>
+      <div class="note">
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" style="width:18px;height:18px;flex:none;color:#9aa0a8"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v5M10 6.2v.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        <span>Abrechnung bequem per SEPA-Lastschrift. Kleinunternehmer nach § 19 UStG — keine zusätzliche Umsatzsteuer.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PORTFOLIO -->
+<section id="beispiele">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <p class="eyebrow">Beispiele aus meiner Werkstatt</p>
+      <h2>So sieht das aus.</h2>
+      <p>Zwei Seiten, die ich gebaut habe — eine live, eine als Konzept für einen Betrieb hier in Chemnitz.</p>
+    </div>
+    <div class="work">
+      <article class="shot reveal">
+        <div class="bar"><i></i><i></i><i></i><span class="u">wh-fischer.com</span></div>
+        <img src="img/beispiel-fischer.jpg" alt="Website von Wertstoffhandel Fischer aus Leipzig – Startseite mit großer Überschrift Schrottankauf in Leipzig" width="1200" height="750" loading="lazy">
+        <div class="cap"><span class="tag">Live-Website · Leipzig</span><h3>Wertstoffhandel Fischer</h3><p>Schrott- &amp; Buntmetallankauf in Leipzig. Live unter wh-fischer.com — schnell, mobil, mit Anfrage-Funktion.</p></div>
+      </article>
+      <article class="shot reveal">
+        <div class="bar"><i></i><i></i><i></i><span class="u">Vorschau · Konzept</span></div>
+        <img src="img/beispiel-pamir.jpg" alt="Design-Konzept für Pamir Pizza aus Chemnitz – dunkle Startseite mit Hero-Foto und Bestell-Buttons" width="1200" height="750" loading="lazy">
+        <div class="cap"><span class="tag">Design-Konzept · Gastronomie</span><h3>Pamir Pizza, Chemnitz</h3><p>Ein Entwurf für einen Imbiss in Helbersdorf — so kann eine Liefer- &amp; Bestellseite aussehen.</p></div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- WHY -->
+<section id="warum">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <p class="eyebrow">Warum mit mir</p>
+      <h2>Gründlich gebaut, fair abgerechnet.</h2>
+      <p>Keine Agentur-Hotline, kein Baukasten von der Stange. Eine Person aus Chemnitz, die jede Seite selbst baut und prüft.</p>
+    </div>
+    <div class="why">
+      <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5l8-3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div><h3>Abmahnsicher gebaut</h3><p>Impressum nach § 5 DDG, sauberer Datenschutz, keine Tracker — und damit kein Cookie-Banner nötig. In Deutschland schützt Sie das vor teuren Abmahnungen.</p></div>
+      <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div><h3>Blitzschnell</h3><p>Lädt in unter einer Sekunde. Schriften liegen auf dem Server, nicht bei Google. Schnelle Seiten werden besser gefunden — und seltener wieder weggeklickt.</p></div>
+      <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5" stroke="currentColor" stroke-width="1.6"/><path d="M11 18.5h2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div><h3>Auf dem Handy top</h3><p>Die meisten Ihrer Kunden kommen vom Smartphone. Jede Seite wird zuerst fürs Handy gebaut — große Buttons, klickbare Nummer, gut lesbar.</p></div>
+      <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 21c5-4.5 7.5-8 7.5-11A7.5 7.5 0 0012 2.5 7.5 7.5 0 004.5 10c0 3 2.5 6.5 7.5 11z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.5" stroke="currentColor" stroke-width="1.6"/></svg></div><h3>Aus der Region</h3><p>Ihr direkter Ansprechpartner in Chemnitz — erreichbar, ohne Hotline und ohne Warteschleife. Wir reden Klartext, nicht in Fachchinesisch.</p></div>
+    </div>
+    <div class="founder reveal">
+      <div class="av" aria-hidden="true">AS</div>
+      <div>
+        <p><b>Hinter Artur WebDesign steckt eine Person, kein Callcenter:</b> Artur Stol aus Chemnitz. Ich baue Websites für Betriebe in Sachsen und kümmere mich danach um alles drumherum. Jede Seite prüfe ich vor der Übergabe hart — auf Technik, Recht, Tempo und Handy-Tauglichkeit. Lieber gründlich als laut.</p>
+        <p class="sig">— Artur Stol</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section class="contact" id="kontakt">
+  <div class="wrap grid">
+    <div class="reveal">
+      <p class="eyebrow">Kennenlernen</p>
+      <h2>Lust auf Ihre kostenlose Vorschau?</h2>
+      <p class="intro">Schreiben Sie mir kurz, um welchen Betrieb es geht — ich melde mich meist noch am selben Tag.</p>
+      <div class="direct">
+        <a href="mailto:info@artur-webdesign.de"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5" stroke="currentColor" stroke-width="1.7"/><path d="M4 7l8 6 8-6" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>info@artur-webdesign.de</a>
+        <a href="tel:+4917663153504"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 3h3l2 5-2.5 1.5a11 11 0 005 5L15 14l5 2v3a2 2 0 01-2 2C9.7 21 3 14.3 3 5a2 2 0 012-2z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>0176 63153504</a>
+        <a href="https://wa.me/4917663153504?text=Hallo%2C%20ich%20komme%20von%20Ihrer%20Website%20und%20m%C3%B6chte%20mehr%20erfahren." target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 20l1.4-4A8 8 0 118 18.6L4 20z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>WhatsApp schreiben</a>
+        <span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 21c5-4.5 7.5-8 7.5-11A7.5 7.5 0 0012 2.5 7.5 7.5 0 004.5 10c0 3 2.5 6.5 7.5 11z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.5" stroke="currentColor" stroke-width="1.7"/></svg>Chemnitz · für ganz Sachsen</span>
+      </div>
+    </div>
+
+    <form action="https://formspree.io/f/xeewbkyw" method="POST" novalidate>
+      <input type="text" name="_gotcha" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <input type="hidden" name="_subject" value="Neue Anfrage / Abo-Abschluss – Artur WebDesign">
+      <input type="hidden" name="_next" value="https://arturs500.github.io/artur-webdesign/danke.html">
+      <div class="two">
+        <div class="field"><label for="name">Ihr Name</label><input id="name" name="name" type="text" autocomplete="name" placeholder="Vor- und Nachname" required></div>
+        <div class="field"><label for="betrieb">Betrieb</label><input id="betrieb" name="betrieb" type="text" autocomplete="organization" placeholder="Name &amp; Ort" required></div>
+      </div>
+      <div class="two">
+        <div class="field"><label for="tel">Telefon</label><input id="tel" name="telefon" type="tel" autocomplete="tel" placeholder="für einen schnellen Rückruf"></div>
+        <div class="field"><label for="mail">E-Mail</label><input id="mail" name="email" type="email" autocomplete="email" placeholder="ihre@mail.de" required></div>
+      </div>
+      <div class="field"><label for="msg">Worum geht's?</label><textarea id="msg" name="nachricht" placeholder="z. B. Branche, was Ihre Seite können soll, oder einfach „bitte um Rückruf“"></textarea></div>
+      <div class="choice" role="group" aria-label="Ich möchte">
+        <label class="opt"><input type="checkbox" name="wunsch_vorschau" value="ja"><span><b>Kostenlose Vorschau</b> — zeigen Sie mir unverbindlich, wie meine Seite aussehen könnte.</span></label>
+        <label class="opt"><input type="checkbox" name="wunsch_abo" value="ja"><span><b>Website verbindlich beauftragen</b> — 649 € einmalig + 79 €/Monat Pflege, 2 Monate Mindestlaufzeit. Mit dem Absenden beauftrage ich die Website; die Auftragsbestätigung folgt per E-Mail.</span></label>
+      </div>
+      <label class="consent"><input type="checkbox" name="datenschutz_ok" value="ja" required><span>Ich habe die <a href="datenschutz.html">Datenschutzerklärung</a> gelesen und bin mit der Verarbeitung meiner Angaben zur Bearbeitung der Anfrage einverstanden.</span></label>
+      <button class="btn btn--light" type="submit">Absenden <span class="ar" aria-hidden="true">→</span></button>
+      <p class="form-note">„Kostenlose Vorschau" = unverbindlich. „Website-Abo verbindlich abschließen" = Sie beauftragen die Website (649 € einmalig + 79 €/Monat Pflege, 2 Monate Mindestlaufzeit); ich bestätige per E-Mail, richte alles ein, erste Zahlung per Rechnung/SEPA.</p>
+    </form>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="top">
+      <div class="brand">Artur WebDesign<br><small style="color:#9aa0a8;font-weight:400">Websites für Betriebe in Chemnitz, Leipzig &amp; Halle</small></div>
+      <div class="links">
+        <a href="#abo">Das Abo</a>
+        <a href="#beispiele">Beispiele</a>
+        <a href="#kontakt">Kontakt</a>
+        <a href="impressum.html">Impressum</a>
+        <a href="datenschutz.html">Datenschutz</a>
+      </div>
+    </div>
+    <div class="bot">
+      <span>© <span id="y"></span> Artur Stol · Artur WebDesign · Chemnitz</span>
+      <span class="nocookie">Kein Cookie-Banner — weil ich Sie nicht tracke.</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+  // Year
+  var y=document.getElementById("y"); if(y){y.textContent=new Date().getFullYear();}
+
+  // Header compact on scroll
+  var hdr=document.getElementById("hdr");
+  if(hdr){var onScroll=function(){hdr.classList.toggle("compact",window.scrollY>12);};onScroll();window.addEventListener("scroll",onScroll,{passive:true});}
+
+  // Mobile menu
+  var burger=document.getElementById("burger");
+  if(burger){
+    burger.addEventListener("click",function(){
+      var open=document.body.classList.toggle("menu-open");
+      burger.setAttribute("aria-expanded",open?"true":"false");
+      burger.setAttribute("aria-label",open?"Menü schließen":"Menü öffnen");
+    });
+    var menu=document.getElementById("menu");
+    if(menu){menu.addEventListener("click",function(e){if(e.target.closest("a")){document.body.classList.remove("menu-open");burger.setAttribute("aria-expanded","false");}});}
+  }
+
+  // Reveal on scroll (no-JS-safe: start states only under .js)
+  var els=document.querySelectorAll(".reveal");
+  if("IntersectionObserver" in window && els.length){
+    var io=new IntersectionObserver(function(entries){
+      entries.forEach(function(en,i){
+        if(en.isIntersecting){var el=en.target;var sibs=el.parentElement?el.parentElement.querySelectorAll(":scope > .reveal"):[el];var idx=Array.prototype.indexOf.call(sibs,el);el.style.transitionDelay=(Math.max(0,idx)*60)+"ms";el.classList.add("is-in");io.unobserve(el);}
+      });
+    },{rootMargin:"0px 0px -8% 0px",threshold:.12});
+    els.forEach(function(el){io.observe(el);});
+  }else{
+    els.forEach(function(el){el.classList.add("is-in");});
+  }
+})();
+</script>
+</body>
+</html>
