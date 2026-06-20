@@ -49,6 +49,9 @@ label{font-weight:600;font-size:.92rem}
 input,select,textarea{font-family:var(--text);font-size:16px;color:var(--ink);background:#fbfaf7;border:1px solid var(--line);border-radius:10px;padding:12px 13px;width:100%}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brass);box-shadow:0 0 0 3px rgba(178,107,30,.15)}
 textarea{min-height:84px;resize:vertical}
+input[type=file]{padding:9px 12px;cursor:pointer;background:#fbfaf7}
+input[type=file]::file-selector-button{font-family:var(--text);font-weight:600;font-size:.9rem;border:0;background:var(--ink);color:#fff;padding:9px 14px;border-radius:8px;margin-right:12px;cursor:pointer}
+input[type=file]::file-selector-button:hover{background:var(--brass-deep)}
 .opt,.consent{display:flex;gap:10px;align-items:flex-start;font-size:.92rem;margin-bottom:11px;cursor:pointer}
 .opt input,.consent input{width:auto;margin-top:3px;accent-color:var(--brass-deep)}
 .consent{background:#fbfaf7;border:1px solid var(--line);border-radius:10px;padding:12px 13px}
@@ -74,9 +77,11 @@ textarea{min-height:84px;resize:vertical}
 </div></section>
 
 <main><div class="wrap">
-<form action="https://formspree.io/f/xeewbkyw" method="POST">
-  <input type="text" name="_gotcha" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+<form action="https://formsubmit.co/artur.stool2@gmail.com" method="POST" enctype="multipart/form-data">
+  <input type="text" name="_honey" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
   <input type="hidden" name="_subject" value="BESTELLUNG – Website-Auftrag (Artur WebDesign)">
+  <input type="hidden" name="_template" value="table">
+  <input type="hidden" name="_captcha" value="false">
   <input type="hidden" name="_next" value="https://artur.ae/danke.html">
 
   <fieldset>
@@ -111,14 +116,14 @@ textarea{min-height:84px;resize:vertical}
   <fieldset>
     <legend>Für eine 1-A-Seite <span class="tag kuer">optional</span></legend>
     <div class="hint">Je mehr davon, desto stärker die Seite. Fehlt etwas, ergänzen wir es vor dem Live-Gang.</div>
-    <div class="note"><b>Fotos</b> (der größte Hebel): am einfachsten per <b>WhatsApp an 0176 63153504</b> schicken – oder unten einen Link zu einem Ordner (Google Drive/Dropbox) einfügen.</div>
+    <div class="note"><b>Fotos &amp; Unterlagen</b> hängen Sie unten direkt an – mehrere Bilder gleichzeitig möglich.</div>
     <div class="grid">
       <div class="field col2"><label>Ihre Leistungen</label><textarea name="leistungen" placeholder="Was bieten Sie an? Stichpunkte genügen."></textarea></div>
       <div class="field col2"><label>Über uns</label><textarea name="ueber_uns" placeholder="Seit wann am Markt? Region? Was macht Sie besonders?"></textarea></div>
       <div class="field"><label>Einzugsgebiet / Orte</label><input name="einzugsgebiet" placeholder="z. B. Chemnitz und Umgebung"></div>
       <div class="field"><label>Besonderes</label><input name="besonderes" placeholder="Notdienst? Garantie? Meisterbetrieb? Innung?"></div>
       <div class="field"><label>Google-Profil-Link</label><input name="google_profil" type="url" placeholder="https://…"></div>
-      <div class="field"><label>Foto-Ordner-Link (optional)</label><input name="fotos_link" type="url" placeholder="Drive/Dropbox-Link"></div>
+      <div class="field col2"><label>Fotos &amp; Unterlagen anhängen</label><input type="file" name="anhang" multiple accept="image/*,application/pdf"></div>
       <div class="field"><label>Wunsch-Domain</label><input name="wunsch_domain" placeholder="z. B. ihr-betrieb.de"></div>
       <div class="field"><label>Social-Media</label><input name="social" placeholder="Facebook / Instagram"></div>
       <div class="field col2"><label>Sonstige Wünsche</label><textarea name="wuensche" placeholder="Farben, Stil, was Ihnen wichtig ist …"></textarea></div>
