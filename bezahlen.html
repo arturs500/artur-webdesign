@@ -49,7 +49,19 @@ main{padding:28px 0 56px}
 .btn--bank{background:#fff;color:var(--ink);border:1px solid var(--line)}
 .btn--bank:hover{border-color:var(--ink)}
 .btn.big{width:100%;font-size:1.06rem;padding:17px 22px;min-height:58px}
-.bank{margin-top:4px;padding:14px 16px;background:#fbfaf7;border:1px solid var(--line);border-radius:11px;font-size:.92rem;line-height:1.75;color:var(--ink)}
+.bankcard{margin-top:18px;padding:18px 20px;background:#fbfaf7;border:1px solid var(--line);border-radius:13px}
+.bankcard h3{font-size:1.08rem}
+.bankcard .bsub{color:var(--muted);font-size:.9rem;margin:3px 0 14px}
+.bankcard .bnote{color:var(--muted);font-size:.84rem;margin-top:12px}
+.bankfields{list-style:none;display:flex;flex-direction:column;gap:9px}
+.bankfields li{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.96rem;padding-bottom:9px;border-bottom:1px solid #ece8df}
+.bankfields li:last-child{border-bottom:0;padding-bottom:0}
+.bankfields .bk{min-width:140px;color:var(--muted);font-weight:600}
+.bankfields .bv{font-weight:700}
+.copy{margin-left:auto;font-family:var(--text);font-size:.8rem;font-weight:600;border:1px solid var(--line);background:#fff;color:var(--brass-deep);padding:7px 14px;border-radius:8px;cursor:pointer;min-height:36px}
+.copy:hover{border-color:var(--brass)}
+.copy.done{color:var(--ok);border-color:var(--ok);background:#f0f8f3}
+@media(max-width:520px){.bankfields .bk{min-width:110px;font-size:.9rem}.bankfields li{font-size:.9rem}}
 .qrbox{display:none;margin-top:14px;padding:16px;border:1px dashed var(--line);border-radius:12px;background:#fbfaf7}
 .qrbox.show{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
 .qrbox img{width:140px;height:140px;border-radius:8px;background:#fff;padding:6px;border:1px solid var(--line)}
@@ -93,10 +105,17 @@ main{padding:28px 0 56px}
       <a class="btn btn--pp big" href="https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=artur.stool%40icloud.com&item_name=Website+komplett+-+Artur+WebDesign&amount=649.00&currency_code=EUR&lc=DE&no_shipping=1" target="_blank" rel="noopener">Mit <b>Pay<i>Pal</i></b> bezahlen · 649 €</a>
     </div>
 
-    <div class="bank">
-      <b>Lieber per Überweisung?</b> Auch gut:<br>
-      Artur Stol · <span class="mono">DE05 1001 8000 0635 2081 45</span> · Bank: FINOM<br>
-      Betrag: <b>325 €</b> (Anzahlung) oder <b>649 €</b> (komplett) · Verwendungszweck: <i>Website + Ihr Firmenname</i>
+    <div class="bankcard">
+      <h3>Oder per Überweisung — geht für alle, ohne PayPal</h3>
+      <p class="bsub">Banking-App öffnen, „Überweisung" wählen, diese Felder eintragen (tippen zum Kopieren):</p>
+      <ul class="bankfields">
+        <li><span class="bk">Empfänger</span><span class="bv" id="bk-name">Artur Stol</span><button class="copy" type="button" data-c="bk-name">kopieren</button></li>
+        <li><span class="bk">IBAN</span><span class="bv mono" id="bk-iban">DE05 1001 8000 0635 2081 45</span><button class="copy" type="button" data-c="bk-iban">kopieren</button></li>
+        <li><span class="bk">BIC</span><span class="bv mono" id="bk-bic">FNOMDEB2</span><button class="copy" type="button" data-c="bk-bic">kopieren</button></li>
+        <li><span class="bk">Betrag</span><span class="bv">325 € (Anzahlung) · oder 649 € (komplett)</span></li>
+        <li><span class="bk">Verwendungszweck</span><span class="bv" id="bk-zweck">Website + Ihr Firmenname</span><button class="copy" type="button" data-c="bk-zweck">kopieren</button></li>
+      </ul>
+      <p class="bnote">Bank: FINOM. Sobald die Überweisung da ist, lege ich los.</p>
     </div>
   </div>
 
@@ -119,5 +138,21 @@ main{padding:28px 0 56px}
   <p class="fineprint">Sichere Zahlung. Als Kleinunternehmer (§19 UStG) ohne Umsatzsteuer. Bei PayPal genießen Sie Käuferschutz.</p>
 </div></main>
 
+<script>
+  document.querySelectorAll('.copy').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var el = document.getElementById(btn.getAttribute('data-c'));
+      var text = (el && el.textContent ? el.textContent : '').replace(/\s+/g,' ').trim();
+      if (btn.getAttribute('data-c') === 'bk-iban') text = text.replace(/\s/g,''); // IBAN ohne Leerzeichen
+      function ok(){ var o = btn.textContent; btn.textContent = 'kopiert!'; btn.classList.add('done'); setTimeout(function(){ btn.textContent = o; btn.classList.remove('done'); }, 1600); }
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(ok).catch(function(){ fallback(text, ok); });
+      } else { fallback(text, ok); }
+    });
+  });
+  function fallback(text, ok){
+    try{ var t=document.createElement('textarea'); t.value=text; t.style.position='fixed'; t.style.left='-9999px'; document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t); ok(); }catch(e){}
+  }
+</script>
 </body>
 </html>
