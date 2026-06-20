@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Website sichern &amp; bezahlen – Artur WebDesign</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#15181C">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2315181C'/%3E%3Ctext x='16' y='23' font-family='Arial,sans-serif' font-size='18' font-weight='700' text-anchor='middle' fill='%23E0A24A'%3EA%3C/text%3E%3C/svg%3E">
+<style>
+@font-face{font-family:"Space";src:url("fonts/space-grotesk-700.woff2") format("woff2");font-weight:700;font-display:swap}
+@font-face{font-family:"Space";src:url("fonts/space-grotesk-500.woff2") format("woff2");font-weight:500;font-display:swap}
+@font-face{font-family:"InterL";src:url("fonts/inter-400.woff2") format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:"InterL";src:url("fonts/inter-600.woff2") format("woff2");font-weight:600;font-display:swap}
+:root{--ink:#15181C;--paper:#F5F3EE;--card:#fff;--muted:#5B606A;--line:#E7E1D6;--brass:#B26B1E;--brass-deep:#8F5415;--brass-light:#E0A24A;--ok:#2F8F5B;--disp:"Space",system-ui,sans-serif;--text:"InterL",system-ui,Arial,sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--text);color:var(--ink);background:var(--paper);line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{width:100%;max-width:780px;margin:0 auto;padding:0 22px}
+h1,h2,h3{font-family:var(--disp);font-weight:700;letter-spacing:-.02em;line-height:1.1}
+a{color:var(--brass-deep)}
+:focus-visible{outline:3px solid var(--brass);outline-offset:2px;border-radius:4px}
+img{max-width:100%;display:block}
+header.top{background:var(--ink);color:#fff;padding:14px 0}
+header.top .wrap{display:flex;align-items:center;justify-content:space-between}
+.brandlogo{font-family:var(--disp);font-weight:700;color:#fff;font-size:1.05rem}.brandlogo b{color:var(--brass-light)}
+header.top a{color:#cfd3da;font-size:.9rem}
+.hero{background:var(--ink);color:#fff;padding:34px 0 38px}
+.hero .eyebrow{font-weight:600;font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;color:var(--brass-light)}
+.hero h1{font-size:clamp(1.7rem,1.2rem+2.4vw,2.6rem);margin:.4rem 0 .5rem}
+.hero p{color:#c4c8d0;max-width:54ch}
+.trust{display:flex;flex-wrap:wrap;gap:14px;margin-top:16px;color:#aeb3bc;font-size:.9rem}
+.trust span{display:flex;align-items:center;gap:7px}.trust svg{width:18px;height:18px;color:var(--brass-light)}
+main{padding:28px 0 56px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:clamp(20px,4vw,30px);box-shadow:0 18px 50px -30px rgba(21,24,28,.3);margin-bottom:22px}
+.card h2{font-size:1.35rem}
+.card .sub{color:var(--muted);margin:2px 0 16px}
+.opt{border:1px solid var(--line);border-radius:13px;padding:16px 18px;margin-bottom:14px}
+.opt.best{border-color:var(--brass);box-shadow:0 0 0 3px rgba(178,107,30,.1)}
+.opt .row{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.opt b{font-family:var(--disp);font-size:1.25rem}
+.badge{font-size:.66rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;background:#fdf0e2;color:var(--brass-deep);padding:3px 9px;border-radius:20px}
+.opt p{color:var(--muted);font-size:.92rem;margin:4px 0 14px}
+.pay{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.5em;font-family:var(--text);font-weight:600;font-size:1rem;border:0;border-radius:11px;padding:14px 22px;min-height:52px;cursor:pointer;text-align:center;transition:transform .15s,background .2s,box-shadow .2s}
+.btn:active{transform:scale(.98)}
+.btn--pp{background:#ffc439;color:#11264a;box-shadow:0 10px 24px -14px rgba(255,196,57,.9)}
+.btn--pp:hover{background:#f0b72c}
+.btn--pp b{font-weight:800}.btn--pp i{font-style:italic;font-weight:800}
+.btn--bank{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.btn--bank:hover{border-color:var(--ink)}
+.qrbox{display:none;margin-top:14px;padding:16px;border:1px dashed var(--line);border-radius:12px;background:#fbfaf7}
+.qrbox.show{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.qrbox img{width:140px;height:140px;border-radius:8px;background:#fff;padding:6px;border:1px solid var(--line)}
+.qrbox .iban{font-size:.9rem}.qrbox .iban b{font-family:var(--disp)}
+.mono{font-family:ui-monospace,Menlo,monospace;background:#f1efe9;padding:2px 6px;border-radius:5px;font-size:.92rem}
+.next{background:#15181C;color:#fff;border-radius:16px;padding:clamp(20px,4vw,28px)}
+.next h2{color:#fff;font-size:1.25rem}.next p{color:#c4c8d0;margin:8px 0 16px}
+.next a.cta{display:inline-flex;align-items:center;gap:.5em;background:var(--brass-light);color:#241a0c;font-weight:600;padding:13px 22px;border-radius:11px;min-height:50px}
+.fineprint{color:var(--muted);font-size:.84rem;text-align:center;margin-top:8px}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap"><span class="brandlogo">Artur<b>WebDesign</b></span><a href="https://artur.ae/">← zurück</a></div></header>
+
+<section class="hero"><div class="wrap">
+  <span class="eyebrow">Beauftragen &amp; sichern</span>
+  <h1>Ihre Website – direkt &amp; sicher bezahlen</h1>
+  <p>Sie zahlen bequem mit PayPal (mit Käuferschutz) oder per Überweisung. Direkt danach lege ich los und baue Ihre Seite.</p>
+  <div class="trust">
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 3v6c0 4-3.5 7-8 9-4.5-2-8-5-8-9V6z"/></svg>PayPal-Käuferschutz</span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10.5l4 4 8-9"/></svg>Kleinunternehmer §19 – keine MwSt</span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>Sofortiger Start</span>
+  </div>
+</div></section>
+
+<main><div class="wrap">
+
+  <div class="card">
+    <h2>1 · Ihre Website – 649 €</h2>
+    <p class="sub">Fertige, individuelle Seite. Zahlen Sie bequem die Anzahlung oder den Gesamtbetrag.</p>
+
+    <div class="opt best">
+      <div class="row"><b>Anzahlung 325 €</b><span class="badge">empfohlener Start</span></div>
+      <p>Geringe Hürde – ich baue sofort. Rest (324 €) erst bei Veröffentlichung.</p>
+      <div class="pay">
+        <a class="btn btn--pp" href="https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=artur.stool%40icloud.com&item_name=Website+Anzahlung+-+Artur+WebDesign&amount=325.00&currency_code=EUR&lc=DE&no_shipping=1" target="_blank" rel="noopener"><b>Pay<i>Pal</i></b> · 325 € zahlen</a>
+        <button class="btn btn--bank" type="button" onclick="qr('q325')">Überweisung / QR</button>
+      </div>
+      <div class="qrbox" id="q325">
+        <img src="qr-anzahlung-325.png" alt="QR-Code Überweisung 325 Euro">
+        <div class="iban">Mit Banking-App scannen – alles ausgefüllt.<br>Sonst: <b>Artur Stol</b> · <span class="mono">DE05 1001 8000 0635 2081 45</span> · 325,00 € · Zweck: <i>Website + Ihr Firmenname</i></div>
+      </div>
+    </div>
+
+    <div class="opt">
+      <div class="row"><b>Komplett 649 €</b></div>
+      <p>Alles auf einmal – fertig ist fertig.</p>
+      <div class="pay">
+        <a class="btn btn--pp" href="https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=artur.stool%40icloud.com&item_name=Website+komplett+-+Artur+WebDesign&amount=649.00&currency_code=EUR&lc=DE&no_shipping=1" target="_blank" rel="noopener"><b>Pay<i>Pal</i></b> · 649 € zahlen</a>
+        <button class="btn btn--bank" type="button" onclick="qr('q649')">Überweisung / QR</button>
+      </div>
+      <div class="qrbox" id="q649">
+        <img src="qr-website-649.png" alt="QR-Code Überweisung 649 Euro">
+        <div class="iban">Mit Banking-App scannen – alles ausgefüllt.<br>Sonst: <b>Artur Stol</b> · <span class="mono">DE05 1001 8000 0635 2081 45</span> · 649,00 € · Zweck: <i>Website + Ihr Firmenname</i></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>2 · Pflege-Abo – 79 €/Monat <span class="badge">optional</span></h2>
+    <p class="sub">Updates, Hosting, Änderungen, dass alles läuft. 2 Monate Mindestlaufzeit, danach monatlich kündbar. Mit PayPal bucht es sich <b>automatisch jeden Monat</b> ab – Sie müssen nie wieder dran denken.</p>
+    <div class="pay">
+      <a class="btn btn--pp" href="https://www.paypal.com/cgi-bin/webscr?cmd=_xclick-subscriptions&business=artur.stool%40icloud.com&item_name=Website-Pflege+-+Artur+WebDesign&a3=79.00&p3=1&t3=M&src=1&currency_code=EUR&lc=DE&no_shipping=1" target="_blank" rel="noopener"><b>Pay<i>Pal</i></b> · Pflege-Abo starten</a>
+    </div>
+    <p class="fineprint" style="text-align:left;margin-top:10px">Lieber per Dauerauftrag? Kein Problem – sagen Sie Bescheid, ich gebe Ihnen die Daten. Das Abo startet erst, wenn Ihre Seite online ist.</p>
+  </div>
+
+  <div class="next">
+    <h2>So geht's nach der Zahlung weiter</h2>
+    <p>Schicken Sie mir jetzt noch Ihre Fotos und ein paar Angaben – dann baue ich Ihre Seite. Dauert 2 Minuten.</p>
+    <a class="cta" href="bestellung.html">Fotos &amp; Angaben schicken <span aria-hidden="true">→</span></a>
+    <p class="fineprint" style="color:#9aa0aa;text-align:left;margin-top:14px">Fragen? Einfach anrufen: <a href="tel:+4917663153504" style="color:var(--brass-light)">0176 63153504</a></p>
+  </div>
+
+  <p class="fineprint">Sichere Zahlung. Als Kleinunternehmer (§19 UStG) ohne Umsatzsteuer. Bei PayPal genießen Sie Käuferschutz.</p>
+</div></main>
+
+<script>
+  function qr(id){
+    var el=document.getElementById(id);
+    document.querySelectorAll('.qrbox').forEach(function(b){ if(b!==el) b.classList.remove('show'); });
+    el.classList.toggle('show');
+    if(el.classList.contains('show')) el.scrollIntoView({behavior:'smooth',block:'center'});
+  }
+</script>
+</body>
+</html>
