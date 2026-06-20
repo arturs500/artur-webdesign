@@ -48,6 +48,8 @@ main{padding:28px 0 56px}
 .btn--pp b{font-weight:800}.btn--pp i{font-style:italic;font-weight:800}
 .btn--bank{background:#fff;color:var(--ink);border:1px solid var(--line)}
 .btn--bank:hover{border-color:var(--ink)}
+.btn.big{width:100%;font-size:1.06rem;padding:17px 22px;min-height:58px}
+.bank{margin-top:4px;padding:14px 16px;background:#fbfaf7;border:1px solid var(--line);border-radius:11px;font-size:.92rem;line-height:1.75;color:var(--ink)}
 .qrbox{display:none;margin-top:14px;padding:16px;border:1px dashed var(--line);border-radius:12px;background:#fbfaf7}
 .qrbox.show{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
 .qrbox img{width:140px;height:140px;border-radius:8px;background:#fff;padding:6px;border:1px solid var(--line)}
@@ -80,29 +82,21 @@ main{padding:28px 0 56px}
     <p class="sub">Fertige, individuelle Seite. Zahlen Sie bequem die Anzahlung oder den Gesamtbetrag.</p>
 
     <div class="opt best">
-      <div class="row"><b>Anzahlung 325 €</b><span class="badge">empfohlener Start</span></div>
-      <p>Geringe Hürde – ich baue sofort. Rest (324 €) erst bei Veröffentlichung.</p>
-      <div class="pay">
-        <a class="btn btn--pp" href="https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=artur.stool%40icloud.com&item_name=Website+Anzahlung+-+Artur+WebDesign&amount=325.00&currency_code=EUR&lc=DE&no_shipping=1" target="_blank" rel="noopener"><b>Pay<i>Pal</i></b> · 325 € zahlen</a>
-        <button class="btn btn--bank" type="button" onclick="qr('q325')">Überweisung / QR</button>
-      </div>
-      <div class="qrbox" id="q325">
-        <img src="qr-anzahlung-325.png" alt="QR-Code Überweisung 325 Euro">
-        <div class="iban">Mit Banking-App scannen – alles ausgefüllt.<br>Sonst: <b>Artur Stol</b> · <span class="mono">DE05 1001 8000 0635 2081 45</span> · 325,00 € · Zweck: <i>Website + Ihr Firmenname</i></div>
-      </div>
+      <div class="row"><b>Anzahlung 325 €</b><span class="badge">empfohlen – günstigster Start</span></div>
+      <p>Geringe Hürde – ich baue sofort los. Rest (324 €) erst, wenn Ihre Seite online ist.</p>
+      <a class="btn btn--pp big" href="https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=artur.stool%40icloud.com&item_name=Website+Anzahlung+-+Artur+WebDesign&amount=325.00&currency_code=EUR&lc=DE&no_shipping=1" target="_blank" rel="noopener">Mit <b>Pay<i>Pal</i></b> bezahlen · 325 €</a>
     </div>
 
     <div class="opt">
-      <div class="row"><b>Komplett 649 €</b></div>
+      <div class="row"><b>Oder gleich komplett: 649 €</b></div>
       <p>Alles auf einmal – fertig ist fertig.</p>
-      <div class="pay">
-        <a class="btn btn--pp" href="https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=artur.stool%40icloud.com&item_name=Website+komplett+-+Artur+WebDesign&amount=649.00&currency_code=EUR&lc=DE&no_shipping=1" target="_blank" rel="noopener"><b>Pay<i>Pal</i></b> · 649 € zahlen</a>
-        <button class="btn btn--bank" type="button" onclick="qr('q649')">Überweisung / QR</button>
-      </div>
-      <div class="qrbox" id="q649">
-        <img src="qr-website-649.png" alt="QR-Code Überweisung 649 Euro">
-        <div class="iban">Mit Banking-App scannen – alles ausgefüllt.<br>Sonst: <b>Artur Stol</b> · <span class="mono">DE05 1001 8000 0635 2081 45</span> · 649,00 € · Zweck: <i>Website + Ihr Firmenname</i></div>
-      </div>
+      <a class="btn btn--pp big" href="https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=artur.stool%40icloud.com&item_name=Website+komplett+-+Artur+WebDesign&amount=649.00&currency_code=EUR&lc=DE&no_shipping=1" target="_blank" rel="noopener">Mit <b>Pay<i>Pal</i></b> bezahlen · 649 €</a>
+    </div>
+
+    <div class="bank">
+      <b>Lieber per Überweisung?</b> Auch gut:<br>
+      Artur Stol · <span class="mono">DE05 1001 8000 0635 2081 45</span> · Bank: FINOM<br>
+      Betrag: <b>325 €</b> (Anzahlung) oder <b>649 €</b> (komplett) · Verwendungszweck: <i>Website + Ihr Firmenname</i>
     </div>
   </div>
 
@@ -125,13 +119,5 @@ main{padding:28px 0 56px}
   <p class="fineprint">Sichere Zahlung. Als Kleinunternehmer (§19 UStG) ohne Umsatzsteuer. Bei PayPal genießen Sie Käuferschutz.</p>
 </div></main>
 
-<script>
-  function qr(id){
-    var el=document.getElementById(id);
-    document.querySelectorAll('.qrbox').forEach(function(b){ if(b!==el) b.classList.remove('show'); });
-    el.classList.toggle('show');
-    if(el.classList.contains('show')) el.scrollIntoView({behavior:'smooth',block:'center'});
-  }
-</script>
 </body>
 </html>
