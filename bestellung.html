@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Website beauftragen – Artur WebDesign</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#15181C">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2315181C'/%3E%3Ctext x='16' y='23' font-family='Arial,sans-serif' font-size='18' font-weight='700' text-anchor='middle' fill='%23E0A24A'%3EA%3C/text%3E%3C/svg%3E">
+<style>
+@font-face{font-family:"Space";src:url("fonts/space-grotesk-700.woff2") format("woff2");font-weight:700;font-display:swap}
+@font-face{font-family:"Space";src:url("fonts/space-grotesk-500.woff2") format("woff2");font-weight:500;font-display:swap}
+@font-face{font-family:"InterL";src:url("fonts/inter-400.woff2") format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:"InterL";src:url("fonts/inter-600.woff2") format("woff2");font-weight:600;font-display:swap}
+:root{--ink:#15181C;--paper:#F5F3EE;--card:#fff;--muted:#5B606A;--line:#E7E1D6;--brass:#B26B1E;--brass-deep:#8F5415;--brass-light:#E0A24A;--ok:#2F8F5B;--disp:"Space",system-ui,sans-serif;--text:"InterL",system-ui,Arial,sans-serif;--r:16px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--text);color:var(--ink);background:var(--paper);line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{width:100%;max-width:760px;margin:0 auto;padding:0 22px}
+h1,h2,h3{font-family:var(--disp);font-weight:700;letter-spacing:-.02em;line-height:1.1}
+a{color:var(--brass-deep)}
+:focus-visible{outline:3px solid var(--brass);outline-offset:2px;border-radius:4px}
+header.top{background:var(--ink);color:#fff;padding:14px 0}
+header.top .wrap{display:flex;align-items:center;justify-content:space-between}
+.brandlogo{font-family:var(--disp);font-weight:700;color:#fff;font-size:1.05rem}
+.brandlogo b{color:var(--brass-light)}
+header.top a{color:#cfd3da;font-size:.9rem}
+.hero{background:var(--ink);color:#fff;padding:34px 0 40px}
+.hero .eyebrow{font-weight:600;font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;color:var(--brass-light)}
+.hero h1{font-size:clamp(1.7rem,1.2rem+2.4vw,2.6rem);margin:.4rem 0 .6rem}
+.hero p{color:#c4c8d0;max-width:56ch}
+.pakete{display:flex;flex-wrap:wrap;gap:12px;margin-top:18px}
+.pak{background:#1D2127;border:1px solid #2a2f37;border-radius:12px;padding:14px 16px;flex:1;min-width:230px}
+.pak b{font-family:var(--disp);font-size:1.15rem;color:#fff}
+.pak span{display:block;color:#aeb3bc;font-size:.88rem;margin-top:3px}
+main{padding:30px 0 60px}
+form{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:clamp(20px,4vw,34px);box-shadow:0 18px 50px -28px rgba(21,24,28,.3)}
+fieldset{border:0;margin:0 0 26px}
+legend{font-family:var(--disp);font-weight:700;font-size:1.1rem;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.hint{color:var(--muted);font-size:.86rem;margin-bottom:14px}
+.tag{font-family:var(--text);font-size:.66rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:20px}
+.tag.pflicht{background:#fdecec;color:#b22}
+.tag.kuer{background:#eaf6ef;color:#1d7a4a}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:560px){.grid{grid-template-columns:1fr}}
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+.field.col2{grid-column:1/-1}
+label{font-weight:600;font-size:.92rem}
+.req{color:#b22}
+input,select,textarea{font-family:var(--text);font-size:16px;color:var(--ink);background:#fbfaf7;border:1px solid var(--line);border-radius:10px;padding:12px 13px;width:100%}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brass);box-shadow:0 0 0 3px rgba(178,107,30,.15)}
+textarea{min-height:84px;resize:vertical}
+.opt,.consent{display:flex;gap:10px;align-items:flex-start;font-size:.92rem;margin-bottom:11px;cursor:pointer}
+.opt input,.consent input{width:auto;margin-top:3px;accent-color:var(--brass-deep)}
+.consent{background:#fbfaf7;border:1px solid var(--line);border-radius:10px;padding:12px 13px}
+.btn{font-family:var(--text);font-weight:600;font-size:1.05rem;border:0;border-radius:12px;padding:16px 26px;min-height:56px;width:100%;background:var(--brass-deep);color:#fff;cursor:pointer;box-shadow:0 12px 28px -14px rgba(143,84,21,.9);transition:transform .15s,background .2s}
+.btn:active{transform:scale(.98)}
+.btn:hover{background:#7c4810}
+.hp{position:absolute;left:-9999px}
+.note{background:#fff8ee;border:1px solid #f0e3cc;border-radius:10px;padding:12px 14px;font-size:.9rem;margin-bottom:14px}
+.foot{color:var(--muted);font-size:.84rem;text-align:center;margin-top:18px}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap"><span class="brandlogo">Artur<b>WebDesign</b></span><a href="https://artur.ae/">← zurück</a></div></header>
+
+<section class="hero"><div class="wrap">
+  <span class="eyebrow">Verbindliche Beauftragung</span>
+  <h1>Website beauftragen</h1>
+  <p>Füllen Sie das einmal aus – dann baue ich Ihre Seite. Die Auftragsbestätigung mit den Zahlungsdetails bekommen Sie direkt per E-Mail von mir.</p>
+  <div class="pakete">
+    <div class="pak"><b>Website 649 €</b><span>einmalig · fertige, individuelle Seite</span></div>
+    <div class="pak"><b>+ Pflege 79 €/Monat</b><span>optional · Updates, Hosting, Änderungen · 2 Monate Mindestlaufzeit</span></div>
+  </div>
+</div></section>
+
+<main><div class="wrap">
+<form action="https://formspree.io/f/xeewbkyw" method="POST">
+  <input type="text" name="_gotcha" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+  <input type="hidden" name="_subject" value="BESTELLUNG – Website-Auftrag (Artur WebDesign)">
+  <input type="hidden" name="_next" value="https://artur.ae/danke.html">
+
+  <fieldset>
+    <legend>Ihr Paket <span class="tag pflicht">Pflicht</span></legend>
+    <label class="opt"><input type="checkbox" name="paket" value="Website 649 € einmalig" checked required><span><b>Website – 649 € einmalig</b></span></label>
+    <label class="opt"><input type="checkbox" name="paket_abo" value="Pflege-Abo 79 €/Monat"><span><b>Pflege-Abo – 79 €/Monat</b> dazu (empfohlen: Updates, Hosting, Änderungen)</span></label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Pflichtangaben <span class="tag pflicht">für Impressum &amp; Kontakt</span></legend>
+    <div class="hint">Diese Angaben sind gesetzlich nötig (Impressum, §5 DDG) – damit Ihre Seite rechtssicher online gehen darf.</div>
+    <div class="grid">
+      <div class="field col2"><label>Firmenname <span class="req">*</span></label><input name="firmenname" required></div>
+      <div class="field"><label>Inhaber/in <span class="req">*</span></label><input name="inhaber" required autocomplete="name"></div>
+      <div class="field"><label>Rechtsform <span class="req">*</span></label>
+        <select name="rechtsform" required><option value="">bitte wählen</option><option>Einzelunternehmen</option><option>GbR</option><option>GmbH</option><option>UG</option><option>Sonstige</option></select></div>
+      <div class="field col2"><label>Straße &amp; Nr. <span class="req">*</span></label><input name="strasse" required autocomplete="street-address"></div>
+      <div class="field"><label>PLZ <span class="req">*</span></label><input name="plz" required inputmode="numeric"></div>
+      <div class="field"><label>Ort <span class="req">*</span></label><input name="ort" required></div>
+      <div class="field"><label>Telefon <span class="req">*</span></label><input name="telefon" type="tel" required autocomplete="tel"></div>
+      <div class="field"><label>E-Mail <span class="req">*</span></label><input name="email" type="email" required autocomplete="email"></div>
+      <div class="field col2"><label>Handwerkskammer + Berufsbezeichnung <span class="req">*</span></label><input name="handwerkskammer" placeholder="z. B. HWK Chemnitz · Zimmerermeister" required></div>
+      <div class="field col2"><label>Umsatzsteuer <span class="req">*</span></label>
+        <label class="opt"><input type="radio" name="ust" value="Kleinunternehmer §19 UStG" required><span>Kleinunternehmer (§19 UStG – keine USt)</span></label>
+        <label class="opt"><input type="radio" name="ust" value="USt-IdNr." id="ustid_radio"><span>Ich habe eine USt-IdNr.:</span></label>
+        <input name="ust_id" id="ustid_field" placeholder="USt-IdNr. eintragen" style="display:none">
+      </div>
+      <div class="field col2"><label>An welche E-Mail sollen Anfragen über die Website gehen? <span class="req">*</span></label><input name="anfragen_email" type="email" required placeholder="meist Ihre Geschäfts-E-Mail"></div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Für eine 1-A-Seite <span class="tag kuer">optional</span></legend>
+    <div class="hint">Je mehr davon, desto stärker die Seite. Fehlt etwas, ergänzen wir es vor dem Live-Gang.</div>
+    <div class="note"><b>Fotos</b> (der größte Hebel): am einfachsten per <b>WhatsApp an 0176 63153504</b> schicken – oder unten einen Link zu einem Ordner (Google Drive/Dropbox) einfügen.</div>
+    <div class="grid">
+      <div class="field col2"><label>Ihre Leistungen</label><textarea name="leistungen" placeholder="Was bieten Sie an? Stichpunkte genügen."></textarea></div>
+      <div class="field col2"><label>Über uns</label><textarea name="ueber_uns" placeholder="Seit wann am Markt? Region? Was macht Sie besonders?"></textarea></div>
+      <div class="field"><label>Einzugsgebiet / Orte</label><input name="einzugsgebiet" placeholder="z. B. Chemnitz und Umgebung"></div>
+      <div class="field"><label>Besonderes</label><input name="besonderes" placeholder="Notdienst? Garantie? Meisterbetrieb? Innung?"></div>
+      <div class="field"><label>Google-Profil-Link</label><input name="google_profil" type="url" placeholder="https://…"></div>
+      <div class="field"><label>Foto-Ordner-Link (optional)</label><input name="fotos_link" type="url" placeholder="Drive/Dropbox-Link"></div>
+      <div class="field"><label>Wunsch-Domain</label><input name="wunsch_domain" placeholder="z. B. ihr-betrieb.de"></div>
+      <div class="field"><label>Social-Media</label><input name="social" placeholder="Facebook / Instagram"></div>
+      <div class="field col2"><label>Sonstige Wünsche</label><textarea name="wuensche" placeholder="Farben, Stil, was Ihnen wichtig ist …"></textarea></div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Freigabe <span class="tag pflicht">Pflicht</span></legend>
+    <label class="consent"><input type="checkbox" name="foto_rechte" value="ja" required><span>Die Fotos/Inhalte sind von mir oder ich habe die Rechte, sie zu nutzen. <span class="req">*</span></span></label>
+    <label class="consent"><input type="checkbox" name="veroeffentlichen_ok" value="ja" required><span>Artur WebDesign darf meine Website mit diesen Angaben veröffentlichen. <span class="req">*</span></span></label>
+    <label class="consent"><input type="checkbox" name="angaben_korrekt" value="ja" required><span>Meine Angaben sind korrekt. <span class="req">*</span></span></label>
+    <label class="consent"><input type="checkbox" name="datenschutz_ok" value="ja" required><span>Ich habe die <a href="datenschutz.html">Datenschutzerklärung</a> gelesen und bin mit der Verarbeitung meiner Angaben einverstanden. <span class="req">*</span></span></label>
+  </fieldset>
+
+  <button class="btn" type="submit">Auftrag verbindlich absenden</button>
+  <p class="foot">Kein Risiko: Sie zahlen erst nach meiner Auftragsbestätigung (Überweisung/QR). Fragen? <a href="tel:+4917663153504">0176 63153504</a></p>
+</form>
+</div></main>
+
+<script>
+  // USt-IdNr.-Feld nur zeigen, wenn "Ich habe eine USt-IdNr." gewählt ist
+  var radios = document.querySelectorAll('input[name="ust"]');
+  var ustField = document.getElementById('ustid_field');
+  function toggleUst(){
+    var on = document.getElementById('ustid_radio').checked;
+    ustField.style.display = on ? 'block' : 'none';
+    if(!on) ustField.value = '';
+  }
+  radios.forEach(function(r){ r.addEventListener('change', toggleUst); });
+</script>
+</body>
+</html>
