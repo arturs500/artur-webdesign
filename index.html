@@ -3,17 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Webdesign Chemnitz – Website 649 € + Pflege 79 €/Monat | Artur WebDesign</title>
-<meta name="description" content="Moderne Websites für Betriebe in Chemnitz, Leipzig und Halle – ab 649 € einmalig plus Pflege-Abo 79 €/Monat. Erst die kostenlose Vorschau ansehen, dann entscheiden.">
-<meta name="robots" content="noindex">
+<title>Webdesign & KI-Automatisierung Chemnitz/Leipzig — Festpreise | Artur WebDesign</title>
+<meta name="description" content="Website-Check mit Anleitung, Reparatur und komplette Websites zum Festpreis, dazu Pflege und KI-Automatisierung — ehrlich, geprüft, belegbar. Für Betriebe in Chemnitz, Leipzig & Umgebung.">
 <meta name="theme-color" content="#15181C">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="de_DE">
-<meta property="og:title" content="Website 649 € + Pflege 79 €/Monat – Artur WebDesign Chemnitz">
-<meta property="og:description" content="Individuelle Website für Ihren Betrieb. Website 649 € einmalig plus Pflege-Abo 79 €/Monat, 2 Monate Mindestlaufzeit, danach monatlich kündbar. Erst sehen, dann entscheiden.">
+<meta property="og:title" content="Webdesign & KI-Automatisierung — Festpreise | Artur WebDesign">
+<meta property="og:description" content="Vom ehrlichen Website-Check bis zur KI-Automatisierung: feste Preise, belegbare Ergebnisse, Pflege monatlich kündbar. Für Betriebe in Chemnitz, Leipzig & Umgebung. Erst sehen, dann entscheiden.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2315181C'/%3E%3Ctext x='16' y='23' font-family='Arial,sans-serif' font-size='18' font-weight='700' text-anchor='middle' fill='%23E0A24A'%3EA%3C/text%3E%3C/svg%3E">
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"ProfessionalService","name":"Artur WebDesign","description":"Webdesign und Website-Abo für lokale Betriebe in Chemnitz, Leipzig und Halle.","areaServed":["Chemnitz","Leipzig","Halle (Saale)","Sachsen"],"address":{"@type":"PostalAddress","streetAddress":"Paul-Bertz-Straße 187","postalCode":"09120","addressLocality":"Chemnitz","addressCountry":"DE"},"telephone":"+4917663153504","email":"info@artur.ae","priceRange":"ab 649 € + 79 €/Monat","founder":{"@type":"Person","name":"Artur Stol"}}
+{"@context":"https://schema.org","@type":"ProfessionalService","name":"Artur WebDesign","description":"Website-Check, Website-Reparatur, komplette Websites, Website-Pflege und KI-Automatisierung für lokale Betriebe in Chemnitz, Leipzig & Umgebung.","areaServed":["Chemnitz","Leipzig","Sachsen"],"address":{"@type":"PostalAddress","streetAddress":"Paul-Bertz-Straße 187","postalCode":"09120","addressLocality":"Chemnitz","addressCountry":"DE"},"telephone":"+4917622659649","email":"info@artur.ae","priceRange":"49–1990 €","founder":{"@type":"Person","name":"Artur Stol"}}
 </script>
 <style>
 @font-face{font-family:"Space";src:url("fonts/space-grotesk-700.woff2") format("woff2");font-weight:700;font-style:normal;font-display:swap}
@@ -112,7 +111,7 @@ section{padding:clamp(3.5rem,9vw,7rem) 0}
 .step p{color:var(--muted);font-size:1rem;max-width:52ch}
 @media(min-width:740px){.steps{grid-template-columns:1fr 1fr 1fr}.step{grid-template-columns:1fr;gap:.7rem}.step:nth-child(2){transform:translateY(22px)}}
 
-/* Abo (dark, vollfarbige Sektion) */
+/* Angebote (dark, vollfarbige Sektion) */
 .abo{background:var(--dark);color:#EDEAE3}
 .abo .grid{display:grid;gap:2.4rem;align-items:center}
 @media(min-width:880px){.abo .grid{grid-template-columns:1.05fr 1fr;gap:3.4rem}}
@@ -134,6 +133,16 @@ section{padding:clamp(3.5rem,9vw,7rem) 0}
 .guarantee{display:flex;gap:.8rem;align-items:flex-start;margin-top:1.6rem;background:rgba(224,162,74,.08);border:1px solid rgba(224,162,74,.22);border-radius:14px;padding:1rem 1.1rem}
 .guarantee svg{flex:none;width:22px;height:22px;color:var(--brass-light);margin-top:1px}
 .guarantee p{font-size:.98rem;color:#D7D3CB}.guarantee b{color:#fff}
+
+/* Angebots-Leiter (nutzt price-card-Stile) */
+.offers{display:grid;gap:1.2rem;margin-top:2.4rem}
+@media(min-width:880px){.offers{grid-template-columns:1fr 1fr}.offers .offer-wide{grid-column:1/-1}}
+.offers .price-card{padding:clamp(1.4rem,3vw,1.9rem)}
+.offers .price-card h3{color:#fff;font-size:1.3rem;margin:0 0 .45rem}
+.offers .amount .num{font-size:clamp(1.9rem,4.5vw,2.7rem)}
+.offers .price-card .terms{margin:.6rem 0 0}
+.abo .foot{display:flex;flex-wrap:wrap;gap:1.2rem 1.6rem;align-items:center;justify-content:space-between;margin-top:1.8rem}
+.abo .foot .note-sm{display:flex;gap:.6rem;align-items:flex-start;font-size:.9rem;color:#9aa0a8;max-width:52ch}
 
 /* Portfolio (asymmetric) */
 .work{display:grid;gap:1.6rem;margin-top:2.6rem}
@@ -237,13 +246,13 @@ footer .nocookie{color:var(--brass-light)}
   <div class="wrap nav">
     <a class="brand" href="#top" aria-label="Artur WebDesign – Startseite">
       <span class="mk">A</span>
-      <span>Artur WebDesign<small>Websites für Betriebe · Chemnitz</small></span>
+      <span>Artur WebDesign<small>Websites &amp; KI · Chemnitz, Leipzig &amp; Umgebung</small></span>
     </a>
     <nav class="menu" id="menu" aria-label="Hauptnavigation">
-      <a class="lnk" href="#abo">Das Abo</a>
+      <a class="lnk" href="#angebote">Angebote</a>
       <a class="lnk" href="#beispiele">Beispiele</a>
       <a class="lnk" href="#warum">Warum ich</a>
-      <a class="btn btn--primary" href="#kontakt">Vorschau anfragen</a>
+      <a class="btn btn--primary" href="#kontakt">Kostenlos anfragen</a>
     </nav>
     <button class="burger" id="burger" aria-label="Menü öffnen" aria-expanded="false" aria-controls="menu"><span></span></button>
   </div>
@@ -256,16 +265,16 @@ footer .nocookie{color:var(--brass-light)}
 <section class="hero" id="hero">
   <div class="wrap">
     <span class="pill h-stagger"><span class="dot" aria-hidden="true"></span>Aktuell frei für neue Projekte</span>
-    <p class="eyebrow h-stagger">Webdesign · Chemnitz · Leipzig · Halle</p>
+    <p class="eyebrow h-stagger">Webdesign &amp; KI-Automatisierung · Chemnitz, Leipzig &amp; Umgebung</p>
     <h1 class="h-stagger">Eine Website, die <span class="kw">Kunden bringt<svg viewBox="0 0 300 12" preserveAspectRatio="none" aria-hidden="true"><path d="M3 8 C 70 2, 150 2, 297 6" pathLength="1"/></svg></span>.</h1>
-    <p class="lead h-stagger">Für Ihren Betrieb in der Region — modern, blitzschnell und abmahnsicher. Sie sehen zuerst die fertige Vorschau, und entscheiden danach in Ruhe.</p>
+    <p class="lead h-stagger">Für Ihren Betrieb in Chemnitz, Leipzig &amp; Umgebung — vom ehrlichen Website-Check über die Reparatur zum Festpreis bis zur kompletten neuen Seite. Neu: KI, die Ihren Bürokram automatisiert.</p>
     <div class="cta-row h-stagger">
-      <a class="btn btn--primary" href="#kontakt">Kostenlose Vorschau anfragen <span class="ar" aria-hidden="true">→</span></a>
-      <a class="btn btn--ghost" href="#abo">So funktioniert das Abo</a>
+      <a class="btn btn--primary" href="#kontakt">Kostenlos anfragen <span class="ar" aria-hidden="true">→</span></a>
+      <a class="btn btn--ghost" href="#angebote">Angebote &amp; Preise ansehen</a>
     </div>
     <div class="trust h-stagger">
-      <span class="ck"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><b>649 € einmalig + 79 €/Monat Pflege</b></span>
-      <span class="ck"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>2 Monate, dann <b>monatlich kündbar</b></span>
+      <span class="ck"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><b>Feste Preise</b> — keine Stundensätze</span>
+      <span class="ck"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pflege <b>monatlich kündbar</b></span>
       <span class="ck"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>DSGVO-fest, <b>kein Cookie-Banner</b></span>
     </div>
   </div>
@@ -276,43 +285,62 @@ footer .nocookie{color:var(--brass-light)}
   <div class="wrap">
     <div class="sec-head reveal">
       <p class="eyebrow">So einfach geht's</p>
-      <h2>In drei Schritten online — ohne Risiko.</h2>
-      <p>Sie gehen nicht in Vorleistung. Erst sehen Sie Ihre Seite, dann entscheiden Sie.</p>
+      <h2>In drei Schritten zum Ergebnis — ohne Risiko.</h2>
+      <p>Sie gehen nicht in Vorleistung. Erst der ehrliche Befund, dann entscheiden Sie.</p>
     </div>
     <div class="steps">
-      <div class="step reveal"><div class="no">01</div><div><h3>Vorschau — gratis</h3><p>Ich baue Ihnen vorab eine fertige Vorschau Ihrer Seite. Unverbindlich. Gefällt sie nicht, kostet sie nichts.</p></div></div>
-      <div class="step reveal"><div class="no">02</div><div><h3>Abo starten</h3><p>Passt sie? Wir schalten live. 649 € einmalig + 79 €/Monat Pflege, 2 Monate Mindestlaufzeit.</p></div></div>
-      <div class="step reveal"><div class="no">03</div><div><h3>Zurücklehnen</h3><p>Hosting, Updates, Änderungen und Sichtbarkeit übernehme ich. Sie kümmern sich um Ihre Kunden.</p></div></div>
+      <div class="step reveal"><div class="no">01</div><div><h3>Anfragen — kostenlos</h3><p>Kurze Nachricht genügt: Betrieb, Website (falls vorhanden), Anliegen. Der Einstieg kostet nichts und verpflichtet zu nichts.</p></div></div>
+      <div class="step reveal"><div class="no">02</div><div><h3>Festpreis schwarz auf weiß</h3><p>Sie bekommen ein klares Angebot mit festem Preis — schriftlich, ohne Kleingedrucktes und ohne Stundensätze.</p></div></div>
+      <div class="step reveal"><div class="no">03</div><div><h3>Umsetzung mit Beweisen</h3><p>Wir setzen um und zeigen Ihnen im Vorher/Nachher-Vergleich, was sich verbessert hat. Auf Wunsch übernehmen wir danach die laufende Pflege.</p></div></div>
     </div>
   </div>
 </section>
 
-<!-- ABO (dark) -->
-<section class="abo" id="abo">
-  <div class="wrap grid">
-    <div>
-      <p class="eyebrow reveal">Das Website-Abo</p>
-      <h2 class="reveal">Alles drin. Ein fester Preis.</h2>
-      <p class="who reveal">Für Gastronomie, Handwerk, Beauty und Garten- &amp; Landschaftsbau in Chemnitz, Leipzig und Halle. Eine Website, die zu Ihrem Betrieb passt — und die ich für Sie aktuell halte.</p>
-      <div class="guarantee reveal">
-        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5l8-3z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M8.5 12l2.5 2.5 4.5-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <p><b>Erst sehen, dann entscheiden.</b> Sie bekommen die fertige Vorschau, bevor Sie sich festlegen. Gefällt sie nicht, kostet sie nichts.</p>
-      </div>
+<!-- ANGEBOTE (dark) -->
+<section class="abo" id="angebote">
+  <div class="wrap">
+    <p class="eyebrow reveal">Angebote &amp; Preise</p>
+    <h2 class="reveal">Vom Check bis zur KI. Feste Preise.</h2>
+    <p class="who reveal">Für Gastronomie, Handwerk, Beauty und Garten- &amp; Landschaftsbau in Chemnitz, Leipzig &amp; Umgebung. Sie wählen nur, was Ihr Betrieb wirklich braucht — und wissen vorher, was es kostet.</p>
+    <div class="guarantee reveal" style="max-width:64ch">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5l8-3z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M8.5 12l2.5 2.5 4.5-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <p><b>Wir erfinden nichts:</b> Jeder genannte Fehler ist geprüft und belegbar — und was Sie selbst können, sagen wir Ihnen gratis.</p>
     </div>
-    <div class="price-card reveal">
-      <span class="ribbon">Website-Abo</span>
-      <div class="amount"><span class="num">649 €</span><span class="per">einmalig + 79 €/Mon.</span></div>
-      <p class="terms"><b>649 € einmalig</b> + 79 €/Monat Pflege. 2 Monate Mindestlaufzeit, danach monatlich kündbar.</p>
-      <ul class="feats">
-        <li><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Individuelle Website</b> — Design, Texte und Technik, gebaut für Ihren Betrieb</span></li>
-        <li><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Hosting, Updates &amp; Sicherheit</b> — immer aktuell, nichts zu tun für Sie</span></li>
-        <li><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Änderungen jeden Monat inklusive</b> — neue Preise, Öffnungszeiten, Aktionen</span></li>
-        <li><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Monatlicher Sichtbarkeits-Report</b> — Sie sehen, was die Seite bringt</span></li>
-        <li><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Bewertungs-Aufsteller</b> — für mehr echte Google-Bewertungen</span></li>
-        <li><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Impressum &amp; Datenschutz</b> nach DSGVO — abmahnsicher</span></li>
-      </ul>
-      <a class="btn btn--light" href="bezahlen.html" style="width:100%;justify-content:center">Jetzt beauftragen &amp; bezahlen <span class="ar" aria-hidden="true">→</span></a>
-      <div class="note">
+    <div class="offers">
+      <article class="price-card reveal">
+        <span class="ribbon">Der Einstieg</span>
+        <h3>Website-Check mit Anleitung</h3>
+        <div class="amount"><span class="num">ab 49&nbsp;€</span></div>
+        <p class="terms">Wir prüfen Ihre Website und Sie bekommen eine <b>Schritt-für-Schritt-Anleitung</b>, wie Sie jeden gefundenen Punkt selbst beheben — ehrlich gekennzeichnet, was Profi-Arbeit ist. Der einfachste Punkt wird direkt im Erstkontakt <b>kostenlos</b> erklärt.</p>
+      </article>
+      <article class="price-card reveal">
+        <span class="ribbon">Reparatur</span>
+        <h3>Website-Reparatur zum Festpreis</h3>
+        <div class="amount"><span class="num">290–990&nbsp;€</span></div>
+        <p class="terms">Wir beheben alle gefundenen Punkte für Sie — mit <b>Vorher/Nachher-Beweisen</b>. Kleine Änderungswünsche (Texte, Fotos, Öffnungszeiten) <b>ohne Aufpreis</b> mit dabei.</p>
+      </article>
+      <article class="price-card reveal">
+        <span class="ribbon">Neue Website</span>
+        <h3>Komplette Website</h3>
+        <div class="amount"><span class="num">990&nbsp;€</span><span class="per">Festpreis</span></div>
+        <p class="terms">Für Betriebe ohne (brauchbare) Website: Startseite mit Leistungen und Fotos, antippbare Telefonnummer, Impressum &amp; Datenschutz, Google-Unternehmensprofil — <b>fertig in einer Woche</b>. Vorab <b>kostenlos: ein Design-Entwurf</b>. Auf Wunsch inkl. Rundum-Betreuung: Hosting, eigene Domain und kleine Änderungen für <b>19&nbsp;€/Monat</b> — Sie müssen sich um nichts kümmern.</p>
+      </article>
+      <article class="price-card reveal">
+        <span class="ribbon">Laufende Betreuung</span>
+        <h3>Website-Pflege</h3>
+        <div class="amount"><span class="num">49&nbsp;€</span><span class="per">/Monat (Basis) / 89&nbsp;€/Monat (Plus)</span></div>
+        <p class="terms">Updates, Sicherung, monatlicher Funktions-Check — <b>monatlich kündbar</b>. <b>Plus:</b> dazu kleine Änderungen und Erreichbarkeits-Überwachung.</p>
+      </article>
+      <article class="price-card reveal offer-wide">
+        <span class="ribbon">NEU · Pilotprojekt</span>
+        <h3>KI-Automatisierung</h3>
+        <div class="amount"><span class="per">Pilot</span><span class="num">ab 1.990&nbsp;€</span></div>
+        <p class="terms">Wir automatisieren Ihren Bürokram mit KI: Aus einer Kunden-E-Mail wird automatisch ein <b>Angebots-Entwurf</b>, Anfragen werden vorsortiert, Termine koordiniert. <b>Erst die Live-Vorführung</b>, dann entscheiden Sie.</p>
+      </article>
+    </div>
+    <div class="foot reveal">
+      <a class="btn btn--light" href="#kontakt">Unverbindlich anfragen <span class="ar" aria-hidden="true">→</span></a>
+      <div class="note-sm">
         <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" style="width:18px;height:18px;flex:none;color:#9aa0a8"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v5M10 6.2v.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
         <span>Abrechnung bequem per SEPA-Lastschrift. Kleinunternehmer nach § 19 UStG — keine zusätzliche Umsatzsteuer.</span>
       </div>
@@ -324,21 +352,10 @@ footer .nocookie{color:var(--brass-light)}
 <section id="beispiele">
   <div class="wrap">
     <div class="sec-head reveal">
-      <p class="eyebrow">Beispiele aus meiner Werkstatt</p>
-      <h2>So sieht das aus.</h2>
-      <p>Zwei Seiten, die ich gebaut habe — eine live, eine als Konzept für einen Betrieb hier in Chemnitz.</p>
-    </div>
-    <div class="work">
-      <article class="shot reveal">
-        <div class="bar"><i></i><i></i><i></i><span class="u">wh-fischer.com</span></div>
-        <img src="img/beispiel-fischer.jpg" alt="Website von Wertstoffhandel Fischer aus Leipzig – Startseite mit großer Überschrift Schrottankauf in Leipzig" width="1200" height="750" loading="lazy">
-        <div class="cap"><span class="tag">Live-Website · Leipzig</span><h3>Wertstoffhandel Fischer</h3><p>Schrott- &amp; Buntmetallankauf in Leipzig. Live unter wh-fischer.com — schnell, mobil, mit Anfrage-Funktion.</p></div>
-      </article>
-      <article class="shot reveal">
-        <div class="bar"><i></i><i></i><i></i><span class="u">Vorschau · Konzept</span></div>
-        <img src="img/beispiel-pamir.jpg" alt="Design-Konzept für Pamir Pizza aus Chemnitz – dunkle Startseite mit Hero-Foto und Bestell-Buttons" width="1200" height="750" loading="lazy">
-        <div class="cap"><span class="tag">Design-Konzept · Gastronomie</span><h3>Pamir Pizza, Chemnitz</h3><p>Ein Entwurf für einen Imbiss in Helbersdorf — so kann eine Liefer- &amp; Bestellseite aussehen.</p></div>
-      </article>
+      <p class="eyebrow">Ihr Beispiel ist das beste Beispiel</p>
+      <h2>Wie könnte IHRE Seite aussehen?</h2>
+      <p>Statt fremder Referenzen zeigen wir Ihnen lieber Ihre eigene: Vor jedem Auftrag bekommen Sie auf Wunsch einen <b>kostenlosen Design-Entwurf</b> für Ihren Betrieb — unverbindlich, in Ihren Farben, mit Ihren Inhalten. Gefällt er Ihnen nicht, kostet es Sie nichts als fünf Minuten Anschauen.</p>
+      <p><a class="btn btn--primary" href="#kontakt">Kostenlosen Entwurf anfragen</a></p>
     </div>
   </div>
 </section>
@@ -355,7 +372,7 @@ footer .nocookie{color:var(--brass-light)}
       <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5l8-3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div><h3>Abmahnsicher gebaut</h3><p>Impressum nach § 5 DDG, sauberer Datenschutz, keine Tracker — und damit kein Cookie-Banner nötig. In Deutschland schützt Sie das vor teuren Abmahnungen.</p></div>
       <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div><h3>Blitzschnell</h3><p>Lädt in unter einer Sekunde. Schriften liegen auf dem Server, nicht bei Google. Schnelle Seiten werden besser gefunden — und seltener wieder weggeklickt.</p></div>
       <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5" stroke="currentColor" stroke-width="1.6"/><path d="M11 18.5h2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div><h3>Auf dem Handy top</h3><p>Die meisten Ihrer Kunden kommen vom Smartphone. Jede Seite wird zuerst fürs Handy gebaut — große Buttons, klickbare Nummer, gut lesbar.</p></div>
-      <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 21c5-4.5 7.5-8 7.5-11A7.5 7.5 0 0012 2.5 7.5 7.5 0 004.5 10c0 3 2.5 6.5 7.5 11z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.5" stroke="currentColor" stroke-width="1.6"/></svg></div><h3>Aus der Region</h3><p>Ihr direkter Ansprechpartner in Chemnitz — erreichbar, ohne Hotline und ohne Warteschleife. Wir reden Klartext, nicht in Fachchinesisch.</p></div>
+      <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 21c5-4.5 7.5-8 7.5-11A7.5 7.5 0 0012 2.5 7.5 7.5 0 004.5 10c0 3 2.5 6.5 7.5 11z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.5" stroke="currentColor" stroke-width="1.6"/></svg></div><h3>Aus der Region</h3><p>Ihr direkter Ansprechpartner für Chemnitz, Leipzig &amp; Umgebung — erreichbar, ohne Hotline und ohne Warteschleife. Wir reden Klartext, nicht in Fachchinesisch.</p></div>
     </div>
     <div class="founder reveal">
       <div class="av" aria-hidden="true">AS</div>
@@ -372,13 +389,14 @@ footer .nocookie{color:var(--brass-light)}
   <div class="wrap grid">
     <div class="reveal">
       <p class="eyebrow">Kennenlernen</p>
-      <h2>Lust auf Ihre kostenlose Vorschau?</h2>
+      <p class="terms" style="color:var(--muted);font-size:.9rem">Zahlung bequem per Überweisung oder PayPal nach Rechnung — keine Vorkasse bei Projektaufträgen. Schon entschieden? <a href="bezahlen.html" style="color:var(--brass-deep);font-weight:600">Hier direkt bezahlen →</a></p>
+      <h2>Der erste Schritt kostet nichts.</h2>
       <p class="intro">Schreiben Sie mir kurz, um welchen Betrieb es geht — ich melde mich meist noch am selben Tag.</p>
       <div class="direct">
         <a href="mailto:info@artur.ae"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5" stroke="currentColor" stroke-width="1.7"/><path d="M4 7l8 6 8-6" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>info@artur.ae</a>
-        <a href="tel:+4917663153504"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 3h3l2 5-2.5 1.5a11 11 0 005 5L15 14l5 2v3a2 2 0 01-2 2C9.7 21 3 14.3 3 5a2 2 0 012-2z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>0176 63153504</a>
-        <a href="https://wa.me/4917663153504?text=Hallo%2C%20ich%20komme%20von%20Ihrer%20Website%20und%20m%C3%B6chte%20mehr%20erfahren." target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 20l1.4-4A8 8 0 118 18.6L4 20z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>WhatsApp schreiben</a>
-        <span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 21c5-4.5 7.5-8 7.5-11A7.5 7.5 0 0012 2.5 7.5 7.5 0 004.5 10c0 3 2.5 6.5 7.5 11z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.5" stroke="currentColor" stroke-width="1.7"/></svg>Chemnitz · für ganz Sachsen</span>
+        <a href="tel:+4917622659649"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 3h3l2 5-2.5 1.5a11 11 0 005 5L15 14l5 2v3a2 2 0 01-2 2C9.7 21 3 14.3 3 5a2 2 0 012-2z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>0176 2265 9649</a>
+        <a href="https://wa.me/4917622659649?text=Hallo%2C%20ich%20komme%20von%20Ihrer%20Website%20und%20m%C3%B6chte%20mehr%20erfahren." target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 20l1.4-4A8 8 0 118 18.6L4 20z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>WhatsApp schreiben</a>
+        <span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 21c5-4.5 7.5-8 7.5-11A7.5 7.5 0 0012 2.5 7.5 7.5 0 004.5 10c0 3 2.5 6.5 7.5 11z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.5" stroke="currentColor" stroke-width="1.7"/></svg>Chemnitz, Leipzig &amp; Umgebung</span>
       </div>
     </div>
 
@@ -400,7 +418,7 @@ footer .nocookie{color:var(--brass-light)}
       </div>
       <label class="consent"><input type="checkbox" name="datenschutz_ok" value="ja" required><span>Ich habe die <a href="datenschutz.html">Datenschutzerklärung</a> gelesen und bin mit der Verarbeitung meiner Angaben zur Bearbeitung der Anfrage einverstanden.</span></label>
       <button class="btn btn--light" type="submit">Absenden <span class="ar" aria-hidden="true">→</span></button>
-      <p class="form-note">Die Vorschau ist <b>komplett kostenlos</b> und unverbindlich — keine Zahlungsdaten nötig. Schon entschieden? <a href="bezahlen.html"><b>Hier direkt beauftragen &amp; bezahlen →</b></a></p>
+      <p class="form-note">Anfrage und Erst-Erklärung sind <b>komplett kostenlos</b> und unverbindlich — keine Zahlungsdaten nötig.</p>
     </form>
   </div>
 </section>
@@ -409,9 +427,9 @@ footer .nocookie{color:var(--brass-light)}
 <footer>
   <div class="wrap">
     <div class="top">
-      <div class="brand">Artur WebDesign<br><small style="color:#9aa0a8;font-weight:400">Websites für Betriebe in Chemnitz, Leipzig &amp; Halle</small></div>
+      <div class="brand">Artur WebDesign<br><small style="color:#9aa0a8;font-weight:400">Websites &amp; KI-Automatisierung für Betriebe in Chemnitz, Leipzig &amp; Umgebung</small></div>
       <div class="links">
-        <a href="#abo">Das Abo</a>
+        <a href="#angebote">Angebote</a>
         <a href="#beispiele">Beispiele</a>
         <a href="#kontakt">Kontakt</a>
         <a href="impressum.html">Impressum</a>
