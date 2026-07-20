@@ -245,6 +245,53 @@ body{background:linear-gradient(135deg,#1a1a2e 0%,#0f0f1e 100%);min-height:100vh
 .help-step .hs-text{font-size:.8rem;color:var(--dim);line-height:1.6}
 .help-step .hs-text b{color:var(--text)}
 </style>
+  <style>
+    /* Handy-Lesbarkeits-Boden (20.07.2026): Demo-Texte liefen mit 9,6-12,5 px */
+    @media (max-width:720px){
+      .demo-band{font-size:.74rem}
+      .toast{font-size:.85rem}
+      .sim-btn{font-size:.85rem;min-height:44px}
+      .login-field label{font-size:.85rem}
+      .login-hint{font-size:.8rem}
+      .login-help h4{font-size:.85rem}
+      .login-help p{font-size:.85rem}
+      /* Inline-Groessen im HTML (style=...) schlagen normale Regeln — darum hier !important */
+      p[style*="font-size:.72rem"]{font-size:.85rem!important}
+      p[style*="font-size:.74rem"]{font-size:.85rem!important}
+      .login-hint[style*="font-size:.78rem"]{font-size:.85rem!important}
+      .login-help .step-n{font-size:.75rem}
+      .app-header .firm-info small{font-size:.8rem}
+      .app-header .badge-new{font-size:.78rem}
+      .tab{font-size:.85rem;min-height:44px}
+      .tab .tab-badge{font-size:.7rem}
+      .filter-chip{font-size:.85rem;min-height:44px}
+      .filter-chip .chip-count{font-size:.78rem}
+      .sec-header .sec-count{font-size:.8rem}
+      .sec-header .sec-toggle{font-size:.8rem;min-height:44px}
+      .sec-archived-note{font-size:.82rem}
+      .lead-meta{font-size:.82rem}
+      .lead-top .time{font-size:.8rem}
+      .lead-btn{font-size:.82rem;min-height:44px}
+      .lead-src{font-size:.72rem}
+      .news-card{font-size:.85rem}
+      .news-card .news-title{font-size:.82rem}
+      .photo-overlay .po-sub{font-size:.8rem}
+      .photo-tile{font-size:.78rem}
+      .lead-status{font-size:.8rem}
+      .lead-followup{font-size:.82rem}
+      .status-option{font-size:.8rem;min-height:44px}
+      .revenue-input button{font-size:.85rem;min-height:44px}
+      .stat-card .lbl{font-size:.82rem}
+      .chart-bar .lbl{font-size:.78rem}
+      .chart-legend{font-size:.8rem}
+      .settings-group h4{font-size:.85rem}
+      .settings-info{font-size:.82rem}
+      .settings-footer{font-size:.82rem}
+      .support-form label{font-size:.85rem}
+      .support-contact .sc-row small{font-size:.8rem}
+      .help-step .hs-n{font-size:.8rem}
+    }
+  </style>
 </head>
 <body>
 
