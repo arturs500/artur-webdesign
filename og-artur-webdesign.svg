@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">Artur WebDesign</title>
+  <desc id="desc">Klarheit vor Code. Websites, Google Ads und Kunden-Systeme.</desc>
+  <rect width="1200" height="630" fill="#101313"/>
+  <g stroke="#f3f1e9" stroke-opacity=".1">
+    <path d="M0 105H1200M0 210H1200M0 315H1200M0 420H1200M0 525H1200"/>
+    <path d="M120 0V630M240 0V630M360 0V630M480 0V630M600 0V630M720 0V630M840 0V630M960 0V630M1080 0V630"/>
+  </g>
+  <circle cx="1090" cy="88" r="205" fill="#3eb8e5" fill-opacity=".16"/>
+  <rect x="70" y="67" width="60" height="60" fill="none" stroke="#3eb8e5" stroke-width="2"/>
+  <text x="87" y="111" fill="#3eb8e5" font-family="Georgia,serif" font-size="43">A</text>
+  <text x="152" y="96" fill="#f3f1e9" font-family="Arial,sans-serif" font-size="28" font-weight="700">Artur WebDesign</text>
+  <text x="70" y="222" fill="#3eb8e5" font-family="Arial,sans-serif" font-size="18" font-weight="700" letter-spacing="4">CHEMNITZ · LEIPZIG · DEUTSCHLANDWEIT</text>
+  <text x="67" y="348" fill="#f3f1e9" font-family="Georgia,serif" font-size="118" letter-spacing="-8">Klarheit</text>
+  <text x="67" y="449" fill="#f3f1e9" font-family="Georgia,serif" font-size="118" letter-spacing="-8">vor Code.</text>
+  <rect x="70" y="505" width="475" height="5" fill="#3eb8e5"/>
+  <text x="70" y="560" fill="#c7cfc5" font-family="Arial,sans-serif" font-size="25">Websites · Google Ads · Kunden-Systeme</text>
+  <g transform="translate(820 246)">
+    <rect width="296" height="222" fill="#e7e4db"/>
+    <rect x="12" y="12" width="272" height="198" fill="none" stroke="#101313" stroke-opacity=".23"/>
+    <text x="30" y="48" fill="#59615b" font-family="Arial,sans-serif" font-size="12" font-weight="700" letter-spacing="2">BETRIEBS-PLAN</text>
+    <line x1="30" y1="71" x2="265" y2="71" stroke="#101313" stroke-opacity=".25"/>
+    <text x="30" y="105" fill="#101313" font-family="Arial,sans-serif" font-size="20" font-weight="700">01  Sichtbar werden</text>
+    <text x="30" y="138" fill="#101313" font-family="Arial,sans-serif" font-size="20" font-weight="700">02  Vertrauen auslösen</text>
+    <text x="30" y="171" fill="#101313" font-family="Arial,sans-serif" font-size="20" font-weight="700">03  Klar handeln</text>
+    <rect x="30" y="188" width="95" height="9" fill="#3eb8e5"/>
+  </g>
+</svg>

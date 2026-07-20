@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="de" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Automatisierung zum Anschauen | Artur WebDesign</title>
+<meta name="description" content="Was KI-Automatisierung im Handwerksbetrieb konkret tut: Sofort-Antwort, Angebots-Nachfass, Termin-Erinnerung. Mit ehrlicher Beispielrechnung.">
+<meta name="theme-color" content="#101313">
+<link rel="canonical" href="https://artur.ae/automatisierung-demo.html">
+<meta property="og:locale" content="de_DE">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://artur.ae/automatisierung-demo.html">
+<meta property="og:title" content="Automatisierung zum Anschauen | Artur WebDesign">
+<meta property="og:description" content="Sehen Sie am Beispiel eines Handwerksbetriebs, welche Handgriffe Automatisierung übernimmt — und was sie ehrlich NICHT tut.">
+<meta property="og:image" content="https://artur.ae/og-artur-webdesign.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%23101313'/%3E%3Cpath d='M14 48 28 15h9l14 33h-9l-3-8H26l-3 8h-9Zm15-15h7l-3.5-10L29 33Z' fill='%233eb8e5'/%3E%3C/svg%3E">
+<noscript><style>.step,.reveal{opacity:1!important;transform:none!important}</style></noscript>
+<style>
+:root{
+  --ink:#101313;--ink-soft:#171b1a;--paper:#ece9e1;--paper-white:#f7f5ef;
+  --line:#c9c7be;--text:#141817;--muted:#58605b;--on-dark:#f3f1e9;
+  --on-dark-muted:#bcc2ba;--accent:#3eb8e5;--accent-d:#1b7fa8;--accent-soft:#7fd0f0;
+  --max:1080px;--ease:cubic-bezier(.22,1,.36,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;background:var(--ink)}
+body{background:var(--paper);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.58;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button,input{font:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid #2795c4;outline-offset:4px}
+.wrap{width:min(calc(100% - 40px),var(--max));margin-inline:auto}
+.display{font-family:ui-serif,Georgia,Cambria,"Times New Roman",serif;font-weight:500;letter-spacing:-.055em;line-height:.95}
+.eyebrow{display:flex;align-items:center;gap:.55rem;font-size:.72rem;font-weight:800;letter-spacing:.15em;text-transform:uppercase}
+.eyebrow::before{content:"";width:1.8rem;height:1px;background:currentColor}
+.eyebrow--lime{color:var(--accent-soft)}
+.eyebrow--dark{color:#4f5a52}
+
+.site-header{position:sticky;top:0;z-index:50;background:rgba(16,19,19,.92);border-bottom:1px solid rgba(255,255,255,.11);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.header-row{min-height:68px;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.brand{display:inline-flex;align-items:center;gap:.7rem;color:var(--on-dark);font-weight:850;letter-spacing:-.04em;white-space:nowrap}
+.brand-mark{display:grid;place-items:center;width:30px;height:30px;border:1px solid rgba(127,208,240,.65);color:var(--accent-soft);font-family:ui-serif,Georgia,serif;font-size:1.3rem}
+.back-link{display:inline-flex;align-items:center;gap:.5rem;color:var(--on-dark);font-size:.86rem;font-weight:800}
+.back-link:hover{color:var(--accent)}
+
+.hero{background:var(--ink);color:var(--on-dark);padding:clamp(2.8rem,7vw,5.5rem) 0 clamp(2.6rem,6vw,4.5rem)}
+.hero h1{font-size:clamp(2.5rem,6vw,4.6rem);max-width:16ch;margin-top:1.1rem}
+.hero p.lead{color:var(--on-dark-muted);max-width:58ch;font-size:clamp(1rem,1.6vw,1.13rem);margin-top:1.2rem}
+.hero p.lead b{color:var(--on-dark)}
+
+.picker{background:var(--ink);color:var(--on-dark);padding-bottom:2.6rem}
+.picker-label{font-size:.72rem;font-weight:850;letter-spacing:.13em;text-transform:uppercase;color:var(--on-dark-muted);margin-bottom:.7rem}
+.trades{display:flex;flex-wrap:wrap;gap:.6rem}
+.trade{border:1px solid rgba(255,255,255,.3);background:transparent;color:var(--on-dark);padding:.72rem 1rem;font-weight:800;font-size:.9rem;transition:transform .2s var(--ease),background .2s ease,color .2s ease}
+.trade:hover{transform:translateY(-2px);border-color:var(--on-dark)}
+.trade[aria-pressed="true"]{background:var(--accent);color:var(--ink);border-color:var(--accent)}
+
+.section{padding:clamp(3.4rem,8vw,6.5rem) 0}
+.section-head{max-width:720px;margin-bottom:clamp(2rem,4vw,3.2rem)}
+.section-head h2{font-size:clamp(2.1rem,4.5vw,3.6rem)}
+.section-head p{color:var(--muted);margin-top:.9rem;max-width:60ch}
+.section--dark{background:var(--ink);color:var(--on-dark)}
+.section--dark .section-head p{color:var(--on-dark-muted)}
+.section--dark .eyebrow--dark{color:var(--accent-soft)}
+.demo-box{background:var(--ink-soft);border:1px solid rgba(255,255,255,.16);padding:clamp(1.4rem,3.2vw,2.4rem)}
+.section--dark .limits-list{border-top-color:rgba(255,255,255,.5)}
+.section--dark .limit{border-bottom-color:rgba(255,255,255,.14)}
+.section--dark .limit h3{color:var(--on-dark)}
+.section--dark .limit p{color:var(--on-dark-muted)}
+.section--dark .limit span{color:var(--accent-soft)}
+
+.timeline{border-left:2px solid rgba(255,255,255,.22);margin-left:.6rem}
+.step{position:relative;padding:0 0 1.5rem 1.9rem;opacity:0;transform:translateY(14px);transition:opacity .6s var(--ease),transform .6s var(--ease)}
+.step.is-visible{opacity:1;transform:none}
+.step:last-child{padding-bottom:.4rem}
+.step::before{content:"";position:absolute;left:-9px;top:.35rem;width:16px;height:16px;background:var(--ink-soft);border:2px solid rgba(255,255,255,.55)}
+.step--auto::before{background:var(--accent-soft);border-color:var(--accent-soft)}
+.step-time{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.74rem;color:#8b98a5;letter-spacing:.06em}
+.step h3{font-size:1.28rem;letter-spacing:-.035em;margin-top:.25rem;color:var(--on-dark)}
+.step p.desc{color:var(--on-dark-muted);font-size:.92rem;max-width:62ch;margin-top:.35rem}
+.step p.desc b{color:var(--on-dark)}
+.badge{display:inline-block;background:var(--accent);color:var(--ink);font-size:.66rem;font-weight:850;letter-spacing:.1em;text-transform:uppercase;padding:.3rem .5rem;margin-top:.6rem}
+.badge--hand{background:transparent;color:#9aa7b3;border:1px solid rgba(255,255,255,.28)}
+
+.bubble{margin-top:.85rem;max-width:560px;background:#1a212a;border:1px solid rgba(255,255,255,.14);border-left:5px solid var(--accent-soft);padding:1rem 1.15rem;color:var(--on-dark)}
+.bubble .from{font-size:.68rem;font-weight:850;letter-spacing:.11em;text-transform:uppercase;color:#98a7b5}
+.bubble p{font-size:.92rem;margin-top:.45rem;white-space:pre-line}
+.bubble--in{border-left-color:#5c6b78;background:#232a31}
+.saving{display:flex;gap:.5rem;align-items:baseline;margin-top:.7rem;font-size:.8rem;color:#9aa7b3}
+.saving b{color:var(--on-dark);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.86rem}
+
+.calc{background:var(--ink);color:var(--on-dark)}
+.calc-box{background:var(--ink-soft);border:1px solid rgba(255,255,255,.16);padding:clamp(1.3rem,3vw,2.1rem)}
+.calc-box h3{font-size:1.35rem;letter-spacing:-.04em}
+.calc-note{color:var(--on-dark-muted);font-size:.85rem;margin-top:.5rem;max-width:70ch}
+.calc-table{width:100%;border-collapse:collapse;margin-top:1.3rem}
+.calc-table th,.calc-table td{text-align:left;padding:.75rem .5rem;border-bottom:1px solid rgba(255,255,255,.14);font-size:.9rem;vertical-align:top}
+.calc-table th{font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--on-dark-muted);font-weight:850}
+.calc-table td:last-child{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}
+.calc-sum{display:flex;justify-content:space-between;gap:1rem;border-top:2px solid var(--accent-soft);margin-top:.2rem;padding-top:1rem;font-weight:850}
+.calc-sum span:last-child{font-family:ui-serif,Georgia,serif;color:var(--accent-soft);font-size:1.6rem;letter-spacing:-.05em}
+.calc-fine{color:var(--on-dark-muted);font-size:.78rem;margin-top:1rem;max-width:74ch}
+
+.limits-list{border-top:1px solid var(--text);max-width:760px}
+.limit{display:grid;grid-template-columns:1.8rem 1fr;gap:.9rem;padding:1.05rem 0;border-bottom:1px solid var(--line)}
+.limit span{color:#4f5a52;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.72rem;padding-top:.25rem}
+.limit h3{font-size:1.05rem;letter-spacing:-.025em}
+.limit p{color:var(--muted);font-size:.88rem;margin-top:.2rem}
+
+.offer{background:var(--paper-white);border-block:1px solid var(--line)}
+.offer-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.offer-card{background:#fff;border:1px solid var(--line);padding:clamp(1.2rem,2.5vw,1.8rem);display:flex;flex-direction:column}
+.offer-card h3{font-size:1.3rem;letter-spacing:-.04em}
+.offer-card p{color:var(--muted);font-size:.9rem;margin-top:.5rem}
+.offer-price{font-family:ui-serif,Georgia,serif;font-size:1.9rem;letter-spacing:-.055em;margin-top:1.1rem}
+.offer-price small{display:block;font-family:ui-sans-serif,system-ui,sans-serif;font-size:.74rem;color:var(--muted);letter-spacing:0;margin-top:.3rem}
+.offer-card .foot{margin-top:auto;padding-top:1rem}
+.button{display:inline-flex;align-items:center;justify-content:center;gap:.6rem;min-height:48px;padding:.78rem 1.1rem;font-size:.9rem;font-weight:850;border:1px solid transparent;transition:transform .2s var(--ease),background .2s ease}
+.button--lime{background:var(--accent);color:var(--ink)}
+.button--lime:hover{background:#66cbef;transform:translateY(-2px)}
+.button--ink{background:var(--ink);color:var(--on-dark)}
+.button--ink:hover{background:#2a312d;transform:translateY(-2px)}
+.text-link{display:inline-flex;align-items:center;gap:.45rem;font-size:.86rem;font-weight:850}
+.text-link span{color:var(--accent);font-size:1.15rem;transition:transform .2s var(--ease)}
+.text-link:hover span{transform:translateX(4px)}
+
+.cta{background:var(--ink);color:var(--on-dark);text-align:left}
+.cta h2{font-size:clamp(2.2rem,5vw,3.8rem);max-width:14ch}
+.cta p{color:var(--on-dark-muted);max-width:52ch;margin-top:1rem}
+.cta-actions{display:flex;flex-wrap:wrap;gap:.8rem;margin-top:1.8rem}
+
+.site-footer{background:#090b0b;color:#aeb7ad;padding:1.9rem 0;font-size:.78rem}
+.site-footer .row{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.site-footer a{text-decoration:underline;text-underline-offset:2px}
+.site-footer a:hover{color:var(--accent)}
+
+@media (max-width:760px){
+  .offer-grid{grid-template-columns:1fr}
+  .cta-actions .button{width:100%}
+}
+
+/* Kompakt-Umbau + 60-Sekunden-Check (19.07. abends) */
+.hero{padding:clamp(2.2rem,5vw,3.8rem) 0 clamp(1.6rem,3.5vw,2.6rem)}
+.section{padding:clamp(2.6rem,6vw,4.6rem) 0}
+.section-head{margin-bottom:clamp(1.4rem,3vw,2.2rem)}
+.hp{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}
+.stepper-bar{display:none;align-items:center;justify-content:space-between;gap:.8rem 1rem;margin-bottom:1.2rem;flex-wrap:wrap}
+.js .is-stepper .stepper-bar{display:flex}
+.stepper-count{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.78rem;color:#98a7b5;letter-spacing:.08em}
+.stepper-nav{display:flex;gap:.5rem}
+.step-btn{border:1px solid rgba(255,255,255,.3);background:transparent;color:var(--on-dark);padding:.5rem .9rem;font-weight:800;font-size:.85rem}
+.step-btn:hover{border-color:var(--accent-soft)}
+.step-btn[disabled]{opacity:.35;cursor:default}
+.stepper-all{background:none;border:0;color:#98a7b5;font-size:.78rem;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.js .demo-box.is-stepper .timeline{border-left:0;margin-left:0}
+.js .demo-box.is-stepper .step{display:none;opacity:1;transform:none;padding:0}
+.js .demo-box.is-stepper .step.is-current{display:block}
+.js .demo-box.is-stepper .step::before{display:none}
+.check{background:var(--ink);color:var(--on-dark)}
+.check-box{background:var(--ink-soft);border:1px solid rgba(255,255,255,.16);padding:clamp(1.4rem,3vw,2.2rem);max-width:840px}
+.check-progress{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.75rem;color:#98a7b5;letter-spacing:.08em;margin-bottom:.9rem}
+.check-q h3{font-size:clamp(1.25rem,2.6vw,1.7rem);letter-spacing:-.04em}
+.check-opts{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-top:1.1rem}
+.check-opt{border:1px solid rgba(255,255,255,.28);background:transparent;color:var(--on-dark);padding:.85rem 1rem;text-align:left;font-weight:750;font-size:.92rem;transition:transform .15s var(--ease),border-color .15s ease}
+.check-opt:hover{border-color:var(--accent-soft);transform:translateY(-1px)}
+.check-back{background:none;border:0;color:#98a7b5;font-size:.78rem;text-decoration:underline;text-underline-offset:2px;cursor:pointer;margin-top:1rem}
+.check-result{border-left:5px solid var(--accent-soft);background:#1a212a;border:1px solid rgba(255,255,255,.14);border-left-width:5px;border-left-color:var(--accent-soft);padding:1.1rem 1.2rem}
+.check-result .label{font-size:.68rem;font-weight:850;letter-spacing:.11em;text-transform:uppercase;color:#98a7b5}
+.check-result h3{font-size:1.35rem;letter-spacing:-.04em;margin-top:.3rem}
+.check-result p{color:var(--on-dark-muted);font-size:.92rem;margin-top:.4rem}
+.check-price{font-family:ui-serif,Georgia,serif;color:var(--accent-soft);font-size:1.45rem;letter-spacing:-.04em;margin-top:.55rem}
+.check-honest{font-size:.78rem;color:#9aa7b3;margin-top:.9rem;max-width:70ch}
+.check-form{margin-top:1.3rem;display:grid;gap:.8rem;grid-template-columns:1fr 1fr}
+.check-form .field-wide{grid-column:1/-1}
+.check-form label{font-size:.74rem;font-weight:850;letter-spacing:.04em;display:block;margin-bottom:.3rem}
+.check-form input,.check-form textarea{width:100%;border:1px solid rgba(255,255,255,.25);background:#101418;color:var(--on-dark);padding:.72rem .8rem;font-size:16px;border-radius:0}
+.check-form input:focus,.check-form textarea:focus{outline:2px solid #2795c4;outline-offset:2px}
+.check-form textarea{min-height:84px;resize:vertical}
+.check-consent{display:flex;gap:.6rem;align-items:flex-start;font-size:.76rem;color:#9aa7b3;grid-column:1/-1;line-height:1.45}
+.check-consent a{text-decoration:underline;text-underline-offset:2px;color:var(--on-dark)}
+.check-reset{background:none;border:0;color:#98a7b5;font-size:.78rem;text-decoration:underline;text-underline-offset:2px;cursor:pointer;margin-top:.8rem}
+.limits-list{max-width:none;display:grid;grid-template-columns:1fr 1fr;gap:0 2.4rem}
+@media (max-width:760px){
+  .check-opts,.check-form,.limits-list{grid-template-columns:1fr}
+  .stepper-bar{justify-content:flex-start}
+}
+/* Motion-Feinschliff 19.07. */
+.reveal{opacity:0;transform:translateY(14px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
+.reveal.is-visible{opacity:1;transform:none}
+.offer-grid .offer-card:nth-child(2){transition-delay:.1s}
+.limits-list .limit:nth-child(2){transition-delay:.06s}
+.limits-list .limit:nth-child(3){transition-delay:.12s}
+.limits-list .limit:nth-child(4){transition-delay:.18s}
+.limits-list .limit:nth-child(5){transition-delay:.24s}
+@keyframes stepIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.js .demo-box.is-stepper .step.is-current{animation:stepIn .35s var(--ease)}
+.check-anim{animation:stepIn .3s var(--ease)}
+@media (prefers-reduced-motion:reduce){
+  .reveal{opacity:1;transform:none;transition:none}
+  .js .demo-box.is-stepper .step.is-current,.check-anim{animation:none}
+  .offer-grid .offer-card,.limits-list .limit{transition-delay:0s!important}
+}
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap header-row">
+    <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true">A</span><span>Artur WebDesign</span></a>
+    <span><a class="back-link" href="tel:+4917622659649" style="margin-right:1.1rem">0176 2265 9649</a><a class="back-link" href="index.html">← Zur Startseite</a></span>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap">
+      <p class="eyebrow eyebrow--lime">Demo · Automatisierung im Betrieb</p>
+      <h1 class="display">Sehen Sie, was Automatisierung wirklich tut.</h1>
+      <p class="lead">Keine Buzzwords: Unten läuft ein Beispiel-Tag in einem Handwerksbetrieb ab — mit jedem Handgriff, den die Automatik übernimmt, und jedem, der <b>bewusst bei Ihnen bleibt</b>. Wählen Sie Ihr Gewerk, die Beispiele passen sich an.</p>
+      <p style="margin-top:1.4rem"><a class="button button--lime" href="#check">Direkt zum 60-Sekunden-Check <span aria-hidden="true">↓</span></a></p>
+    </div>
+  </section>
+
+  <section class="picker" aria-label="Gewerk wählen">
+    <div class="wrap">
+      <p class="picker-label">Ihr Gewerk</p>
+      <div class="trades" role="group" aria-label="Beispiel-Betrieb auswählen">
+        <button class="trade" type="button" aria-pressed="true" data-trade="shk">Heizung &amp; Sanitär</button>
+        <button class="trade" type="button" aria-pressed="false" data-trade="maler">Maler</button>
+        <button class="trade" type="button" aria-pressed="false" data-trade="dach">Dachdecker</button>
+        <button class="trade" type="button" aria-pressed="false" data-trade="elektro">Elektro</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--dark" aria-labelledby="tag-title">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow eyebrow--dark">So läuft es ab</p>
+        <h2 class="display" id="tag-title">Eine Anfrage — ihr ganzer Weg.</h2>
+        <p>Blaue Schritte laufen automatisch — das Etikett am Schritt zeigt, ob das schon im Anfragen-System (490 €) steckt oder erst im KI-Pilot (ab 1.990 €). Graue Schritte bleiben Handarbeit.</p>
+      </div>
+
+      <div class="demo-box">
+      <div class="stepper-bar">
+        <span class="stepper-count" id="stepper-count">Schritt 1 von 8</span>
+        <div class="stepper-nav">
+          <button class="step-btn" type="button" id="step-prev">← Zurück</button>
+          <button class="step-btn" type="button" id="step-next">Weiter →</button>
+          <button class="step-btn" type="button" id="step-play">▶ Abspielen</button>
+        </div>
+        <button class="stepper-all" type="button" id="stepper-all">Alle Schritte untereinander zeigen</button>
+      </div>
+      <div class="timeline">
+        <article class="step">
+          <p class="step-time">21:47 Uhr — Feierabend</p>
+          <h3>Eine Anfrage kommt über Ihre Website.</h3>
+          <div class="bubble bubble--in">
+            <p class="from">Anfrage · Kontaktformular</p>
+            <p id="msg-in">„Unsere Heizung macht seit gestern laute Klopfgeräusche und im Keller tropft Wasser aus dem Rohr. Können Sie zeitnah kommen?“</p>
+          </div>
+          <span class="badge badge--hand">So weit normal</span>
+        </article>
+
+        <article class="step step--auto">
+          <p class="step-time">21:49 Uhr — wenige Minuten später</p>
+          <h3>Der Kunde bekommt sofort eine echte Antwort.</h3>
+          <p class="desc">Im Anfragen-System ist das Ihre <b>feste Antwort-Vorlage</b>. Die mitdenkende Antwort wie im Beispiel ist die KI-Ausbaustufe aus dem Pilot.</p>
+          <div class="bubble">
+            <p class="from">Sofort-Antwort · Beispiel: so antwortet die KI im Pilot</p>
+            <p id="msg-auto">„Guten Abend! Klopfgeräusche und tropfendes Rohr schauen wir uns zeitnah an. Hilft uns vorab: Tropft es dauerhaft? Und ein Foto der Stelle. Wir melden uns zeitnah am nächsten Werktag.“</p>
+          </div>
+          <span class="badge">Vorlage im Anfragen-System (490 €) · mitdenkend im KI-Pilot</span>
+          <p class="saving"><b>Annahme: bis zu 12 Min. weniger Schreibarbeit</b><span>— der Kunde weiß sofort, woran er ist.</span></p>
+        </article>
+
+        <article class="step step--auto">
+          <p class="step-time">21:49 Uhr — im selben Moment</p>
+          <h3>Sie bekommen die Anfrage sortiert aufs Handy.</h3>
+          <p class="desc" id="msg-chef">Per E-Mail-Benachrichtigung auf Ihrem Handy und sortiert in Ihrer App-Übersicht — mit Kontaktdaten und Fotos. Was zuerst drankommt, entscheiden Sie.</p>
+          <span class="badge">Im Anfragen-System (490 €)</span>
+        </article>
+
+        <article class="step">
+          <p class="step-time">Tag 1 — 8:30 Uhr</p>
+          <h3>Sie entscheiden: Termin, Preis, Prioritäten.</h3>
+          <p class="desc">Mit Absicht Handarbeit: Kein System sagt Preise oder Termine zu, die Sie nicht freigegeben haben.</p>
+          <span class="badge badge--hand">Bleibt bei Ihnen</span>
+        </article>
+
+        <article class="step step--auto">
+          <p class="step-time">Tag 3 — 10:00 Uhr</p>
+          <h3>Ihr Angebot ist raus — der Nachfass kommt von allein.</h3>
+          <p class="desc">Keine Antwort? Nach Ihrer Frist geht automatisch eine freundliche Erinnerung raus — der Handgriff, der sonst am häufigsten liegen bleibt.</p>
+          <div class="bubble">
+            <p class="from">Nachfass · automatisch, Text von Ihnen freigegeben</p>
+            <p>„Guten Tag! Gibt es zu unserem Angebot noch offene Fragen? Wir halten den vorgeschlagenen Termin bis Ende der Woche frei.“</p>
+          </div>
+          <span class="badge">Im Anfragen-System (490 €)</span>
+          <p class="saving"><b>Annahme: bis zu 8 Min. pro Angebot</b><span>— und offene Angebote geraten nicht in Vergessenheit.</span></p>
+        </article>
+
+        <article class="step step--auto">
+          <p class="step-time">Tag vor dem Termin — 16:00 Uhr</p>
+          <h3>Der Kunde wird an den Termin erinnert.</h3>
+          <p class="desc" id="msg-termin">„Kurze Erinnerung: Morgen zwischen 8 und 10 Uhr kommt unser Monteur. Bitte halten Sie den Zugang zum Heizungsraum frei.“</p>
+          <span class="badge">Nur im KI-Pilot (ab 1.990 €)</span>
+          <p class="saving"><b>Annahme: bis zu 4 Min. pro Termin</b><span>— vermiedene Leerfahrten sparen zusätzlich Sprit.</span></p>
+        </article>
+
+        <article class="step step--auto">
+          <p class="step-time">Nach dem Auftrag</p>
+          <h3>Nach abgeschlossenem Auftrag: die Bitte um eine Bewertung.</h3>
+          <p class="desc">Sie schalten es an oder aus. Echte Google-Bewertungen gelten für viele lokale Betriebe als einer der wirkungsvollsten Hebel — und die Bitte darum wird sonst fast immer vergessen. Versendet wird sie nur auf rechtlich zulässigem Weg; das legen wir bei der Einrichtung fest.</p>
+          <span class="badge">Im Anfragen-System (490 €) · AN/AUS</span>
+        </article>
+
+        <article class="step step--auto">
+          <p class="step-time">Laufend im Hintergrund</p>
+          <h3>Ihr Betriebswissen wird zum Nachschlagewerk.</h3>
+          <p class="desc">Preislisten, Abläufe, Vorlagen, häufige Kundenfragen — in Sekunden auffindbar statt verstreut in Köpfen, Zetteln und alten Mails.</p>
+          <span class="badge">Nur im KI-Pilot (ab 1.990 €) · Wissensassistent</span>
+        </article>
+      </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section calc" aria-labelledby="calc-title">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow eyebrow--lime">Beispielrechnung</p>
+        <h2 class="display" id="calc-title" style="color:var(--on-dark)">Was das in Stunden bedeutet.</h2>
+      </div>
+      <div class="calc-box reveal">
+        <h3>Beispiel: Betrieb mit 10 Anfragen pro Woche</h3>
+        <p class="calc-note">Alle Zahlen sind offen gelegte <b>Annahmen eines Beispiels</b> — keine Zusage. In der Erst-Analyse setzen wir Ihre echten Zahlen ein, und im Pilot wird die Ersparnis gemessen statt versprochen.</p>
+        <table class="calc-table">
+          <thead><tr><th scope="col">Handgriff</th><th scope="col">Annahme</th><th scope="col">Pro Woche</th></tr></thead>
+          <tbody>
+            <tr><td>Erstantworten auf Anfragen <small style="color:#8b98a5">· Anfragen-System</small></td><td>10 Anfragen × ca. 12 Min.</td><td>≈ 2,0 Std.</td></tr>
+            <tr><td>Angebots-Nachfass <small style="color:#8b98a5">· Anfragen-System</small></td><td>5 offene Angebote × ca. 8 Min.</td><td>≈ 0,7 Std.</td></tr>
+            <tr><td>Termin-Erinnerungen <small style="color:#8b98a5">· KI-Pilot</small></td><td>6 Termine × ca. 4 Min.</td><td>≈ 0,4 Std.</td></tr>
+            <tr><td>Suchen nach Infos &amp; Vorlagen <small style="color:#8b98a5">· KI-Pilot</small></td><td>vorsichtig angesetzt</td><td>≈ 0,5 Std.</td></tr>
+          </tbody>
+        </table>
+        <div class="calc-sum"><span>Beispiel-Summe</span><span id="calc-zahl">≈ 3,6 Std./Woche</span></div>
+        <p class="calc-fine">Die ersten beiden Zeilen deckt bereits das Anfragen-System (490 €) ab — die letzten beiden gehören zum KI-Pilot. Zum Einordnen: 3,6 Std./Woche sind über 180 Stunden im Jahr — Zeit, die im Betrieb, bei der Familie oder im Verkauf besser aufgehoben ist. Ob es bei Ihnen mehr oder weniger ist, hängt von Ihren Abläufen ab. Genau deshalb beginnt jedes Projekt mit einer Prozess-Analyse und einem Messpunkt, nicht mit Technik.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--dark" aria-labelledby="limits-title">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow eyebrow--dark">Ehrlichkeit zuerst</p>
+        <h2 class="display" id="limits-title">Was die Automatik bewusst NICHT tut.</h2>
+      </div>
+      <div class="limits-list">
+        <div class="limit reveal"><span>01</span><div><h3>Keine Preis- oder Terminzusagen ohne Sie.</h3><p>Jede Zusage an Kunden geben Sie frei — die Automatik bereitet vor, entscheidet aber nicht über Ihr Geld.</p></div></div>
+        <div class="limit reveal"><span>02</span><div><h3>Kein Ersatz für Ihr Fachurteil.</h3><p>Ein Mensch vor Ort beurteilt, ob ein Rohr getauscht oder ein Dach neu gedeckt werden muss. Die Automatik nimmt Ihnen Schreibarbeit ab, nicht das Handwerk.</p></div></div>
+        <div class="limit reveal"><span>03</span><div><h3>Telefonate führen weiterhin Menschen.</h3><p>Auf Telefon-Roboter verzichten wir bewusst. Erst wenn die schriftlichen Abläufe rund laufen, lohnt der nächste Schritt überhaupt.</p></div></div>
+        <div class="limit reveal"><span>04</span><div><h3>Keine versprochenen Umsätze.</h3><p>Versprochen wird nur, was messbar ist: Antwortzeit, gesparte Stunden, weniger liegengebliebene Angebote. Gemessen wird im Pilot — vorher gibt es keine Erfolgszahlen.</p></div></div>
+        <div class="limit reveal"><span>05</span><div><h3>Ihre Kundendaten bleiben geschützt.</h3><p>Vor dem Start wird gemeinsam festgelegt, welche Daten wohin fließen dürfen — mit Auftragsverarbeitungs-Vertrag und ohne Kundendaten in kostenlosen KI-Diensten.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section offer" aria-labelledby="offer-title">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow eyebrow--dark">Der Weg dahin</p>
+        <h2 class="display" id="offer-title">Zwei klare Einstiege. Feste Preise.</h2>
+      </div>
+      <div class="offer-grid">
+        <div class="offer-card reveal">
+          <h3>Anfragen-System mit Kunden-App</h3>
+          <p>Die Grundausstattung: Anfragen laufen sortiert in eine einfache App — mit Ihrer festen Sofort-Antwort-Vorlage, E-Mail-Benachrichtigung aufs Handy und Nachfass. Sechs Monate Mindestlaufzeit, danach monatlich kündbar.</p>
+          <p class="offer-price">490 €<small>Setup einmalig + 49 €/Monat Betrieb</small></p>
+          <div class="foot"><a class="text-link" href="app-demo.html">Die Kunden-App live ausprobieren <span aria-hidden="true">→</span></a></div>
+        </div>
+        <div class="offer-card reveal">
+          <h3>KI-Automatisierungs-Pilot</h3>
+          <p>Ein konkreter Ablauf Ihrer Wahl — zum Beispiel fallbezogene KI-Antworten wie in der Demo oder der Wissensassistent. Erst Prozess-Analyse, dann Bau, dann Messung der Ersparnis.</p>
+          <p class="offer-price">ab 1.990 €<small>Festpreis für den abgegrenzten Pilot</small></p>
+          <div class="foot"><a class="text-link" href="index.html#preise">Alle Preise ansehen <span aria-hidden="true">→</span></a></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section check" id="check" aria-labelledby="check-title">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow eyebrow--lime">Der 60-Sekunden-Check</p>
+        <h2 class="display" id="check-title">Vier Klicks bis zur Ersteinschätzung.</h2>
+        <p>Vier kurze Fragen — am Ende sehen Sie den wahrscheinlichsten Einstieg mit klarem Preis, und Ihre Angaben landen direkt bei mir.</p>
+      </div>
+      <div class="check-box reveal">
+        <p class="check-progress" id="check-progress" aria-live="polite">Frage 1 von 4</p>
+        <div id="check-questions" class="check-q" aria-live="polite"></div>
+        <noscript><p>Der Schnell-Check braucht eingeschaltetes JavaScript. Kein Problem: <a href="index.html#kontakt" style="text-decoration:underline">Schreiben Sie mir direkt über das Kontaktformular.</a></p></noscript>
+        <div id="check-done" hidden>
+          <div class="check-result">
+            <p class="label">Ihr wahrscheinlichster Einstieg</p>
+            <h3 id="res-title">—</h3>
+            <p id="res-why">—</p>
+            <p class="check-price" id="res-price"></p>
+          </div>
+          <p class="check-honest">Ehrliche Einordnung, kein Kaufzwang: Ob der Einstieg wirklich passt, klären wir in einer kurzen Erst-Analyse. Wenn ich nicht der Richtige dafür bin, sage ich Ihnen das offen.</p>
+          <form class="check-form" action="https://formspree.io/f/xeewbkyw" method="POST">
+            <input type="hidden" name="_subject" value="Neue Anfrage über artur.ae (60-Sekunden-Check)">
+            <input type="hidden" name="_next" value="https://artur.ae/danke.html">
+            <input class="hp" type="text" name="_gotcha" tabindex="-1" autocomplete="off" aria-hidden="true">
+            <input type="hidden" name="check_lage" id="f-lage">
+            <input type="hidden" name="check_website" id="f-website">
+            <input type="hidden" name="check_kanal" id="f-kanal">
+            <input type="hidden" name="check_menge" id="f-menge">
+            <input type="hidden" name="check_empfehlung" id="f-empfehlung">
+            <div><label for="c-name">Ihr Name *</label><input id="c-name" name="name" autocomplete="name" required></div>
+            <div><label for="c-email">E-Mail *</label><input id="c-email" name="email" type="email" autocomplete="email" required></div>
+            <div class="field-wide"><label for="c-msg">Noch etwas, das ich wissen sollte?</label><textarea id="c-msg" name="message" placeholder="Optional — z. B. Ihr Gewerk und was gerade am meisten Zeit kostet."></textarea></div>
+            <label class="check-consent"><input type="checkbox" name="datenschutz_ok" value="ja" required style="width:1rem;height:1rem;margin-top:.15rem;accent-color:#3eb8e5;flex:0 0 auto"><span>Ich habe die <a href="datenschutz.html">Datenschutzerklärung</a> zur Kenntnis genommen. Die Übermittlung läuft über Formspree.</span></label>
+            <button class="button button--lime field-wide" type="submit">Check absenden — ich melde mich <span aria-hidden="true">→</span></button>
+          </form>
+          <button class="check-reset" type="button" id="check-reset">Antworten ändern</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap row">
+    <span>© 2026 Artur WebDesign · Artur Stol · Kleinunternehmer nach § 19 UStG</span>
+    <span><a href="impressum.html">Impressum</a> · <a href="datenschutz.html">Datenschutz</a></span>
+  </div>
+</footer>
+
+<script>
+(function(){
+  document.documentElement.classList.replace("no-js","js");
+
+  var DATA={
+    shk:{
+      in:"„Unsere Heizung macht seit gestern laute Klopfgeräusche und im Keller tropft Wasser aus dem Rohr. Können Sie zeitnah kommen?“",
+      auto:"„Guten Abend! Klopfgeräusche und tropfendes Rohr schauen wir uns zeitnah an. Hilft uns vorab: Tropft es dauerhaft? Und ein Foto der Stelle. Wir melden uns zeitnah am nächsten Werktag.“",
+      chef:"Per E-Mail-Benachrichtigung auf Ihrem Handy und sortiert in Ihrer App-Übersicht — mit Kontaktdaten und Fotos. Was zuerst drankommt, entscheiden Sie.",
+      termin:"„Kurze Erinnerung: Morgen zwischen 8 und 10 Uhr kommt unser Monteur. Bitte halten Sie den Zugang zum Heizungsraum frei.“"
+    },
+    maler:{
+      in:"„Wir möchten Wohnzimmer, Flur und Küche streichen lassen, ca. 70 m². Was würde das kosten und wann hätten Sie Zeit?“",
+      auto:"„Guten Abend! Danke für Ihre Anfrage — drei Räume mit ca. 70 m² notieren wir. Damit unser Angebot direkt passt: 1) Sind Wände tapeziert, verputzt oder gestrichen? 2) Sollen Decken und Türzargen mit gemacht werden? Fotos je Raum helfen uns sehr. Wir melden uns zeitnah am nächsten Werktag.“",
+      chef:"Per E-Mail aufs Handy: 3 Räume, ca. 70 m² — mit Kontaktdaten und Fotos, sauber in der App einsortiert.",
+      termin:"„Kurze Erinnerung: Morgen ab 7:30 Uhr beginnen wir mit dem Abkleben. Bitte räumen Sie kleine Möbel und Bilder vorher beiseite.“"
+    },
+    dach:{
+      in:"„Nach dem Sturm gestern liegen bei uns Ziegel im Garten und im Dachgeschoss ist ein feuchter Fleck an der Decke. Bitte um schnelle Rückmeldung.“",
+      auto:"„Guten Abend! Danke für Ihre Nachricht — lose Ziegel nach Sturm plus Feuchtstelle nehmen wir ernst. Zwei Bitten vorab: 1) Betreten Sie den Bereich unter dem beschädigten Dach nicht. 2) Ein Foto von außen (vom Boden aus!) und vom Fleck innen hilft bei der Einschätzung. Wir melden uns zeitnah am nächsten Werktag — bei akutem Wassereintritt rufen Sie bitte direkt an.“",
+      chef:"Per E-Mail aufs Handy: Sturmschaden mit Feuchtstelle, Fotos und Adresse dabei — die Reihenfolge bestimmen Sie.",
+      termin:"„Kurze Erinnerung: Morgen zwischen 8 und 10 Uhr kommt unser Team zur Dachbesichtigung. Bitte halten Sie die Zufahrt für die Leiter frei.“"
+    },
+    elektro:{
+      in:"„Bei uns fliegt seit zwei Tagen ständig der FI-Schalter raus, teilweise ist die halbe Wohnung ohne Strom. Können Sie sich das ansehen?“",
+      auto:"„Guten Abend! Danke für Ihre Anfrage. Ein häufig auslösender FI-Schalter sollte zeitnah geprüft werden. Zwei Fragen vorab: 1) Löst er bei einem bestimmten Gerät aus (z. B. Waschmaschine)? 2) Lässt er sich danach wieder einschalten? Bitte nicht selbst am Sicherungskasten arbeiten. Wir melden uns zeitnah am nächsten Werktag mit einem Terminvorschlag.“",
+      chef:"Per E-Mail aufs Handy: wiederholt auslösender FI, alle Antworten des Kunden dabei — die Reihenfolge bestimmen Sie.",
+      termin:"„Kurze Erinnerung: Morgen zwischen 8 und 10 Uhr kommt unser Elektriker. Bitte halten Sie den Zugang zum Sicherungskasten frei.“"
+    }
+  };
+
+  var buttons=document.querySelectorAll(".trade");
+  buttons.forEach(function(btn){
+    btn.addEventListener("click",function(){
+      buttons.forEach(function(b){b.setAttribute("aria-pressed","false");});
+      btn.setAttribute("aria-pressed","true");
+      var d=DATA[btn.getAttribute("data-trade")];
+      if(!d){return;}
+      document.getElementById("msg-in").textContent=d.in;
+      document.getElementById("msg-auto").textContent=d.auto;
+      document.getElementById("msg-chef").textContent=d.chef;
+      document.getElementById("msg-termin").textContent=d.termin;
+    });
+  });
+
+  document.querySelectorAll(".step").forEach(function(el){el.classList.add("is-visible");});
+
+  /* Schritt-für-Schritt-Anzeige */
+  var box=document.querySelector(".demo-box");
+  var steps=[].slice.call(document.querySelectorAll(".demo-box .step"));
+  var cntEl=document.getElementById("stepper-count");
+  var prevBtn=document.getElementById("step-prev");
+  var nextBtn=document.getElementById("step-next");
+  var allBtn=document.getElementById("stepper-all");
+  if(box&&steps.length&&cntEl&&prevBtn&&nextBtn&&allBtn){
+    box.classList.add("is-stepper");
+    var cur=0;
+    var zeigen=function(i){
+      cur=Math.max(0,Math.min(steps.length-1,i));
+      steps.forEach(function(s,j){s.classList.toggle("is-current",j===cur);});
+      cntEl.textContent="Schritt "+(cur+1)+" von "+steps.length;
+      prevBtn.disabled=(cur===0);
+      nextBtn.disabled=(cur===steps.length-1);
+    };
+    var playBtn=document.getElementById("step-play");
+    var playTimer=null;
+    var playStopp=function(){if(playTimer){clearTimeout(playTimer);playTimer=null;}if(playBtn){playBtn.textContent="▶ Abspielen";}};
+    var leseZeit=function(i){
+      var text=(steps[i]&&steps[i].textContent)||"";
+      var lesen=(text.replace(/\s+/g," ").length/18)*1000;
+      return Math.min(20000,Math.max(5000,lesen+2500));
+    };
+    var weiterSpielen=function(){
+      if(cur>=steps.length-1){playStopp();return;}
+      zeigen(cur+1);
+      playTimer=setTimeout(weiterSpielen,leseZeit(cur));
+    };
+    prevBtn.addEventListener("click",function(){playStopp();zeigen(cur-1);});
+    nextBtn.addEventListener("click",function(){playStopp();zeigen(cur+1);});
+    allBtn.addEventListener("click",function(){playStopp();box.classList.remove("is-stepper");});
+    if(playBtn){
+      playBtn.addEventListener("click",function(){
+        if(playTimer){playStopp();return;}
+        playBtn.textContent="⏸ Pause";
+        if(cur>=steps.length-1){zeigen(0);}
+        playTimer=setTimeout(weiterSpielen,leseZeit(cur));
+      });
+    }
+    zeigen(0);
+  }
+
+  /* 60-Sekunden-Check */
+  var FRAGEN=[
+    {key:"lage",q:"Was beschreibt Ihre Lage am besten?",opts:["Zu wenige Anfragen","Website überzeugt nicht oder ist veraltet","Anfragen gehen unter oder kosten Zeit","Büro- und Schreibarbeit frisst Zeit","Etwas anderes"]},
+    {key:"website",q:"Haben Sie eine eigene Website?",opts:["Ja, aktuell","Ja, aber veraltet","Nein"]},
+    {key:"kanal",q:"Wie kommen Anfragen heute herein? (hilft mir bei der Einordnung)",opts:["Telefon","E-Mail","WhatsApp","Gemischt"]},
+    {key:"menge",q:"Wie viele Anfragen pro Woche ungefähr?",opts:["Unter 5","5 bis 15","Über 15","Schwer zu sagen"]}
+  ];
+  var qBox=document.getElementById("check-questions");
+  var doneBox=document.getElementById("check-done");
+  var progEl=document.getElementById("check-progress");
+  if(qBox&&doneBox&&progEl){
+    var antworten={};
+    var qi=0;
+    var empfehlung=function(a){
+      if(a.lage==="Etwas anderes")return{t:"Kurz schildern — ich sage ehrlich, ob ich helfen kann",why:"Ihr Fall passt in keine Standard-Schublade. Beschreiben Sie ihn unten in zwei Sätzen — Sie bekommen eine ehrliche Antwort, ob er in meine Zuständigkeit fällt oder wer besser passt.",price:""};
+      if(a.lage==="Zu wenige Anfragen"){
+        if(a.website==="Nein")return{t:"Kompakt-Seite zuerst",why:"Ohne eigene Website verpufft jede Werbung. Erst die Basis — danach lohnt sich Sichtbarkeit, zum Beispiel über Google Ads.",price:"990 € Festpreis"};
+        if(a.website==="Ja, aber veraltet")return{t:"Erst Website auffrischen, dann Sichtbarkeit",why:"Werbung, die auf eine veraltete Seite führt, verpufft. Erst ein Website-Check (danach ggf. Reparatur für 290–990 €), dann lohnt sich Google Ads.",price:"ab 49 €"};
+        return{t:"Google Ads mit Betreuung",why:"Ihre Website steht — der Engpass ist, gefunden zu werden. Genau dafür ist bezahlte Sichtbarkeit da.",price:"349 € Setup + 179/229 €/Monat"};
+      }
+      if(a.lage==="Website überzeugt nicht oder ist veraltet")return a.website==="Nein"?{t:"Kompakt-Seite",why:"Sie brauchen eine überzeugende Basis mit klarem Kontaktziel.",price:"990 € Festpreis"}:{t:"Website-Check mit Anleitung",why:"Erst prüfen, dann entscheiden: Oft reicht eine Reparatur (290–990 €) statt einer neuen Seite.",price:"ab 49 €"};
+      if(a.lage==="Anfragen gehen unter oder kosten Zeit"){var extra=(a.menge==="Über 15")?" Bei vielen Anfragen entlastet ein sortierter Eingang besonders spürbar.":"";return{t:"Anfragen-System mit Kunden-App",why:"Anfragen laufen sortiert in eine App — mit Sofort-Antwort-Vorlage und automatischem Nachfass."+extra,price:"490 € Setup + 49 €/Monat (6 Monate Mindestlaufzeit)"}}
+      return{t:"KI-Automatisierungs-Pilot",why:"Ein konkreter Arbeitsablauf wird analysiert, automatisiert und die Ersparnis gemessen — Festpreis statt Blindflug.",price:"ab 1.990 €"};
+    };
+    var frageZeigen=function(){
+      var f=FRAGEN[qi];
+      progEl.textContent="Frage "+(qi+1)+" von "+FRAGEN.length;
+      var html='<h3 tabindex="-1">'+f.q+'</h3><div class="check-opts">';
+      f.opts.forEach(function(o){html+='<button class="check-opt" type="button" data-wert="'+o+'">'+o+"</button>";});
+      html+="</div>";
+      if(qi>0){html+='<button class="check-back" type="button" id="check-back">← Frage zurück</button>';}
+      qBox.innerHTML='<div class="check-anim">'+html+"</div>";
+      var frageH3=qBox.querySelector("h3");
+      if(frageH3 && qi>0){try{frageH3.focus({preventScroll:true});}catch(e){}}
+      qBox.querySelectorAll(".check-opt").forEach(function(b){
+        b.addEventListener("click",function(){
+          antworten[f.key]=b.getAttribute("data-wert");
+          if(qi<FRAGEN.length-1){qi++;frageZeigen();}else{fertig();}
+        });
+      });
+      var back=document.getElementById("check-back");
+      if(back){back.addEventListener("click",function(){qi--;frageZeigen();});}
+    };
+    var fertig=function(){
+      var e=empfehlung(antworten);
+      document.getElementById("res-title").textContent=e.t;
+      document.getElementById("res-why").textContent=e.why;
+      document.getElementById("res-price").textContent=e.price;
+      document.getElementById("f-lage").value=antworten.lage||"";
+      document.getElementById("f-website").value=antworten.website||"";
+      document.getElementById("f-kanal").value=antworten.kanal||"";
+      document.getElementById("f-menge").value=antworten.menge||"";
+      document.getElementById("f-empfehlung").value=e.t+(e.price?" ("+e.price+")":"");
+      progEl.textContent="Fertig — Ihre Ersteinschätzung";
+      qBox.hidden=true;
+      doneBox.hidden=false;
+    };
+    var reset=document.getElementById("check-reset");
+    if(reset){reset.addEventListener("click",function(){antworten={};qi=0;doneBox.hidden=true;qBox.hidden=false;frageZeigen();});}
+    frageZeigen();
+  }
+
+  if(!window.matchMedia("(prefers-reduced-motion: reduce)").matches && "IntersectionObserver" in window){
+    var observer=new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if(entry.isIntersecting){entry.target.classList.add("is-visible");observer.unobserve(entry.target);}
+      });
+    },{threshold:.15,rootMargin:"0px 0px -24px"});
+    document.querySelectorAll(".reveal").forEach(function(el){observer.observe(el);});
+  }else{
+    document.querySelectorAll(".reveal").forEach(function(el){el.classList.add("is-visible");});
+  }
+
+  var zahl=document.getElementById("calc-zahl");
+  if(zahl && !window.matchMedia("(prefers-reduced-motion: reduce)").matches && "IntersectionObserver" in window){
+    var zObs=new IntersectionObserver(function(es){
+      es.forEach(function(en){
+        if(en.isIntersecting){
+          zObs.unobserve(en.target);
+          var t0=null;
+          var tick=function(ts){
+            if(!t0){t0=ts;}
+            var p=Math.min(1,(ts-t0)/800);
+            zahl.textContent="≈ "+(3.6*p).toFixed(1).replace(".",",")+" Std./Woche";
+            if(p<1){requestAnimationFrame(tick);}
+          };
+          requestAnimationFrame(tick);
+        }
+      });
+    },{threshold:.4});
+    zObs.observe(zahl);
+  }
+}());
+</script>
+</body>
+</html>
