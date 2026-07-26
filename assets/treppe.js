@@ -8,8 +8,12 @@
    Breite (CSS), Treppe fängt keine Klicks (nur der kleine Griff-Punkt). */
 (function () {
   "use strict";
+  // Doppel-Lade-Schutz: index.html laedt deterministisch (Inline-Loader),
+  // site.js lazy — wer zuerst kommt, gewinnt; ein zweiter Lauf tut nichts.
+  if (window.__treppeGeladen) return;
+  window.__treppeGeladen = true;
   var reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
-  var desktopMQ = window.matchMedia("(min-width:1440px)");
+  var desktopMQ = window.matchMedia("(min-width:1400px)");
   var laeuft = false;
   if (reduce.matches) return;
 

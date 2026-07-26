@@ -27,7 +27,7 @@
       doc.head.appendChild(script);
     };
 
-    const desktopVisuals = window.matchMedia("(min-width: 1440px)");
+    const desktopVisuals = window.matchMedia("(min-width: 1400px)"); // Treppen-Schwelle wie damals (V8.8)
     const handyVisual = window.matchMedia("(min-width: 1024px) and (hover: hover)");
     let heroHandyStarted = false;
     let heroHandyReady = false;
@@ -61,14 +61,14 @@
       mount.appendChild(heroStage);
 
       const s1 = doc.createElement("script");
-      s1.src = new URL("hero3d-stage.js?v=74", assetsBase).href;
+      s1.src = new URL("hero3d-stage.js?v=75", assetsBase).href;
       s1.dataset.optionalVisual = "hero3d-stage.js";
       s1.onerror = failHeroHandy;
       s1.onload = () => {
         syncHeroHandy();
         const s2 = doc.createElement("script");
         s2.type = "module";
-        s2.src = new URL("hero3d-handy.js?v=74", assetsBase).href;
+        s2.src = new URL("hero3d-handy.js?v=75", assetsBase).href;
         s2.dataset.optionalVisual = "hero3d-handy.js";
         s2.onload = () => {
           heroHandyReady = true;
@@ -86,7 +86,7 @@
 
     const maybeLoad = () => {
       if (!reduceMotion.matches && desktopVisuals.matches && doc.querySelector(".hero")) {
-        load("treppe.js?v=74");
+        load("treppe.js?v=75");
       }
       if (heroHandyEligible() && doc.querySelector("[data-hero-stage]")) {
         loadHeroHandy();
@@ -574,7 +574,6 @@
     let scrubRaf = 0;
     let scrubAnfordern = null;
     let pulseAnimation = null;
-    let progressAnimation = null;
     let progressScrollStopp = null;
     let inViewStopp = null;
     let bewegungGestoppt = false;
@@ -611,7 +610,7 @@
       }
       if (typeof inViewStopp === "function") inViewStopp();
       if (typeof progressScrollStopp === "function") progressScrollStopp();
-      [progressAnimation, pulseAnimation].forEach((steuerung) => {
+      [pulseAnimation].forEach((steuerung) => {
         if (!steuerung) return;
         try { steuerung.pause(); } catch (fehler) { /* bereits beendet */ }
       });
@@ -644,10 +643,27 @@
       return;
     }
 
-    const { animate, inView, scroll } = window.Motion;
-    if (progress && animate && scroll) {
-      progressAnimation = animate(progress, { transform: ["scaleX(0)", "scaleX(1)"] }, { ease: "linear" });
-      progressScrollStopp = scroll(progressAnimation);
+    const { animate, inView } = window.Motion;
+    // Fortschrittsbalken: eigener Scroll-Handler statt Motions scroll()-Bindung.
+    // Ursache-Fix 26.07.2026: scroll(animation) hat den Balken in manchen
+    // Umgebungen nie angetrieben (live gemessen: transform blieb scaleX(0)),
+    // dasselbe Muster wie beim ziel-gebundenen scroll({target}) unten. Die
+    // Rechnung ist trivial — also deterministisch selbst, wie im reduce-Zweig.
+    if (progress) {
+      const progressUpdate = () => {
+        const max = Math.max(1, doc.documentElement.scrollHeight - window.innerHeight);
+        progress.style.transform = `scaleX(${Math.min(1, Math.max(0, window.scrollY / max))})`;
+      };
+      let progressRaf = 0;
+      const progressAnfordern = () => { if (!progressRaf) progressRaf = window.requestAnimationFrame(() => { progressRaf = 0; progressUpdate(); }); };
+      progressUpdate();
+      window.addEventListener("scroll", progressAnfordern, { passive: true });
+      window.addEventListener("resize", progressAnfordern, { passive: true });
+      progressScrollStopp = () => {
+        window.removeEventListener("scroll", progressAnfordern);
+        window.removeEventListener("resize", progressAnfordern);
+        if (progressRaf) { window.cancelAnimationFrame(progressRaf); progressRaf = 0; }
+      };
     }
 
     // Hero-Ueberschrift: Zeilen steigen aus Masken auf
@@ -755,6 +771,38 @@
     window.setTimeout(revealEverything, 2600);
   }
 
+  // Kleine Prozentzahl am Fortschrittsbalken (rechts oben, dezent, aria-hidden):
+  // zeigt beim Scrollen den Seitenfortschritt, blendet nach kurzer Ruhe aus.
+  // Wiederbelebt nach V8.11-Vorlage (damals wanderte das Label mit dem Balken);
+  // heute fest rechts oben, damit es dem 3D-Hero und dem Menü nie im Weg steht.
+  function setupScrollProzent() {
+    if (!doc.querySelector(".scroll-progress")) return;
+    // Bei reduzierter Bewegung keine ein-/ausblendende Pille (haertetes Blinken vermeiden).
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const label = doc.createElement("div");
+    label.className = "scroll-prozent";
+    label.setAttribute("aria-hidden", "true");
+    const prozentSetzen = () => {
+      const max = Math.max(1, doc.documentElement.scrollHeight - window.innerHeight);
+      const p = Math.min(1, Math.max(0, window.scrollY / max));
+      label.textContent = Math.round(p * 100) + " %";
+    };
+    prozentSetzen();
+    doc.body.appendChild(label);
+    let raf = 0;
+    let ausblenden = 0;
+    window.addEventListener("scroll", () => {
+      if (raf) return;
+      raf = window.requestAnimationFrame(() => {
+        raf = 0;
+        prozentSetzen();
+        label.classList.add("sichtbar");
+        window.clearTimeout(ausblenden);
+        ausblenden = window.setTimeout(() => label.classList.remove("sichtbar"), 1100);
+      });
+    }, { passive: true });
+  }
+
   function setupMarquee() {
     const stop = doc.querySelector("[data-marquee-stop]");
     const band = stop ? stop.closest(".marquee") : null;
@@ -775,5 +823,6 @@
   setupDiagnostic();
   setupContactForm();
   setupMotion();
+  setupScrollProzent();
   root.classList.add("site-ready");
 })();

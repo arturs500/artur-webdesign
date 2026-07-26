@@ -27,7 +27,7 @@
   <meta name="twitter:title" content="Erst prüfen. Dann das Richtige bauen. – Webdesign für Handwerk in Chemnitz & Leipzig">
   <meta name="twitter:description" content="Websites, Google Ads und Anfragen-Systeme für Handwerk und lokale Dienstleister in Chemnitz, Leipzig und deutschlandweit.">
   <meta name="twitter:image" content="https://artur.ae/og-artur-webdesign.png">
-  <link rel="stylesheet" href="assets/site.css?v=74">
+  <link rel="stylesheet" href="assets/site.css?v=75">
   <noscript><style>.price-panel[hidden]{display:block}.price-tabs,.diagnostic-shell{display:none}</style></noscript>
   <script>document.documentElement.classList.replace('no-js','js');</script>
   <script type="importmap">
@@ -240,7 +240,26 @@
   }
   </script>
   <script src="assets/vendor/motion-12.42.2.min.js" defer></script>
-  <script src="assets/site.js?v=74" defer></script>
+  <script src="assets/site.js?v=75" defer></script>
+  <script>
+  /* Treppen-Laeufer (A-Figur links, Interaktivfassung seit V8.12; Anzeige-Schwelle 1400px wie V8.8) ohne Warten auf window.load laden:
+     nur Desktop ab 1400px, nie bei reduzierter Bewegung oder Datensparmodus —
+     Handy laedt die Datei gar nicht erst. site.js erkennt das data-Attribut
+     und laedt nicht doppelt; treppe.js hat zusaetzlich einen eigenen Schutz. */
+  (function () {
+    try {
+      var conn = navigator.connection;
+      if (conn && conn.saveData) return;
+      if (!window.matchMedia("(min-width:1400px)").matches) return;
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      var s = document.createElement("script");
+      s.src = "assets/treppe.js?v=75";
+      s.defer = true;
+      s.setAttribute("data-optional-visual", "treppe.js?v=75");
+      document.head.appendChild(s);
+    } catch (e) { /* Schmuck-Element — Seite bleibt ohne ihn voll nutzbar */ }
+  })();
+  </script>
 </head>
 <body id="top">
   <a class="skip-link" href="#main">Zum Inhalt springen</a>
@@ -258,7 +277,7 @@
         <a href="#arbeiten">Demos</a>
         <a href="#preise">Preise</a>
         <a href="handwerker-website-kosten.html">Ratgeber</a>
-        <a class="nav-phone" href="tel:+4917622659649" aria-label="Anrufen: 0176 2265 9649">0176 2265 9649</a>
+        <a class="nav-phone" href="mailto:info@artur.ae" aria-label="E-Mail schreiben: info@artur.ae">info@artur.ae</a>
         <a class="button" href="#kontakt">Problem schildern</a>
       </nav>
       <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="hauptnavigation" aria-label="Menü öffnen" data-menu-toggle>

@@ -92,6 +92,10 @@ button{border:0}
 
 .scroll-progress{position:fixed;inset:0 0 auto;z-index:1600;height:3px;background:rgba(255,255,255,.07)}
 .scroll-progress span{display:block;width:100%;height:100%;background:var(--signal);transform:scaleX(0);transform-origin:left center}
+.scroll-prozent{position:fixed;top:9px;right:10px;z-index:1601;padding:.14rem .5rem;border-radius:999px;background:rgba(7,25,31,.78);border:1px solid rgba(98,213,255,.35);color:var(--signal-soft);font-family:var(--sans);font-size:.75rem;font-weight:600;letter-spacing:.05em;font-variant-numeric:tabular-nums;pointer-events:none;opacity:0;transition:opacity .25s ease}
+@media (max-width:1120px){.scroll-prozent{display:none!important}}
+.scroll-prozent.sichtbar{opacity:1}
+@media (prefers-reduced-motion:reduce){.scroll-prozent{transition:none}}
 .site-header{position:fixed;inset:0 0 auto;z-index:1500;border-bottom:1px solid var(--line-dark);background:rgba(7,25,31,.94)}
 .header-row{height:var(--header);display:flex;align-items:center;gap:2rem}
 .brand{display:inline-flex;min-height:44px;align-items:center;gap:.75rem;text-decoration:none;min-width:max-content}
@@ -619,18 +623,18 @@ button{border:0}
 /* ===== Treppen-Laeufer links (dekorativ, 21.07.2026) ===== */
 .treppe-rail{position:fixed;left:0;top:0;bottom:0;width:120px;z-index:5;pointer-events:none;display:none}
 .js .treppe-rail{display:none}
-@media (min-width:1440px){ .js .treppe-rail{display:block} }
+@media (min-width:1400px){ .js .treppe-rail{display:block} }
 @media (prefers-reduced-motion:reduce){ .treppe-rail{display:none!important} }
 .treppe-rail canvas{width:100%;height:100%;display:block}
 
 /* Treppen-Laeufer: Wurf-Ebene + Griff (21.07.2026) */
 .treppe-overlay{position:fixed;inset:0;width:100%;height:100%;z-index:1550;pointer-events:none;display:none}
-@media (min-width:1440px){ .js .treppe-overlay{display:block} }
+@media (min-width:1400px){ .js .treppe-overlay{display:block} }
 .treppe-griff{position:fixed;left:0;top:0;width:44px;height:48px;z-index:1551;display:none;padding:0;border:0;background:transparent;cursor:grab;touch-action:none}
 .treppe-griff:active{cursor:grabbing}
 .treppe-griff:focus-visible{outline:3px solid var(--signal);outline-offset:3px;border-radius:.35rem}
 @media (prefers-reduced-motion:reduce){ .treppe-overlay,.treppe-griff{display:none!important} }
-@media (max-width:1439px){.treppe-rail,.treppe-overlay,.treppe-griff{display:none!important}}
+@media (max-width:1399px){.treppe-rail,.treppe-overlay,.treppe-griff{display:none!important}}
 
 /* Lesbarkeits-Boden auch fuer Preiszeilen + Konditionen (21.07.2026) */
 @media (max-width:720px){
