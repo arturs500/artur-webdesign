@@ -1,4 +1,82 @@
+# robots.txt — artur.ae
+# ---------------------------------------------------------------------------
+# Nutzungsvorbehalt fuer kommerzielles Text- und Data-Mining, soweit nach
+# § 44b Abs. 3 UrhG und Art. 4 Abs. 3 DSM-Richtlinie (EU) 2019/790 zulaessig.
+# Die Regeln unten unterscheiden Suchabruf und Modelltraining. robots.txt
+# ist ein maschinenlesbarer Nutzungshinweis, aber keine Zugangssperre.
+# ---------------------------------------------------------------------------
+
+# Normale Suchmaschinen (Google, Bing) - voll erlaubt, wichtig fuers Ranking.
 User-agent: *
+Allow: /
+
+# KI-SUCHE/ANTWORT-Bots erlauben (Zitate bringen echte Besucher; Blockieren kostet
+# nachweislich Traffic). Modelltraining bleibt ausdruecklich ausgeschlossen.
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: GPTBot
+Disallow: /
+
+# Weitere bekannte Trainings- und Datensammlungs-Crawler ausgeschlossen.
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: Claude-Web
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: Applebot-Extended
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+User-agent: Amazonbot
+Disallow: /
+
+User-agent: Meta-ExternalAgent
+Disallow: /
+
+User-agent: FacebookBot
+Disallow: /
+
+User-agent: cohere-ai
+Disallow: /
+
+User-agent: Diffbot
+Disallow: /
+
+User-agent: Omgilibot
+Disallow: /
+
+User-agent: ImagesiftBot
+Disallow: /
+
+User-agent: DataForSeoBot
+Disallow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: Claude-User
 Allow: /
 
 Sitemap: https://artur.ae/sitemap.xml

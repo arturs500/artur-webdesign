@@ -1,903 +1,677 @@
-<!DOCTYPE html>
-<html lang="de">
+<!doctype html>
+<html lang="de" class="no-js">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="robots" content="noindex,nofollow">
-<title>Kunden-App — Demo mit Beispieldaten</title>
-<style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#0a0a14;--bg2:#12121f;--card:#1a1a2e;--card2:#22223e;
-  --text:#e8eaf0;--dim:#8890a8;--dim2:#6b7088;
-  --green:#16a34a;--green-l:#22c55e;--green-d:#15803d;
-  --blue:#2563eb;--blue-l:#3b82f6;--blue-d:#1d4ed8;
-  --red:#ef4444;--yellow:#eab308;--orange:#f97316;--dark:#3f3f46;
-  --r:10px;--r-md:14px;--r-lg:20px
-}
-body{background:linear-gradient(135deg,#1a1a2e 0%,#0f0f1e 100%);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:var(--text)}
-.phone{width:380px;max-width:100%;height:760px;max-height:90vh;background:var(--bg);border-radius:36px;border:8px solid #1a1a2e;box-shadow:0 0 0 2px rgba(255,255,255,.05),0 20px 80px rgba(0,0,0,.6);overflow:hidden;position:relative;display:flex;flex-direction:column;transition:transform .18s ease-out;will-change:transform}
-@media (prefers-reduced-motion:reduce){.phone{transition:none!important;transform:none!important}}
-.phone::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:120px;height:24px;background:#1a1a2e;border-radius:0 0 14px 14px;z-index:100}
-.demo-band{display:none;position:absolute;top:24px;left:0;right:0;z-index:95;background:rgba(234,179,8,.92);color:#1a1a2e;font-size:.66rem;font-weight:800;text-align:center;padding:3px 8px;letter-spacing:.04em}
-.toast{position:absolute;bottom:70px;left:50%;transform:translateX(-50%) translateY(10px);background:rgba(34,197,94,.95);color:#0a0a14;font-size:.74rem;font-weight:700;padding:8px 16px;border-radius:50px;opacity:0;pointer-events:none;transition:all .25s ease;z-index:150;white-space:nowrap;max-width:92%;overflow:hidden;text-overflow:ellipsis}
-.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-.sim-btn{width:100%;margin-top:6px;background:transparent;border:1px dashed rgba(234,179,8,.35);color:var(--yellow);padding:11px;border-radius:var(--r-md);font-size:.76rem;font-weight:600;cursor:pointer;font-family:inherit;transition:all .2s}
-.sim-btn:hover{background:rgba(234,179,8,.06)}
-.screen{flex:1;overflow-y:auto;overflow-x:hidden;position:relative}
-.screen::-webkit-scrollbar{width:0}
-.svg-ic{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
-
-/* Login */
-.login{padding:40px 24px;display:flex;flex-direction:column;height:100%;justify-content:center;gap:14px}
-.login-logo{text-align:center;margin-bottom:16px}
-.login-logo .icon{width:64px;height:64px;border-radius:16px;background:linear-gradient(135deg,var(--blue),var(--blue-d));display:flex;align-items:center;justify-content:center;margin:0 auto 12px;color:#fff}
-.login-logo h2{font-size:1.3rem;font-weight:800}
-.login-logo p{font-size:.82rem;color:var(--dim2);margin-top:4px}
-.login-field{display:flex;flex-direction:column;gap:6px}
-.login-field label{font-size:.78rem;font-weight:600;color:var(--dim)}
-.login-field input{background:var(--card);border:2px solid rgba(255,255,255,.06);border-radius:var(--r);padding:12px 16px;color:var(--text);font-size:1rem;font-family:inherit;transition:border .2s}
-.login-field input:focus{outline:none;border-color:var(--blue)}
-.login-btn{background:linear-gradient(135deg,var(--blue),var(--blue-d));color:#fff;border:none;padding:13px;border-radius:var(--r);font-size:.95rem;font-weight:700;cursor:pointer;transition:all .2s;font-family:inherit;margin-top:6px}
-.login-btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(37,99,235,.3)}
-.login-error{color:var(--red);font-size:.8rem;text-align:center;min-height:18px}
-.login-hint{text-align:center;font-size:.72rem;color:var(--dim2);margin-top:8px}
-.login-help{margin-top:16px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.05);border-radius:var(--r);padding:14px}
-.login-help h4{font-size:.78rem;font-weight:700;margin-bottom:8px;color:var(--dim)}
-.login-help .step{display:flex;gap:8px;align-items:flex-start;margin-bottom:6px}
-.login-help .step-n{width:18px;height:18px;border-radius:50%;background:var(--blue-d);color:#fff;font-size:.65rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
-
-/* App Header */
-.app-header{padding:50px 20px 14px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,.05);background:var(--bg2)}
-.app-header .firm{display:flex;align-items:center;gap:10px}
-.app-header .firm-logo{width:36px;height:36px;border-radius:10px;background:rgba(37,99,235,.15);display:flex;align-items:center;justify-content:center;color:var(--blue-l);font-weight:800;font-size:.9rem}
-.app-header .firm-info b{font-size:.92rem;display:block}
-.app-header .firm-info small{font-size:.72rem;color:var(--dim2)}
-.app-header .badge-new{background:var(--red);color:#fff;font-size:.7rem;font-weight:700;padding:3px 10px;border-radius:50px;animation:pulse-bg 2s infinite}
-@keyframes pulse-bg{0%,100%{opacity:1}50%{opacity:.6}}
-
-/* Tabs */
-.tabs{display:flex;background:var(--bg2);border-bottom:1px solid rgba(255,255,255,.05)}
-.tab{flex:1;padding:12px 4px;background:none;border:none;color:var(--dim2);font-size:.76rem;font-weight:600;cursor:pointer;transition:color .2s;position:relative;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:4px}
-.tab.active{color:var(--blue-l)}
-.tab.active::after{content:"";position:absolute;bottom:0;left:20%;right:20%;height:2px;background:var(--blue-l);border-radius:2px}
-.tab .tab-badge{position:absolute;top:6px;right:22%;background:var(--red);color:#fff;font-size:.6rem;font-weight:700;min-width:16px;height:16px;border-radius:50px;display:flex;align-items:center;justify-content:center;padding:0 4px}
-
-/* Tab Content */
-.tab-content{padding:16px;display:none}
-.tab-content.active{display:block;animation:fadeIn .3s ease}
-@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-
-/* Filter Bar */
-.filter-bar{display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
-.filter-bar::-webkit-scrollbar{height:0}
-.filter-chip{padding:8px 14px;border-radius:50px;border:1px solid rgba(255,255,255,.08);background:transparent;color:var(--dim);font-size:.78rem;font-weight:600;cursor:pointer;transition:all .2s;white-space:nowrap;font-family:inherit;display:flex;align-items:center;gap:6px}
-.filter-chip:hover{border-color:rgba(255,255,255,.15);color:var(--text)}
-.filter-chip.active{background:var(--blue);color:#fff;border-color:var(--blue)}
-.filter-chip .chip-count{background:rgba(255,255,255,.15);font-size:.68rem;padding:1px 6px;border-radius:50px;font-weight:700}
-.filter-chip.active .chip-count{background:rgba(255,255,255,.25)}
-.filter-chip .chip-count.red{background:rgba(239,68,68,.2);color:var(--red)}
-.filter-chip.active .chip-count.red{background:rgba(255,255,255,.25);color:#fff}
-
-/* Section Headers */
-.sec-header{display:flex;justify-content:space-between;align-items:center;padding:14px 0 8px;cursor:pointer;user-select:none}
-.sec-header .sec-left{display:flex;align-items:center;gap:8px}
-.sec-header .sec-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.sec-header .sec-dot.red{background:var(--red)}
-.sec-header .sec-dot.yellow{background:var(--yellow)}
-.sec-header .sec-dot.blue{background:var(--blue-l)}
-.sec-header .sec-dot.green{background:var(--green-l)}
-.sec-header .sec-dot.gray{background:var(--dark)}
-.sec-header .sec-title{font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
-.sec-header .sec-count{font-size:.72rem;font-weight:600;color:var(--dim2);background:rgba(255,255,255,.04);padding:2px 8px;border-radius:50px}
-.sec-header .sec-toggle{font-size:.7rem;color:var(--dim2);transition:transform .2s}
-.sec-header.collapsed .sec-toggle{transform:rotate(-90deg)}
-.sec-body{overflow:hidden;transition:max-height .3s ease}
-.sec-body.collapsed{max-height:0!important}
-.sec-divider{height:1px;background:rgba(255,255,255,.04);margin:6px 0}
-.sec-archived-note{font-size:.72rem;color:var(--dim2);text-align:center;padding:6px 0 10px;font-style:italic}
-
-/* Lead Cards */
-.lead-card{background:var(--card);border-radius:var(--r-md);padding:13px 14px;margin-bottom:9px;border:1px solid rgba(255,255,255,.05);transition:all .2s;position:relative}
-.lead-card:hover{border-color:rgba(255,255,255,.1)}
-.lead-card.new{border-left:3px solid var(--red)}
-.lead-card.waiting{border-left:3px solid var(--yellow)}
-.lead-card.appointment{border-left:3px solid var(--yellow)}
-.lead-card.won{border-left:3px solid var(--green-l);opacity:.7}
-.lead-card.won:hover{opacity:.95}
-.lead-card.lost{border-left:3px solid var(--dark);opacity:.45;background:#101018}
-.lead-card.lost:hover{opacity:.7}
-.lead-card.new::before{content:"";position:absolute;top:0;right:0;width:8px;height:8px;background:var(--red);border-radius:0 0 0 8px}
-.lead-card .svg-ic{width:12px;height:12px}
-.lead-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:8px}
-.lead-top .name{font-size:.9rem;font-weight:700;line-height:1.3}
-.lead-meta{font-size:.68rem;color:var(--dim2);margin-top:2px}
-.lead-meta b{color:var(--dim);font-weight:600}
-.lead-top .time{font-size:.68rem;color:var(--dim2);white-space:nowrap;flex-shrink:0}
-.lead-msg{font-size:.8rem;color:var(--dim);margin-bottom:9px;line-height:1.45;font-style:italic}
-.lead-actions{display:flex;gap:6px;flex-wrap:wrap}
-.lead-btn{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:var(--text);padding:5px 10px;border-radius:7px;font-size:.72rem;font-weight:600;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:4px;font-family:inherit;text-decoration:none}
-.lead-btn:hover{border-color:rgba(255,255,255,.15);background:rgba(255,255,255,.06)}
-.lead-btn.call{background:rgba(34,197,94,.1);border-color:rgba(34,197,94,.2);color:var(--green-l)}
-.lead-btn.call:hover{background:rgba(34,197,94,.15)}
-.lead-btn.wa{background:rgba(37,99,235,.1);border-color:rgba(37,99,235,.2);color:var(--blue-l)}
-.lead-btn.wa:hover{background:rgba(37,99,235,.15)}
-.lead-btn.photo{background:rgba(234,179,8,.08);border-color:rgba(234,179,8,.2);color:var(--yellow)}
-.lead-btn.photo:hover{background:rgba(234,179,8,.14)}
-.lead-src{font-size:.6rem;color:var(--dim2);font-weight:600;background:rgba(255,255,255,.04);padding:1px 6px;border-radius:50px;display:inline-block;margin-top:3px}
-.news-card{background:rgba(37,99,235,.07);border:1px solid rgba(37,99,235,.18);border-radius:var(--r-md);padding:11px 14px;margin-bottom:12px;font-size:.76rem;color:var(--dim);line-height:1.6}
-.news-card b{color:var(--text)}
-.news-card .news-title{display:flex;align-items:center;gap:6px;font-weight:700;color:var(--blue-l);font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
-.photo-overlay{position:absolute;inset:0;background:rgba(10,10,20,.94);z-index:200;display:flex;flex-direction:column;padding:20px}
-.photo-overlay h4{font-size:.9rem;font-weight:700;margin-bottom:4px}
-.photo-overlay .po-sub{font-size:.7rem;color:var(--yellow);margin-bottom:14px}
-.photo-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;overflow-y:auto}
-.photo-tile{aspect-ratio:4/3;background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:var(--r);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--dim2);font-size:.66rem}
-.photo-close{margin-top:auto;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:var(--text);padding:11px;border-radius:var(--r);font-size:.85rem;font-weight:600;cursor:pointer;font-family:inherit;width:100%}
-.lead-status{display:inline-flex;align-items:center;gap:5px;font-size:.7rem;font-weight:700;padding:3px 9px;border-radius:50px;margin-top:7px}
-.lead-status.new{background:rgba(239,68,68,.12);color:var(--red)}
-.lead-status.waiting{background:rgba(234,179,8,.12);color:var(--yellow)}
-.lead-status.appointment{background:rgba(234,179,8,.12);color:var(--yellow)}
-.lead-status.won{background:rgba(34,197,94,.12);color:var(--green-l)}
-.lead-status.lost{background:rgba(63,63,70,.3);color:var(--dim2)}
-.status-dot{width:7px;height:7px;border-radius:50%;display:inline-block}
-.status-dot.new{background:var(--red)}
-.status-dot.waiting{background:var(--yellow)}
-.status-dot.appointment{background:var(--yellow)}
-.status-dot.won{background:var(--green-l)}
-.status-dot.lost{background:var(--dark)}
-.lead-revenue{font-size:.82rem;color:var(--green-l);font-weight:700;margin-top:6px}
-.lead-followup{font-size:.72rem;color:var(--orange);margin-top:6px;display:flex;align-items:center;gap:5px}
-.status-select{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
-.status-option{font-size:.68rem;padding:4px 8px;border-radius:6px;cursor:pointer;border:1px solid rgba(255,255,255,.08);background:transparent;color:var(--dim2);transition:all .15s;font-family:inherit}
-.status-option:hover{color:var(--text);border-color:rgba(255,255,255,.15)}
-.status-option.sel-new{background:rgba(239,68,68,.15);color:var(--red);border-color:rgba(239,68,68,.2)}
-.status-option.sel-waiting{background:rgba(234,179,8,.15);color:var(--yellow);border-color:rgba(234,179,8,.2)}
-.status-option.sel-appointment{background:rgba(234,179,8,.15);color:var(--yellow);border-color:rgba(234,179,8,.2)}
-.status-option.sel-won{background:rgba(34,197,94,.15);color:var(--green-l);border-color:rgba(34,197,94,.2)}
-.status-option.sel-lost{background:rgba(63,63,70,.35);color:var(--dim2);border-color:rgba(63,63,70,.5)}
-.revenue-input{margin-top:8px;display:none;align-items:center;gap:8px}
-.revenue-input.show{display:flex}
-.revenue-input input{width:80px;background:var(--card2);border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:6px 10px;color:var(--text);font-size:.85rem;font-family:inherit}
-.revenue-input input:focus{outline:none;border-color:var(--green-l)}
-.revenue-input button{background:var(--green-d);color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:inherit}
-.lead-empty{text-align:center;padding:40px 20px;color:var(--dim2)}
-.lead-empty svg{margin-bottom:10px;opacity:.3}
-.lead-empty p{font-size:.85rem}
-
-/* Stats */
-.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
-.stat-card{background:var(--card);border-radius:var(--r-md);padding:18px 16px;border:1px solid rgba(255,255,255,.05);text-align:center}
-.stat-card .num{font-size:1.8rem;font-weight:900;letter-spacing:-.02em}
-.stat-card .lbl{font-size:.76rem;color:var(--dim2);margin-top:4px}
-.stat-card.green .num{color:var(--green-l)}
-.stat-card.blue .num{color:var(--blue-l)}
-.stat-card.yellow .num{color:var(--yellow)}
-.chart-card{background:var(--card);border-radius:var(--r-md);padding:18px;border:1px solid rgba(255,255,255,.05);margin-bottom:10px}
-.chart-card h4{font-size:.82rem;font-weight:700;margin-bottom:14px}
-.chart-bars{display:flex;align-items:flex-end;gap:6px;height:120px}
-.chart-bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;height:100%}
-.chart-bar .bar{width:100%;background:linear-gradient(180deg,var(--blue-l),var(--blue-d));border-radius:4px 4px 0 0;transition:height .5s ease;min-height:4px}
-.chart-bar .bar.won{background:linear-gradient(180deg,var(--green-l),var(--green-d))}
-.chart-bar .lbl{font-size:.68rem;color:var(--dim2)}
-.chart-legend{display:flex;gap:14px;margin-top:10px;font-size:.72rem;color:var(--dim)}
-.chart-legend span{display:flex;align-items:center;gap:5px}
-.chart-legend .dot{width:8px;height:8px;border-radius:2px}
-.chart-legend .dot.blue{background:var(--blue-l)}
-.chart-legend .dot.green{background:var(--green-l)}
-.distribution{display:flex;flex-direction:column;gap:8px;margin-top:6px}
-.dist-row{display:flex;align-items:center;gap:10px}
-.dist-row .dist-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
-.dist-row .dist-label{font-size:.82rem;color:var(--dim);flex:1}
-.dist-row .dist-val{font-size:.82rem;font-weight:700}
-
-/* Settings */
-.settings-group{background:var(--card);border-radius:var(--r-md);padding:4px 16px;border:1px solid rgba(255,255,255,.05);margin-bottom:10px}
-.settings-group h4{font-size:.78rem;font-weight:700;color:#9aa5c9;text-transform:uppercase;letter-spacing:.05em;padding:14px 0 8px}
-.empf-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
-.empf-row input{flex:1;background:var(--card2);border:1px solid rgba(255,255,255,.08);border-radius:var(--r);padding:9px 12px;color:var(--text);font-size:.82rem;font-family:inherit}
-.empf-row input:focus{outline:none;border-color:var(--blue)}
-.empf-add{background:rgba(37,99,235,.12);border:1px solid rgba(37,99,235,.25);color:var(--blue-l);width:34px;height:34px;border-radius:9px;font-size:1.1rem;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0}
-.empf-add:hover{background:rgba(37,99,235,.2)}
-.empf-remove{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.18);color:var(--red);width:34px;height:34px;border-radius:9px;font-size:.95rem;cursor:pointer;font-family:inherit;flex-shrink:0}
-.settings-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.04)}
-.settings-row:last-child{border-bottom:none}
-.settings-row .sr-label{font-size:.88rem}
-.settings-row .sr-val{font-size:.82rem;color:var(--dim)}
-.settings-toggle{width:40px;height:22px;border-radius:50px;background:var(--green-d);position:relative;cursor:pointer;transition:background .2s;border:none}
-.settings-toggle::after{content:"";position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:all .2s}
-.settings-toggle.off{background:rgba(255,255,255,.1)}
-.settings-toggle.off::after{right:auto;left:2px}
-.settings-textarea{width:100%;background:var(--card2);border:1px solid rgba(255,255,255,.08);border-radius:var(--r);padding:10px 14px;color:var(--text);font-size:.82rem;font-family:inherit;margin:8px 0;resize:vertical;min-height:60px}
-.settings-textarea:focus{outline:none;border-color:var(--blue)}
-.settings-info{font-size:.72rem;color:var(--orange);padding:8px 12px;background:rgba(249,115,22,.06);border:1px solid rgba(249,115,22,.12);border-radius:8px;margin:6px 0;line-height:1.5}
-.settings-save{background:linear-gradient(135deg,var(--blue),var(--blue-d));color:#fff;border:none;padding:8px 18px;border-radius:var(--r);font-size:.82rem;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:12px}
-.logout-btn{background:rgba(239,68,68,.08);color:var(--red);border:1px solid rgba(239,68,68,.15);width:100%;padding:12px;border-radius:var(--r);font-size:.88rem;font-weight:600;cursor:pointer;font-family:inherit;transition:all .2s}
-.logout-btn:hover{background:rgba(239,68,68,.12)}
-.settings-footer{text-align:center;font-size:.72rem;color:var(--dim2);padding:16px 0}
-.settings-footer a{color:var(--dim)}
-
-/* Support */
-.support-intro{font-size:.82rem;color:var(--dim);margin-bottom:14px;line-height:1.6;padding:0 4px}
-.support-form{background:var(--card);border-radius:var(--r-md);padding:16px;border:1px solid rgba(255,255,255,.05)}
-.support-form label{display:block;font-size:.78rem;font-weight:600;color:var(--dim);margin-bottom:5px}
-.support-form select{width:100%;background:var(--card2);border:1px solid rgba(255,255,255,.08);border-radius:var(--r);padding:10px 14px;color:var(--text);font-size:.88rem;font-family:inherit;margin-bottom:12px}
-.support-form select:focus{outline:none;border-color:var(--blue)}
-.support-form textarea{width:100%;background:var(--card2);border:1px solid rgba(255,255,255,.08);border-radius:var(--r);padding:10px 14px;color:var(--text);font-size:.88rem;font-family:inherit;margin-bottom:12px;resize:vertical;min-height:80px}
-.support-form textarea:focus{outline:none;border-color:var(--blue)}
-.support-btn{background:linear-gradient(135deg,var(--blue),var(--blue-d));color:#fff;border:none;padding:11px;border-radius:var(--r);font-size:.88rem;font-weight:600;cursor:pointer;font-family:inherit;width:100%}
-.support-success{text-align:center;padding:30px 0}
-.support-success .check-circle{width:56px;height:56px;border-radius:50%;background:rgba(34,197,94,.12);border:2px solid rgba(34,197,94,.3);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;color:var(--green-l)}
-.support-success h3{font-size:1.1rem;margin-bottom:6px}
-.support-success p{color:var(--dim);font-size:.85rem;line-height:1.6}
-.support-contact{margin-top:16px;background:var(--card);border-radius:var(--r-md);padding:14px 16px;border:1px solid rgba(255,255,255,.05)}
-.support-contact h4{font-size:.82rem;font-weight:700;margin-bottom:10px}
-.support-contact .sc-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:.82rem;text-decoration:none;color:inherit}
-.support-contact .sc-ic{width:32px;height:32px;border-radius:8px;background:rgba(37,99,235,.1);display:flex;align-items:center;justify-content:center;color:var(--blue-l);flex-shrink:0}
-.support-contact .sc-row b{display:block;font-size:.84rem}
-.support-contact .sc-row small{color:var(--dim2);font-size:.72rem}
-.help-card{background:var(--card);border-radius:var(--r-md);padding:16px;border:1px solid rgba(255,255,255,.05);margin-top:16px}
-.help-card h4{font-size:.82rem;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:7px}
-.help-card .help-ic{width:24px;height:24px;border-radius:7px;background:rgba(37,99,235,.1);display:flex;align-items:center;justify-content:center;color:var(--blue-l);flex-shrink:0}
-.help-step{display:flex;gap:10px;align-items:flex-start;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.04)}
-.help-step:first-of-type{border-top:none;padding-top:0;margin-top:0}
-.help-step .hs-n{width:22px;height:22px;border-radius:50%;background:var(--blue-d);color:#fff;font-size:.72rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.help-step .hs-text{font-size:.8rem;color:var(--dim);line-height:1.6}
-.help-step .hs-text b{color:var(--text)}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="description" content="Interaktive Demo eines Anfragen-Systems mit Kunden-App. Alle Demo-Namen und Vorgänge sind frei erfundene Beispiele.">
+  <meta name="theme-color" content="#07191f">
+  <link rel="icon" href="favicon.png" type="image/png">
+  <title>Kunden-App ausprobieren | Artur WebDesign</title>
+  <link rel="stylesheet" href="assets/site.css?v=74">
+  <script>document.documentElement.classList.replace('no-js','js');</script>
   <style>
-    /* Handy-Lesbarkeits-Boden (20.07.2026): Demo-Texte liefen mit 9,6-12,5 px */
+    @font-face{font-family:"Demo Space";src:url("assets/fonts/space-grotesk-500.woff2") format("woff2");font-weight:500;font-style:normal;font-display:swap}
+    @font-face{font-family:"Demo Space";src:url("assets/fonts/space-grotesk-700.woff2") format("woff2");font-weight:700;font-style:normal;font-display:swap}
+    @font-face{font-family:"Demo News";src:url("assets/fonts/newsreader-latin-normal.woff2") format("woff2");font-weight:400;font-style:normal;font-display:swap}
+    :root{
+      --demo-ink:#07191f;
+      --demo-ink-2:#122426;
+      --demo-paper:#f1ebde;
+      --demo-paper-2:#faf8f2;
+      --demo-line:#c9cbc3;
+      --demo-muted:#566264;
+      --demo-aqua:#49cad4;
+      --demo-aqua-dark:#076f78;
+      --demo-lime:#d8f36c;
+      --demo-red:#b43b33;
+      --demo-amber:#a66500;
+      --demo-green:#176b4b;
+      --demo-max:1180px;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    html{scroll-behavior:smooth;background:var(--demo-ink)}
+    body.v8-demo-page{margin:0;background:var(--demo-paper);color:var(--demo-ink);font-family:"Demo Space",system-ui,sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased}
+    .v8-demo-page button,.v8-demo-page input,.v8-demo-page select,.v8-demo-page textarea{font:inherit}
+    .v8-demo-page button{cursor:pointer}
+    .v8-demo-page a{color:inherit}
+    .v8-demo-page :focus-visible{outline:3px solid var(--demo-aqua-dark);outline-offset:3px}
+    .demo-wrap{width:min(calc(100% - 40px),var(--demo-max));margin-inline:auto}
+    .demo-skip{position:fixed;z-index:999;left:1rem;top:1rem;padding:.75rem 1rem;background:#62d5ff;color:var(--demo-ink);font-weight:700;transform:translateY(-160%)}
+    .demo-skip:focus{transform:none}
+    .demo-topbar{position:sticky;z-index:50;top:0;background:rgba(7,25,31,.94);color:#fff;border-bottom:1px solid rgba(241,235,222,.16);backdrop-filter:blur(12px)}
+    .demo-topbar__row{min-height:70px;display:flex;align-items:center;justify-content:space-between;gap:1.5rem}
+    .demo-brand{display:inline-flex;min-width:44px;min-height:44px;align-items:center;justify-content:center;gap:.72rem;text-decoration:none;font-weight:700;letter-spacing:-.03em}
+    .demo-brand__mark{display:grid;place-items:center;width:34px;height:34px;border:1px solid #62d5ff;color:#62d5ff;font-family:"Demo News",serif;font-size:1.45rem}
+    .demo-back{display:inline-flex;min-height:44px;align-items:center;font-size:.88rem;font-weight:700;text-underline-offset:4px}
+    .demo-hero{padding:clamp(4rem,8vw,7.5rem) 0 3.25rem;border-bottom:1px solid var(--demo-line);overflow:hidden}
+    .demo-hero__grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(280px,.55fr);gap:clamp(2rem,7vw,7rem);align-items:end}
+    .demo-kicker{display:flex;align-items:center;gap:.7rem;margin:0 0 1.2rem;color:var(--demo-ink);font-size:.75rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase}
+    .demo-kicker::before{content:"";width:2.4rem;height:2px;background:currentColor}
+    .demo-hero h1{max-width:900px;margin:0;font-family:"Demo News",Georgia,serif;font-size:clamp(3.15rem,8.8vw,7.6rem);font-weight:400;letter-spacing:-.065em;line-height:.84}
+    .demo-hero h1 em{color:var(--demo-ink);font-style:normal}
+    .demo-lead{max-width:44rem;margin:1.8rem 0 0;color:#314042;font-size:clamp(1.05rem,1.7vw,1.3rem)}
+    .demo-note{border-top:3px solid var(--demo-ink);padding-top:1rem}
+    .demo-note strong{display:block;margin-bottom:.45rem;font-size:.77rem;letter-spacing:.12em;text-transform:uppercase}
+    .demo-note p{margin:.35rem 0;color:var(--demo-muted);font-size:.92rem}
+    .demo-note .demo-price{margin-top:1.2rem;color:var(--demo-ink);font-family:"Demo News",serif;font-size:1.55rem;line-height:1.1}
+    .demo-section{padding:clamp(3.5rem,7vw,6.5rem) 0}
+    .demo-section--dark{background:var(--demo-ink);color:#f4f2e9}
+    .demo-section__head{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,.55fr);gap:2rem;margin-bottom:2rem;align-items:end}
+    .demo-section__head h2{max-width:760px;margin:0;font-family:"Demo News",Georgia,serif;font-size:clamp(2.5rem,5vw,4.7rem);font-weight:400;letter-spacing:-.055em;line-height:.94}
+    .demo-section__head p{margin:0;color:var(--demo-muted)}
+    .demo-section--dark .demo-section__head p{color:#b8c2c1}
+    .demo-evidence{display:flex;gap:.55rem;flex-wrap:wrap;margin-top:1rem}
+    .demo-chip{display:inline-flex;align-items:center;gap:.4rem;padding:.42rem .75rem;border:1px solid var(--demo-line);border-radius:99px;background:var(--demo-paper-2);font-size:.75rem;font-weight:700}
+    .demo-chip::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--demo-aqua-dark)}
+    .demo-shell{overflow:hidden;border:1px solid #304245;background:#f7f6f0;box-shadow:0 32px 80px rgba(0,0,0,.28)}
+    .demo-shell__bar{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.85rem 1rem;background:#101f21;color:#eef4f2;border-bottom:1px solid #304245}
+    .demo-shell__dots{display:flex;gap:.4rem}
+    .demo-shell__dots i{display:block;width:8px;height:8px;border-radius:50%;background:#65787a}
+    .demo-shell__title{font-size:.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+    .demo-shell__state{padding:.28rem .55rem;background:var(--demo-lime);color:var(--demo-ink);font-size:.75rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+    .demo-app{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:650px;background:#edf0ec;color:var(--demo-ink)}
+    .demo-app__nav{padding:1.15rem;background:#142628;color:#eef4f2;border-right:1px solid #304245}
+    .demo-app__firm{padding:.6rem .55rem 1.2rem;border-bottom:1px solid rgba(255,255,255,.12)}
+    .demo-app__firm span{display:block;color:var(--demo-aqua);font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+    .demo-app__firm strong{display:block;margin-top:.25rem;font-size:.92rem}
+    .demo-tabs{display:grid;gap:.35rem;margin-top:1.1rem}
+    .demo-tab{width:100%;padding:.78rem .8rem;border:1px solid transparent;background:transparent;color:#bdc9c8;text-align:left;font-size:.85rem;font-weight:700}
+    .demo-tab[aria-selected="true"]{background:var(--demo-aqua);color:var(--demo-ink)}
+    .demo-tab:hover{border-color:#4d6264;color:#fff}
+    .no-js .demo-tab{cursor:default}
+    .demo-app__small{margin:1.4rem .55rem 0;color:#91a2a3;font-size:.75rem;line-height:1.5}
+    .demo-app__content{min-width:0;padding:clamp(1rem,2.5vw,2rem)}
+    .app-panel{display:block;margin-bottom:3rem}
+    .app-panel:last-child{margin-bottom:0}
+    .js .app-panel[hidden]{display:none}
+    .app-panel__head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;margin-bottom:1.2rem}
+    .app-panel__head h3{margin:0;font-family:"Demo News",serif;font-size:2rem;font-weight:400;letter-spacing:-.04em}
+    .app-panel__head p{margin:.2rem 0 0;color:var(--demo-muted);font-size:.82rem}
+    .app-button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:.65rem .9rem;border:1px solid var(--demo-ink);background:var(--demo-ink);color:#fff;font-size:.78rem;font-weight:700;text-decoration:none}
+    .app-button:hover{background:var(--demo-aqua-dark);border-color:var(--demo-aqua-dark)}
+    .app-button--quiet{background:transparent;color:var(--demo-ink)}
+    .app-button--quiet:hover{background:#dfe7e2;color:var(--demo-ink);border-color:var(--demo-ink)}
+    .app-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.7rem;margin-bottom:1.2rem}
+    .app-metric{padding:1rem;background:#fff;border:1px solid #cdd5d0}
+    .app-metric span{display:block;color:var(--demo-muted);font-size:.75rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase}
+    .app-metric strong{display:block;margin-top:.25rem;font-family:"Demo News",serif;font-size:1.7rem;font-weight:400;line-height:1}
+    .app-filter{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:0 0 1rem;padding:0;border:0}
+    .app-filter legend{float:left;margin:0 .45rem 0 0;padding:.45rem 0;font-size:.75rem;font-weight:700}
+    .app-filter__button{min-height:44px;padding:.45rem .75rem;border:1px solid #bdc8c3;background:#fff;color:var(--demo-ink);font-size:.75rem;font-weight:700}
+    .app-filter__button[aria-pressed="true"]{border-color:var(--demo-ink);background:var(--demo-ink);color:#fff}
+    .app-filter__result{width:100%;margin:.25rem 0 0;color:var(--demo-muted);font-size:.75rem}
+    .app-leads{display:grid;gap:.7rem}
+    .app-lead{position:relative;padding:1rem;background:#fff;border:1px solid #cdd5d0;border-left:5px solid #879594}
+    .app-lead[data-status="new"]{border-left-color:var(--demo-red)}
+    .app-lead[data-status="waiting"]{border-left-color:var(--demo-amber)}
+    .app-lead[data-status="appointment"]{border-left-color:var(--demo-aqua-dark)}
+    .app-lead[data-status="won"]{border-left-color:var(--demo-green)}
+    .app-lead__top{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1rem;align-items:start}
+    .app-lead__name{margin:0;font-size:.95rem}
+    .app-lead__meta{margin:.2rem 0 0;color:var(--demo-muted);font-size:.75rem}
+    .app-lead__status{display:inline-flex;align-items:center;gap:.35rem;padding:.27rem .52rem;background:#edf0ec;font-size:.75rem;font-weight:700;white-space:nowrap}
+    .app-lead__status::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+    .app-lead__message{margin:.85rem 0;color:#263638;font-size:.82rem}
+    .app-lead__actions{display:flex;align-items:end;gap:.55rem;flex-wrap:wrap}
+    .app-lead__actions label{display:grid;gap:.2rem;color:var(--demo-muted);font-size:.75rem;font-weight:700}
+    .app-lead__actions select{min-height:44px;padding:.42rem 2rem .42rem .55rem;border:1px solid #aebbb6;background:#fff;color:var(--demo-ink)}
+    .app-detail{margin-top:.8rem;border-top:1px solid #e1e5e1;padding-top:.65rem}
+    .app-detail summary{display:flex;align-items:center;min-height:44px;cursor:pointer;font-size:.75rem;font-weight:700}
+    .app-detail p{margin:.55rem 0 0;color:var(--demo-muted);font-size:.76rem}
+    .app-empty{padding:2rem;border:1px dashed #aebbb6;text-align:center;color:var(--demo-muted)}
+    .app-chart{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(240px,.85fr);gap:1rem}
+    .app-card{padding:1.2rem;background:#fff;border:1px solid #cdd5d0}
+    .app-card h4{margin:0 0 .35rem;font-size:.9rem}
+    .app-card > p{margin:.2rem 0 1rem;color:var(--demo-muted);font-size:.76rem}
+    .app-bars{display:grid;gap:.8rem;margin-top:1rem}
+    .app-bar__label{display:flex;justify-content:space-between;gap:1rem;font-size:.75rem;font-weight:700}
+    .app-bar__track{height:11px;margin-top:.25rem;background:#e5e9e5}
+    .app-bar__fill{display:block;height:100%;background:var(--demo-aqua-dark)}
+    .app-table{width:100%;border-collapse:collapse;font-size:.76rem}
+    .app-table th,.app-table td{padding:.65rem .2rem;border-bottom:1px solid #dde2de;text-align:left}
+    .app-table th:last-child,.app-table td:last-child{text-align:right}
+    .app-settings{display:grid;gap:1rem}
+    .app-setting{padding:1rem;background:#fff;border:1px solid #cdd5d0}
+    .app-setting__row{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem}
+    .app-setting h4{margin:0;font-size:.9rem}
+    .app-setting p{margin:.25rem 0 0;color:var(--demo-muted);font-size:.75rem}
+    .app-switch{display:flex;align-items:center;gap:.5rem;flex:0 0 auto;font-size:.75rem;font-weight:700}
+    .app-switch input{width:1.15rem;height:1.15rem;accent-color:var(--demo-aqua-dark)}
+    .app-setting label:not(.app-switch){display:grid;gap:.35rem;margin-top:.85rem;color:var(--demo-muted);font-size:.75rem;font-weight:700}
+    .app-setting select,.app-setting textarea{width:100%;padding:.65rem;border:1px solid #aebbb6;background:#fff;color:var(--demo-ink)}
+    .app-setting textarea{min-height:88px;resize:vertical}
+    .app-demo-note{margin:1rem 0 0;padding:.8rem;border-left:3px solid var(--demo-aqua-dark);background:#e5efec;color:#304143;font-size:.75rem}
+    .demo-offer{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(270px,.75fr);gap:clamp(2rem,7vw,6rem);align-items:start}
+    .demo-offer h2{margin:0;font-family:"Demo News",serif;font-size:clamp(2.7rem,5.7vw,5.3rem);font-weight:400;letter-spacing:-.06em;line-height:.9}
+    .demo-offer__copy p{max-width:44rem;color:#b9c4c3}
+    .demo-offer__facts{border-top:1px solid #506062}
+    .demo-offer__fact{display:flex;justify-content:space-between;gap:1rem;padding:1rem 0;border-bottom:1px solid #506062}
+    .demo-offer__fact span{color:#aab8b7;font-size:.76rem}
+    .demo-offer__fact strong{text-align:right;font-size:.86rem}
+    .demo-cta{display:flex;gap:.75rem;flex-wrap:wrap;margin-top:1.5rem}
+    .demo-cta a{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:.75rem 1rem;border:1px solid #62d5ff;background:#62d5ff;color:var(--demo-ink);font-size:.82rem;font-weight:700;text-decoration:none}
+    .demo-cta a:last-child{background:transparent;color:#fff;border-color:rgba(251,253,254,.36)}
+    .demo-footer{padding:1.5rem 0;background:#07191f;color:#aebcbb;border-top:1px solid rgba(241,235,222,.16);font-size:.76rem}
+    .demo-footer__row{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+    .demo-footer a{display:inline-flex;align-items:center;min-height:44px;text-underline-offset:3px}
+    .demo-toast{position:fixed;z-index:90;right:1rem;bottom:1rem;max-width:min(360px,calc(100% - 2rem));padding:.85rem 1rem;background:var(--demo-lime);color:var(--demo-ink);box-shadow:0 15px 35px rgba(0,0,0,.25);font-size:.78rem;font-weight:700;opacity:0;transform:translateY(12px);pointer-events:none;transition:opacity .2s,transform .2s}
+    .demo-toast.is-visible{opacity:1;transform:none}
+    @media (max-width:900px){
+      .demo-hero__grid,.demo-section__head,.demo-offer{grid-template-columns:1fr}
+      .demo-app{grid-template-columns:1fr}
+      .demo-app__nav{border-right:0;border-bottom:1px solid #304245}
+      .demo-tabs{grid-template-columns:repeat(3,1fr)}
+      .demo-app__small{margin-top:.8rem}
+      .app-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .app-chart{grid-template-columns:1fr}
+    }
+    @media (max-width:620px){
+      .demo-wrap{width:min(calc(100% - 24px),var(--demo-max))}
+      .demo-topbar__row{min-height:60px}
+      .demo-brand__text{display:none}
+      .demo-back{font-size:.78rem}
+      .demo-hero{padding-top:3.5rem}
+      .demo-hero h1{font-size:clamp(3rem,17vw,5.5rem)}
+      .demo-tabs{grid-template-columns:1fr}
+      .demo-tab{text-align:center}
+      .app-panel__head{display:grid}
+      .app-metrics{grid-template-columns:1fr 1fr}
+      .app-lead__top{grid-template-columns:1fr}
+      .app-lead__status{justify-self:start}
+      .app-setting__row{display:grid}
+      .demo-shell__title{display:none}
+    }
+    @media (prefers-reduced-motion:reduce){
+      html{scroll-behavior:auto}
+      *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+      .demo-toast{transform:none}
+    }
+  
+    /* ===== Handy-Lesbarkeits-Boden (Nachpruefung Design-Review 20.07.2026) =====
+       Grund: Info-Ebene lief mit 9,6-12 px — auf dem Handy schlecht lesbar. */
     @media (max-width:720px){
-      .demo-band{font-size:.74rem}
-      .toast{font-size:.85rem}
-      .sim-btn{font-size:.85rem;min-height:44px}
-      .login-field label{font-size:.85rem}
-      .login-hint{font-size:.8rem}
-      .login-help h4{font-size:.85rem}
-      .login-help p{font-size:.85rem}
-      /* Inline-Groessen im HTML (style=...) schlagen normale Regeln — darum hier !important */
-      p[style*="font-size:.72rem"]{font-size:.85rem!important}
-      p[style*="font-size:.74rem"]{font-size:.85rem!important}
-      .login-hint[style*="font-size:.78rem"]{font-size:.85rem!important}
-      .login-help .step-n{font-size:.75rem}
-      .app-header .firm-info small{font-size:.8rem}
-      .app-header .badge-new{font-size:.78rem}
-      .tab{font-size:.85rem;min-height:44px}
-      .tab .tab-badge{font-size:.7rem}
-      .filter-chip{font-size:.85rem;min-height:44px}
-      .filter-chip .chip-count{font-size:.78rem}
-      .sec-header .sec-count{font-size:.8rem}
-      .sec-header .sec-toggle{font-size:.8rem;min-height:44px}
-      .sec-archived-note{font-size:.82rem}
-      .lead-meta{font-size:.82rem}
-      .lead-top .time{font-size:.8rem}
-      .lead-btn{font-size:.82rem;min-height:44px}
-      .lead-src{font-size:.72rem}
-      .news-card{font-size:.85rem}
-      .news-card .news-title{font-size:.82rem}
-      .photo-overlay .po-sub{font-size:.8rem}
-      .photo-tile{font-size:.78rem}
-      .lead-status{font-size:.8rem}
-      .lead-followup{font-size:.82rem}
-      .status-option{font-size:.8rem;min-height:44px}
-      .revenue-input button{font-size:.85rem;min-height:44px}
-      .stat-card .lbl{font-size:.82rem}
-      .chart-bar .lbl{font-size:.78rem}
-      .chart-legend{font-size:.8rem}
-      .settings-group h4{font-size:.85rem}
-      .settings-info{font-size:.82rem}
-      .settings-footer{font-size:.82rem}
-      .support-form label{font-size:.85rem}
-      .support-contact .sc-row small{font-size:.8rem}
-      .help-step .hs-n{font-size:.8rem}
+      .demo-kicker{font-size:.8rem}
+      .demo-note p,.demo-hero__lead,.demo-app__small,.app-panel__head p,
+      .app-filter__result,.app-lead__meta,.app-lead__message,
+      .app-detail summary,.app-detail p,.app-card > p,
+      .app-setting p,.app-demo-note,.demo-offer > p,
+      .demo-offer__fact span,.demo-footer{
+        font-size:1rem;
+      }
+      .demo-note strong{font-size:.85rem}
+      .demo-chip{font-size:.8rem}
+      .demo-shell__title{font-size:.85rem}
+      .demo-shell__state{font-size:.78rem}
+      .demo-app__firm span{font-size:.8rem}
+      .app-button{font-size:.85rem;min-height:44px}
+      .app-metric span{font-size:.8rem}
+      .app-filter legend{font-size:.8rem}
+      .app-filter__button{font-size:.82rem;min-height:44px}
+      .app-lead__status{font-size:.78rem}
+      .app-lead__actions label{font-size:.875rem}
+      .app-lead__actions select{font-size:.85rem;min-height:44px}
+      .app-bar__label{font-size:.8rem}
+      .app-table{font-size:1rem}
+      .app-switch{font-size:.8rem}
+      .app-setting label:not(.app-switch){font-size:.875rem}
     }
   </style>
 </head>
-<body>
+<body class="v8-demo-page">
+  <a class="demo-skip" href="#inhalt">Zum Inhalt springen</a>
 
-<div class="phone">
-  <div class="demo-band" id="demo-band">Demo — alle Daten sind Beispieldaten</div>
-  <div class="toast" id="toast"></div>
-  <div class="photo-overlay" id="photo-overlay" style="display:none">
-    <h4 id="po-title">Fotos zur Anfrage</h4>
-    <div class="po-sub">Beispiel-Fotos (Demo) — in der echten App sehen Sie hier die Bilder des Kunden.</div>
-    <div class="photo-grid" id="photo-grid"></div>
-    <button class="photo-close" onclick="closePhotos()">Schließen</button>
-  </div>
-  <div class="screen" id="app-screen">
-
-    <div class="login" id="login-screen">
-      <div class="login-logo">
-        <div class="icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg></div>
-        <h2>Kunden-App</h2>
-        <p>Melden Sie sich mit Ihrem Firmencode an</p>
-      </div>
-      <div class="login-field">
-        <label>Firmencode</label>
-        <input type="text" id="firm-code" placeholder="Ihr Firmencode">
-      </div>
-      <div class="login-field">
-        <label>PIN</label>
-        <input type="password" id="pin-input" placeholder="4-stellige PIN" maxlength="4">
-      </div>
-      <div class="login-error" id="login-error"></div>
-      <button class="login-btn" onclick="enterApp()">Demo ansehen — ohne PIN →</button>
-      <button class="login-btn" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);box-shadow:none;margin-top:0" onclick="doLogin()">Einloggen (mit Firmencode)</button>
-      <p class="login-hint">Demo-PIN: <strong>1234</strong> — die echte App ist durch Firmencode, PIN und Fehlversuch-Sperre geschützt.</p>
-      <p class="login-hint" style="color:var(--yellow);font-size:.78rem;font-weight:600;background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.25);border-radius:8px;padding:8px 12px;margin-top:4px">Dies ist eine Vorführ-Version mit Beispieldaten — keine echten Kundendaten. In Ihrer App stehen Ihr Firmenname, Ihr Logo und Ihr Standort.</p>
-      <div class="login-help">
-        <h4>Was Ihnen das bringt — in einem Satz</h4>
-        <p style="font-size:.74rem;color:var(--dim);line-height:1.6;margin-bottom:10px">Jede Kundenanfrage wird automatisch beantwortet und landet sortiert in dieser App. <b style="color:var(--text)">Keine Formular-Anfrage geht unter</b> — auch nicht die um 22 Uhr.</p>
-        <h4>So funktioniert die App</h4>
-        <div class="step"><div class="step-n">1</div><p style="font-size:.72rem;color:var(--dim2);line-height:1.6">Ein Kunde füllt das Formular auf Ihrer Website aus — zu jeder Tages- und Nachtzeit.</p></div>
-        <div class="step"><div class="step-n">2</div><p style="font-size:.72rem;color:var(--dim2);line-height:1.6">Der Kunde bekommt in wenigen Minuten eine automatische Bestätigung. Keine Anfrage geht mehr unter.</p></div>
-        <div class="step"><div class="step-n">3</div><p style="font-size:.72rem;color:var(--dim2);line-height:1.6">Sie sehen die Anfrage in Ihrer App — mit Name, Nachricht, Fotos und Anruf-Button.</p></div>
-        <div class="step"><div class="step-n">4</div><p style="font-size:.72rem;color:var(--dim2);line-height:1.6">Hat der Kunde nach 3 Tagen nicht reagiert? Die App erinnert ihn automatisch — aber nur, wenn er wirklich nicht geantwortet hat.</p></div>
-      </div>
+  <header class="demo-topbar">
+    <div class="demo-wrap demo-topbar__row">
+      <a class="demo-brand" href="/" aria-label="Artur WebDesign – Startseite">
+        <span class="demo-brand__mark" aria-hidden="true">A</span>
+        <span class="demo-brand__text">Artur WebDesign</span>
+      </a>
+      <a class="demo-back" href="/">Zurück zur Startseite</a>
     </div>
+  </header>
 
-    <div id="app-main" style="display:none;flex-direction:column;height:100%">
-
-      <div class="app-header">
-        <div class="firm">
-          <div class="firm-logo">BR</div>
-          <div class="firm-info"><b>Brandner &amp; Roth Haustechnik</b><small>Ihr Standort</small></div>
-        </div>
-        <div class="badge-new" id="new-badge">3 neu</div>
-      </div>
-
-      <div class="tabs">
-        <button class="tab active" data-tab="leads" onclick="switchTab('leads')">
-          <svg class="svg-ic" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-          Anfragen
-          <span class="tab-badge" id="tab-badge">3</span>
-        </button>
-        <button class="tab" data-tab="stats" onclick="switchTab('stats')">
-          <svg class="svg-ic" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
-          Statistik
-        </button>
-        <button class="tab" data-tab="settings" onclick="switchTab('settings')">
-          <svg class="svg-ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-1.8-.3 1.6 1.6 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.6 1.6 0 00-1-1.5 1.6 1.6 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.6 1.6 0 00.3-1.8 1.6 1.6 0 00-1.5-1H3a2 2 0 110-4h.1a1.6 1.6 0 001.5-1 1.6 1.6 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.6 1.6 0 001.8.3H9a1.6 1.6 0 001-1.5V3a2 2 0 114 0v.1a1.6 1.6 0 001 1.5 1.6 1.6 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.6 1.6 0 00-.3 1.8V9a1.6 1.6 0 001.5 1H21a2 2 0 110 4h-.1a1.6 1.6 0 00-1.5 1z"/></svg>
-          Einst.
-        </button>
-        <button class="tab" data-tab="support" onclick="switchTab('support')">
-          <svg class="svg-ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 015.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12" y2="17"/></svg>
-          Support
-        </button>
-      </div>
-
-      <!-- Tab: Leads -->
-      <div class="tab-content active" id="tab-leads">
-        <!-- Filter Bar -->
-        <div class="filter-bar" id="filter-bar"></div>
-        <!-- Leads List -->
-        <div id="leads-list"></div>
-        <button class="sim-btn" onclick="simuliereAnfrage()">▶ Vorführen: So kommt eine neue Anfrage an (Beispiel)</button>
-      </div>
-
-      <!-- Tab: Stats -->
-      <div class="tab-content" id="tab-stats">
-        <div style="display:flex;align-items:center;justify-content:center;margin-bottom:6px">
-          <h3 style="font-size:.95rem;font-weight:800">Statistik</h3>
-        </div>
-        <p style="font-size:.72rem;color:var(--dim2);text-align:center;font-style:italic;margin-bottom:10px">Beispielzahlen zur Veranschaulichung</p>
-        <div class="stats-grid">
-          <div class="stat-card"><div class="num" id="stat-total">–</div><div class="lbl">Anfragen (Juli)</div></div>
-          <div class="stat-card green"><div class="num" id="stat-won">–</div><div class="lbl">Aufträge</div></div>
-          <div class="stat-card yellow"><div class="num" id="stat-rate">–</div><div class="lbl">Auftragsquote</div></div>
-          <div class="stat-card blue"><div class="num" id="stat-rev">–</div><div class="lbl">Umsatz</div></div>
-        </div>
-        <div class="chart-card">
-          <h4>Anfragen — letzte 6 Monate (Beispielverlauf)</h4>
-          <div class="chart-bars" id="chart-bars"></div>
-          <div class="chart-legend">
-            <span><span class="dot blue"></span> Anfragen</span>
-            <span><span class="dot green"></span> Aufträge</span>
-          </div>
-        </div>
-        <div class="chart-card">
-          <h4>Status-Verteilung</h4>
-          <div class="distribution" id="dist-list"></div>
-        </div>
-        <div class="chart-card">
-          <h4>Woher kamen die Anfragen?</h4>
-          <div class="distribution" id="source-list"></div>
-        </div>
-      </div>
-
-      <!-- Tab: Settings -->
-      <div class="tab-content" id="tab-settings">
-        <p style="font-size:.72rem;color:var(--dim2);padding:2px 4px 10px;line-height:1.5">Alle Funktionen sind zu Beginn <b style="color:var(--dim)">ausgeschaltet</b>. Sie schalten ein, was Sie möchten, und schreiben Ihre eigenen Texte. Bei der Einrichtung machen wir das gemeinsam — Sie müssen hier nichts allein herausfinden.</p>
-        <div class="settings-group">
-          <h4>Benachrichtigungen</h4>
-          <div class="settings-row">
-            <span class="sr-label">Bei neuer Anfrage per E-Mail benachrichtigen</span>
-            <button class="settings-toggle off" onclick="this.classList.toggle('off')"></button>
-          </div>
-          <div class="settings-row"><span class="sr-label">Empfänger (eine oder mehrere Adressen)</span></div>
-          <div id="empf-liste">
-            <div class="empf-row"><input type="email" placeholder="z.B. chef@ihre-firma.de"><button class="empf-add" onclick="addEmpfaenger()" title="Weitere Adresse hinzufügen">+</button></div>
-          </div>
-          <button class="settings-save" onclick="alert('Demo: In der echten App wird die Einstellung hier gespeichert.')">Speichern</button>
-        </div>
-        <div class="settings-group">
-          <h4>Auto-Antwort</h4>
-          <div class="settings-row">
-            <span class="sr-label">Automatisch antworten</span>
-            <button class="settings-toggle off" onclick="this.classList.toggle('off')"></button>
-          </div>
-          <div class="settings-row"><span class="sr-label">Antwort-Text</span></div>
-          <textarea class="settings-textarea" placeholder="z.B.: Hallo! Vielen Dank für Ihre Anfrage. Wir melden uns schnellstmöglich. — Ihre Firma"></textarea>
-          <button class="settings-save" onclick="alert('Demo: In der echten App wird die Einstellung hier gespeichert.')">Speichern</button>
-        </div>
-        <div class="settings-group">
-          <h4>Nachfass</h4>
-          <div class="settings-row">
-            <span class="sr-label">Nachfass aktivieren</span>
-            <button class="settings-toggle off" onclick="this.classList.toggle('off')"></button>
-          </div>
-          <div class="settings-row"><span class="sr-label">Nach wie vielen Tagen?</span><span class="sr-val">3 Tage</span></div>
-          <div class="settings-row"><span class="sr-label">Nachfass-Text</span></div>
-          <textarea class="settings-textarea" placeholder="z.B.: Hallo! Ist Ihr Anliegen noch aktuell? Rufen Sie uns gerne an."></textarea>
-          <div class="settings-info">
-            <strong>Wichtig:</strong> Der Nachfass wird nur automatisch verschickt, wenn ein Kunde angefragt hat und danach <strong>gar nicht mehr reagiert</strong> hat. Hat der Kunde bereits geantwortet oder wurde der Status in der App geändert, wird <strong>kein</strong> Nachfass verschickt.
-          </div>
-          <button class="settings-save" onclick="alert('Demo: In der echten App wird die Einstellung hier gespeichert.')">Speichern</button>
-        </div>
-        <div class="settings-group">
-          <h4>Google-Bewertung</h4>
-          <div class="settings-row">
-            <span class="sr-label">Nach abgeschlossenem Auftrag um Bewertung bitten</span>
-            <button class="settings-toggle off" onclick="this.classList.toggle('off')"></button>
-          </div>
-          <div class="settings-row"><span class="sr-label">Nachricht</span></div>
-          <textarea class="settings-textarea" placeholder="z.B.: Vielen Dank für Ihren Auftrag! Wenn Sie zufrieden waren, freuen wir uns über eine Google-Bewertung: [Ihr Bewertungs-Link]"></textarea>
-          <div class="settings-info">
-            <strong>So funktioniert es:</strong> Die Bitte geht automatisch und nur <strong>einmal</strong> an Kunden, deren Auftrag auf „Auftrag" (abgeschlossen) steht. Bewertungen stärken Ihr Google-Profil — die Bitte darum wird sonst fast immer vergessen.
-          </div>
-          <button class="settings-save" onclick="alert('Demo: In der echten App wird die Einstellung hier gespeichert.')">Speichern</button>
-        </div>
-        <div class="settings-group">
-          <h4>Konto</h4>
-          <div class="settings-row"><span class="sr-label">Firma</span><span class="sr-val">Brandner &amp; Roth Haustechnik</span></div>
-          <div class="settings-row" style="cursor:pointer" onclick="alert('Demo: Die PIN-Änderung gibt es in der echten App.')"><span class="sr-label">PIN ändern</span><span class="sr-val">→</span></div>
-        </div>
-        <button class="logout-btn" onclick="doLogout()">Ausloggen</button>
-        <div class="settings-footer">Kunden-App v1.0 — Powered by <a href="index.html">Artur</a></div>
-      </div>
-
-      <!-- Tab: Support -->
-      <div class="tab-content" id="tab-support">
-        <p class="support-intro">Haben Sie ein Problem, eine Frage oder einen Wunsch? Schreiben Sie mir — ich melde mich zeitnah am nächsten Werktag.</p>
-        <div class="support-form" id="support-form-wrap">
-          <label>Was ist Ihr Anliegen?</label>
-          <select id="support-type">
-            <option value="">Bitte wählen...</option>
-            <option value="Problem">Etwas funktioniert nicht</option>
-            <option value="Frage">Ich habe eine Frage</option>
-            <option value="Wunsch">Ich möchte eine neue Funktion</option>
-            <option value="Aenderung">Text oder Einstellung ändern</option>
-            <option value="Sonstiges">Sonstiges</option>
-          </select>
-          <label>Beschreiben Sie Ihr Anliegen</label>
-          <textarea id="support-msg" placeholder="z.B. 'Die Auto-Antwort soll auch am Wochenende gehen'"></textarea>
-          <button class="support-btn" onclick="sendSupport()">An Artur senden →</button>
-        </div>
-        <div class="support-form" id="support-success-wrap" style="display:none">
-          <div class="support-success">
-            <div class="check-circle"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
-            <h3>Demo-Hinweis</h3>
-            <p>Demo: In der echten App geht Ihre Nachricht hier direkt an Artur.</p>
-          </div>
-        </div>
-        <div class="support-contact">
-          <h4>Oder direkt kontaktieren</h4>
-          <a href="mailto:info@artur.ae" class="sc-row"><span class="sc-ic"><svg class="svg-ic" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 6l10 7L22 6"/></svg></span><div><b>info@artur.ae</b><small>E-Mail — Antwort am nächsten Werktag</small></div></a>
-          <a href="tel:+4917622659649" class="sc-row"><span class="sc-ic"><svg class="svg-ic" viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 01-2.2 2A19.8 19.8 0 012 4.1 2 2 0 014.1 2h3a2 2 0 012 1.7c.1 1 .4 1.9.7 2.8a2 2 0 01-.4 2.1L8 9.9a16 16 0 006 6l1.3-1.3a2 2 0 012.1-.4c.9.3 1.8.5 2.8.7A2 2 0 0122 16.9z"/></svg></span><div><b>0176 2265 9649</b><small>Anrufen</small></div></a>
-        </div>
-        <div class="help-card">
-          <h4><span class="help-ic"><svg class="svg-ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 015.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12" y2="17"/></svg></span> Wie funktioniert diese App?</h4>
-          <div class="help-step"><div class="hs-n">1</div><div class="hs-text"><b>Kunde füllt Formular aus</b> — auf Ihrer Website, zu jeder Zeit.</div></div>
-          <div class="help-step"><div class="hs-n">2</div><div class="hs-text"><b>Kunde bekommt Bestätigung</b> — in wenigen Minuten, automatisch.</div></div>
-          <div class="help-step"><div class="hs-n">3</div><div class="hs-text"><b>Sie sehen es in der App</b> — mit Name, Nachricht, Fotos, Anfrage-Quelle und Anruf-Button.</div></div>
-          <div class="help-step"><div class="hs-n">4</div><div class="hs-text"><b>Status ändern</b> — Neu → Wartend → Termin → Auftrag.</div></div>
-          <div class="help-step"><div class="hs-n">5</div><div class="hs-text"><b>Nachfass nur bei Bedarf</b> — Hat der Kunde nach 3 Tagen nicht reagiert? Das System erinnert ihn. Hat er bereits geantwortet? Dann passiert <b>gar nichts</b>.</div></div>
-          <div class="help-step"><div class="hs-n">6</div><div class="hs-text"><b>Statistik</b> — Sie sehen monatlich: Wie viele Anfragen, wie viele Aufträge, wie viel Umsatz.</div></div>
-        </div>
-      </div>
-
-    </div>
-  </div>
-</div>
-
-<div style="max-width:560px;margin:18px auto 26px;padding:0 16px;display:flex;justify-content:center;gap:8px 16px;flex-wrap:wrap;font:600 12px/1.5 system-ui,-apple-system,Arial,sans-serif;text-align:center">
-  <a href="index.html" style="color:#9aa3b8;text-decoration:underline;text-underline-offset:2px">← Zur Startseite</a>
-  <a href="index.html#kontakt" style="color:#9aa3b8;text-decoration:underline;text-underline-offset:2px">Anfragen-System besprechen</a>
-  <a href="impressum.html" style="color:#9aa3b8;text-decoration:underline;text-underline-offset:2px">Impressum</a>
-  <a href="datenschutz.html" style="color:#9aa3b8;text-decoration:underline;text-underline-offset:2px">Datenschutz</a>
-</div>
-
-<script>
-// Beispieldaten (Demo). In der echten App gilt: Firmengröße wird RECHERCHIERT
-// (Impressum/Website der Firma, Google-Unternehmensprofil, Handelsregister) —
-// nie geschätzt. Ist nichts belegbar, steht ehrlich "Größe: unbekannt".
-// photos = Anzahl angehängter Fotos (Demo zeigt Platzhalter-Kacheln).
-// source = woher die Anfrage kam (verstecktes Formularfeld in der echten App).
-let leads=[
-  {id:1,name:"Herr Müller",kind:"privat",firma:null,size:null,time:"14.07. — 22:37",msg:"Guten Abend, unsere Gastherme ist ausgefallen — kein warmes Wasser. Können Sie morgen früh vorbeikommen?",status:"new",revenue:null,followup:false,photos:2,source:"Google Ads"},
-  {id:2,name:"Fr. Schmidt",kind:"firma",firma:"Schmidt Bau GmbH",size:"10–20 Mitarbeiter",time:"14.07. — 16:12",msg:"Hallo, wir brauchen die komplette Sanitärinstallation für 6 Wohneinheiten im Neubau. Bitte um ein Angebot.",status:"new",revenue:null,followup:false,photos:1,source:"Website"},
-  {id:3,name:"Herr Becker",kind:"privat",firma:null,size:null,time:"14.07. — 11:45",msg:"Der Wasserhahn im Bad tropft durchgehend. Haben Sie diese Woche noch einen Termin frei?",status:"new",revenue:null,followup:false,photos:0,source:"Google Ads"},
-  {id:4,name:"Herr Hoffmann",kind:"privat",firma:null,size:null,time:"13.07. — 19:20",msg:"Was kostet ungefähr eine neue Duschkabine inklusive Einbau? Unser Bad ist von 1995.",status:"waiting",revenue:null,followup:true,photos:1,source:"Website"},
-  {id:5,name:"Herr Klein",kind:"firma",firma:"Hausverwaltung Klein",size:null,time:"12.07. — 14:00",msg:"Wir suchen einen Partner für die jährliche Heizungswartung in 12 Wohnungen. Machen Sie ein Rahmenangebot?",status:"appointment",revenue:null,followup:false,photos:0,source:"Empfehlung"},
-  {id:6,name:"Fam. Wagner",kind:"privat",firma:null,size:null,time:"10.07. — 09:30",msg:"Wir möchten unser Bad komplett sanieren lassen. Was kostet das ungefähr?",status:"won",revenue:8400,followup:false,photos:3,source:"Google Ads"},
-  {id:7,name:"Herr Schulze",kind:"firma",firma:"Bäckerei Schulze",size:"ca. 5 Mitarbeiter",time:"08.07. — 15:45",msg:"Unsere Spülküche braucht einen neuen Warmwasseranschluss — geht das kurzfristig?",status:"won",revenue:850,followup:false,photos:0,source:"Website"},
-  {id:8,name:"Fr. Dietrich",kind:"firma",firma:"Dietrich Metallbau",size:"ca. 30 Mitarbeiter",time:"05.07. — 10:15",msg:"Wartung der Hallenheizung plus zwei defekte Lufterhitzer — bitte Termin und Angebot.",status:"won",revenue:3200,followup:false,photos:2,source:"Google Ads"},
-  {id:9,name:"Herr Richter",kind:"privat",firma:null,size:null,time:"03.07. — 18:00",msg:"Der Abfluss in der Küche ist verstopft. Können Sie heute noch kommen?",status:"lost",revenue:null,followup:false,photos:0,source:"Website"},
-  {id:10,name:"Herr Franke",kind:"firma",firma:"Franke Gebäudeservice",size:null,time:"01.07. — 14:20",msg:"Anfrage: Klimaanlage für unsere Büroetage, ca. 200 m². Beraten Sie dazu?",status:"lost",revenue:null,followup:false,photos:0,source:"Google Ads"}
-];
-
-const statusConfig={new:{label:"Neu"},waiting:{label:"Wartend"},appointment:{label:"Termin"},won:{label:"Auftrag"},lost:{label:"Verloren"}};
-
-let activeFilter='all';
-let collapsedSections={};
-
-// Login-Sperre gegen Durchprobieren (Brute-Force-Bremse):
-// Nach 3 Fehlversuchen 30 s Sperre, danach verdoppelt sich die Wartezeit
-// (max. 10 Min). In der ECHTEN App wird zusätzlich serverseitig gesperrt —
-// diese Demo zeigt das Verhalten für den Nutzer.
-let lockTimer=null;
-var _lockMem={fails:0,until:0};
-function getLock(){try{return{fails:parseInt(localStorage.getItem('demo_fails')||'0'),until:parseInt(localStorage.getItem('demo_lock_until')||'0')}}catch(e){return _lockMem}}
-function setLock(f,u){try{localStorage.setItem('demo_fails',f);localStorage.setItem('demo_lock_until',u)}catch(e){_lockMem={fails:f,until:u}}}
-function fmtSek(ms){const s=Math.ceil(ms/1000);return s>=60?Math.floor(s/60)+' Min '+(s%60)+' s':s+' s'}
-function updateLockUI(){
-  const {until}=getLock();
-  const err=document.getElementById('login-error');
-  const btn=document.querySelector('.login-btn');
-  const rest=until-Date.now();
-  if(rest>0){
-    err.textContent='Zu viele Fehlversuche. Bitte warten: '+fmtSek(rest);
-    btn.disabled=true;btn.style.opacity='.5';
-    if(!lockTimer){lockTimer=setInterval(updateLockUI,1000)}
-  } else {
-    if(lockTimer){clearInterval(lockTimer);lockTimer=null}
-    btn.disabled=false;btn.style.opacity='';
-    if(err.textContent.startsWith('Zu viele'))err.textContent='Sperre aufgehoben — Sie können es erneut versuchen.';
-  }
-}
-// Erfolgreicher Einstieg (auch für den Demo-Knopf ohne PIN — setzt die Sperre zurück,
-// damit eine Vorführung nie an alten Fehlversuchen scheitert)
-function enterApp(){
-  setLock(0,0);
-  if(lockTimer){clearInterval(lockTimer);lockTimer=null}
-  document.getElementById('login-error').textContent='';
-  document.getElementById('login-screen').style.display='none';
-  document.getElementById('app-main').style.display='flex';
-  document.getElementById('demo-band').style.display='block';
-  renderFilter();
-  renderLeads();
-  renderStats();
-}
-
-function doLogin(){
-  const {fails,until}=getLock();
-  if(Date.now()<until){updateLockUI();return}
-  const pin=document.getElementById('pin-input').value;
-  if(pin==='1234'){
-    enterApp();
-  } else {
-    const neu=fails+1;
-    if(neu>=3){
-      const stufe=neu-3; // 0,1,2,...
-      const dauer=Math.min(30000*Math.pow(2,stufe),600000); // 30s → 60s → ... max 10 Min
-      setLock(neu,Date.now()+dauer);
-      updateLockUI();
-    } else {
-      setLock(neu,0);
-      document.getElementById('login-error').textContent='Falsche PIN ('+neu+' von 3 Versuchen). Demo-PIN: 1234.';
-    }
-    document.getElementById('pin-input').value='';
-  }
-}
-document.getElementById('pin-input').addEventListener('keypress',e=>{if(e.key==='Enter')doLogin()});
-updateLockUI();
-
-function doLogout(){
-  document.getElementById('app-main').style.display='none';
-  document.getElementById('demo-band').style.display='none';
-  document.getElementById('login-screen').style.display='flex';
-  document.getElementById('pin-input').value='';
-  document.getElementById('login-error').textContent='';
-  document.getElementById('support-form-wrap').style.display='block';
-  document.getElementById('support-success-wrap').style.display='none';
-  document.getElementById('support-type').value='';
-  document.getElementById('support-msg').value='';
-  switchTab('leads');
-  activeFilter='all';
-}
-
-function switchTab(tab){
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
-  document.querySelector('.tab[data-tab="'+tab+'"]').classList.add('active');
-  document.getElementById('tab-'+tab).classList.add('active');
-}
-
-// FILTER
-function renderFilter(){
-  const counts={
-    all:leads.length,
-    new:leads.filter(l=>l.status==='new').length,
-    progress:leads.filter(l=>l.status==='waiting'||l.status==='appointment').length,
-    won:leads.filter(l=>l.status==='won').length,
-    lost:leads.filter(l=>l.status==='lost').length
-  };
-  const filters=[
-    {key:'all',label:'Alle',count:counts.all},
-    {key:'new',label:'Neu',count:counts.new,red:true},
-    {key:'progress',label:'In Bearbeitung',count:counts.progress},
-    {key:'won',label:'Aufträge',count:counts.won},
-    {key:'lost',label:'Verloren',count:counts.lost}
-  ];
-  document.getElementById('filter-bar').innerHTML=filters.map(f=>`
-    <button class="filter-chip ${activeFilter===f.key?'active':''}" onclick="setFilter('${f.key}')">
-      ${f.label}
-      <span class="chip-count ${f.red?'red':''}">${f.count}</span>
-    </button>
-  `).join('');
-}
-
-function setFilter(key){
-  activeFilter=key;
-  renderFilter();
-  renderLeads();
-}
-
-// RENDER LEADS with sections
-function renderLeads(){
-  const list=document.getElementById('leads-list');
-  const newCount=leads.filter(l=>l.status==='new').length;
-  const badge=document.getElementById('new-badge');
-  const tabBadge=document.getElementById('tab-badge');
-  if(newCount>0){badge.style.display='block';badge.textContent=newCount+' neu';tabBadge.style.display='flex';tabBadge.textContent=newCount;}
-  else{badge.style.display='none';tabBadge.style.display='none';}
-
-  let sections=[];
-  let html='';
-
-  if(activeFilter==='all'||activeFilter==='new'){
-    const items=leads.filter(l=>l.status==='new').sort((a,b)=>b.id-a.id);
-    if(items.length||activeFilter==='new'){
-      sections.push({key:'new',dotClass:'red',title:'Neu — noch nicht bearbeitet',items,count:items.length,collapsible:false});
-    }
-  }
-  if(activeFilter==='all'||activeFilter==='progress'){
-    const items=leads.filter(l=>l.status==='waiting'||l.status==='appointment').sort((a,b)=>b.id-a.id);
-    if(items.length||activeFilter==='progress'){
-      sections.push({key:'progress',dotClass:'yellow',title:'In Bearbeitung',items,count:items.length,collapsible:false});
-    }
-  }
-  if(activeFilter==='all'||activeFilter==='won'){
-    const items=leads.filter(l=>l.status==='won').sort((a,b)=>b.id-a.id);
-    if(items.length||activeFilter==='won'){
-      sections.push({key:'won',dotClass:'green',title:'Aufträge — abgeschlossen',items,count:items.length,collapsible:true,archived:true});
-    }
-  }
-  if(activeFilter==='all'||activeFilter==='lost'){
-    const items=leads.filter(l=>l.status==='lost').sort((a,b)=>b.id-a.id);
-    if(items.length||activeFilter==='lost'){
-      sections.push({key:'lost',dotClass:'gray',title:'Verloren — kein Auftrag',items,count:items.length,collapsible:true,archived:true});
-    }
-  }
-
-  const filteredSections=sections.filter(s=>s.items.length>0);
-  if(filteredSections.length===0){
-    list.innerHTML='<div class="lead-empty"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg><p>Keine Anfragen in dieser Kategorie</p></div>';
-    return;
-  }
-
-  // Neuigkeiten-Übersicht (nur in der Alle-Ansicht): was ist neu, was wartet
-  if(activeFilter==='all'){
-    const nWait=leads.filter(l=>l.followup&&l.status==='waiting').length;
-    const nTermin=leads.filter(l=>l.status==='appointment').length;
-    const teile=[];
-    if(newCount>0)teile.push(`<b>${newCount} neue Anfrage${newCount>1?'n':''}</b>`);
-    if(nWait>0)teile.push(`<b>${nWait} Kunde${nWait>1?'n':''}</b> seit 3 Tagen ohne Rückmeldung — Nachfass ist raus`);
-    if(nTermin>0)teile.push(`<b>${nTermin} Termin${nTermin>1?'e':''}</b> offen`);
-    if(teile.length>0){
-      html+=`<div class="news-card"><div class="news-title"><svg class="svg-ic" style="width:12px;height:12px" viewBox="0 0 24 24"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>Neuigkeiten</div>${teile.join(' · ')}</div>`;
-    }
-  }
-
-  filteredSections.forEach((sec,si)=>{
-    const isCollapsed=collapsedSections[sec.key]&&sec.collapsible;
-    html+=`<div class="sec-header ${isCollapsed?'collapsed':''}" ${sec.collapsible?`onclick="toggleSection('${sec.key}')"`:''}>
-      <div class="sec-left">
-        <span class="sec-dot ${sec.dotClass}"></span>
-        <span class="sec-title">${sec.title}</span>
-        <span class="sec-count">${sec.count}</span>
-      </div>
-      ${sec.collapsible?`<span class="sec-toggle">▾</span>`:''}
-    </div>`;
-    html+=`<div class="sec-body ${isCollapsed?'collapsed':''}" id="sec-body-${sec.key}">`;
-    if(sec.archived){html+=`<div class="sec-archived-note">Ausgeblendet — nicht mehr relevant, aber einsehbar</div>`;}
-    sec.items.forEach(lead=>{html+=renderLeadCard(lead);});
-    html+='</div>';
-    if(si<filteredSections.length-1){html+='<div class="sec-divider"></div>';}
-  });
-
-  list.innerHTML=html;
-}
-
-function renderLeadCard(lead){
-  const sc=statusConfig[lead.status];
-  return `
-    <div class="lead-card ${lead.status}">
-      <div class="lead-top">
+  <main id="inhalt">
+    <section class="demo-hero" aria-labelledby="demo-title">
+      <div class="demo-wrap demo-hero__grid">
         <div>
-          <div class="name">${lead.kind==='firma'?lead.firma:lead.name}</div>
-          <div class="lead-meta">${lead.kind==='firma'
-            ?`Firma · Größe: <b>${lead.size?lead.size:'unbekannt'}</b> · Ansprechpartner: ${lead.name}`
-            :'Privatkunde'}</div>
+          <p class="demo-kicker">Interaktive Produkt-Demo</p>
+          <h1 id="demo-title">Anfragen sehen. <em>Nichts verlieren.</em></h1>
+          <p class="demo-lead">Probieren Sie eine mögliche Kunden-App direkt aus: Anfragen filtern, Status ändern und einen neuen Beispielvorgang anlegen.</p>
+          <div class="demo-evidence" aria-label="Eigenschaften dieser Demo">
+            <span class="demo-chip">ohne Anmeldung</span>
+            <span class="demo-chip">keine Datenübertragung</span>
+            <span class="demo-chip">Änderungen nur bis zum Neuladen</span>
+          </div>
         </div>
-        <div class="time">${lead.time}${lead.source?`<br><span class="lead-src">über ${lead.source}</span>`:''}</div>
+        <aside class="demo-note" aria-label="Wichtiger Demo-Hinweis">
+          <strong>Beispieldaten – keine Ergebnisse</strong>
+          <p>Alle Namen, Betriebe, Nachrichten, Zeitpunkte und Beispiel-Auftragswerte in der Demo sind frei erfunden. Die Angebotspreise hier sind die echten Festpreise.</p>
+          <p class="demo-price">490 € Einrichtung<br>+ 49 € pro Monat</p>
+          <p>6 Monate Mindestlaufzeit, danach monatlich kündbar.</p>
+        </aside>
       </div>
-      <div class="lead-msg">&ldquo;${lead.msg}&rdquo;</div>
-      <div class="lead-actions">
-        <a href="#" onclick="alert('Demo: In der echten App startet hier der Anruf.');return false" class="lead-btn call"><svg class="svg-ic" viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 01-2.2 2A19.8 19.8 0 012 4.1 2 2 0 014.1 2h3a2 2 0 012 1.7c.1 1 .4 1.9.7 2.8a2 2 0 01-.4 2.1L8 9.9a16 16 0 006 6l1.3-1.3a2 2 0 012.1-.4c.9.3 1.8.5 2.8.7A2 2 0 0122 16.9z"/></svg> Anrufen</a>
-        <a href="#" onclick="alert('Demo: In der echten App öffnet sich hier WhatsApp.');return false" class="lead-btn wa"><svg class="svg-ic" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> WhatsApp</a>
-        ${lead.photos>0?`<a href="#" onclick="showPhotos(${lead.id});return false" class="lead-btn photo"><svg class="svg-ic" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg> ${lead.photos} Foto${lead.photos>1?'s':''}</a>`:''}
+    </section>
+
+    <section class="demo-section demo-section--dark" aria-labelledby="app-heading">
+      <div class="demo-wrap">
+        <div class="demo-section__head">
+          <h2 id="app-heading">Jetzt selbst durchklicken.</h2>
+          <p>Die Bedienung ist echt. Die Inhalte sind ein bewusst vereinfachtes Modell. Welche Felder und Abläufe ein Betrieb braucht, wird vor dem Bau festgelegt.</p>
+        </div>
+
+        <div class="demo-shell">
+          <div class="demo-shell__bar">
+            <span class="demo-shell__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="demo-shell__title">Kunden-App · interaktive Vorschau</span>
+            <span class="demo-shell__state">Demo</span>
+          </div>
+
+          <div class="demo-app">
+            <aside class="demo-app__nav" aria-label="Demo-Navigation">
+              <div class="demo-app__firm">
+                <span>Fiktiver Betrieb</span>
+                <strong>Beispiel Haustechnik</strong>
+              </div>
+              <div class="demo-tabs" role="tablist" aria-label="Bereiche der Kunden-App">
+                <button class="demo-tab" id="tab-anfragen" type="button" role="tab" aria-selected="true" aria-controls="panel-anfragen" data-panel="panel-anfragen">Anfragen</button>
+                <button class="demo-tab" id="tab-ueberblick" type="button" role="tab" aria-selected="false" aria-controls="panel-ueberblick" data-panel="panel-ueberblick">Überblick</button>
+                <button class="demo-tab" id="tab-einstellungen" type="button" role="tab" aria-selected="false" aria-controls="panel-einstellungen" data-panel="panel-einstellungen">Einstellungen</button>
+              </div>
+              <p class="demo-app__small">Hinweis: Ohne JavaScript stehen alle drei Bereiche untereinander. Es werden keine Eingaben versendet.</p>
+            </aside>
+
+            <div class="demo-app__content">
+              <section class="app-panel" id="panel-anfragen" role="tabpanel" aria-labelledby="tab-anfragen">
+                <div class="app-panel__head">
+                  <div>
+                    <h3>Anfragen</h3>
+                    <p>Frei erfundene Datensätze für diese Demo</p>
+                  </div>
+                  <button class="app-button" id="app-add-lead" type="button">Neue Beispielanfrage</button>
+                </div>
+
+                <div class="app-metrics" aria-label="Zusammenfassung der Beispieldaten">
+                  <div class="app-metric"><span>Gesamt</span><strong id="metric-total">5</strong></div>
+                  <div class="app-metric"><span>Offen</span><strong id="metric-open">4</strong></div>
+                  <div class="app-metric"><span>Termine</span><strong id="metric-appointments">1</strong></div>
+                  <div class="app-metric"><span>Beispiel-Auftragswert</span><strong id="metric-value">3.200 €</strong></div>
+                </div>
+
+                <fieldset class="app-filter" aria-describedby="filter-result">
+                  <legend>Anzeigen:</legend>
+                  <button class="app-filter__button" type="button" data-filter="all" aria-pressed="true">Alle</button>
+                  <button class="app-filter__button" type="button" data-filter="new" aria-pressed="false">Neu</button>
+                  <button class="app-filter__button" type="button" data-filter="waiting" aria-pressed="false">Wartend</button>
+                  <button class="app-filter__button" type="button" data-filter="appointment" aria-pressed="false">Termin</button>
+                  <button class="app-filter__button" type="button" data-filter="won" aria-pressed="false">Auftrag</button>
+                  <p class="app-filter__result" id="filter-result" aria-live="polite">5 Beispielanfragen werden angezeigt.</p>
+                </fieldset>
+
+                <div class="app-leads" id="app-leads">
+                  <article class="app-lead" data-status="new" data-value="0">
+                    <div class="app-lead__top">
+                      <div><h4 class="app-lead__name">Paula Beispiel</h4><p class="app-lead__meta">Privat · über Website · heute, 08:42 Uhr (Beispiel)</p></div>
+                      <span class="app-lead__status">Neu</span>
+                    </div>
+                    <p class="app-lead__message">„Seit gestern bleibt das Wasser kalt. Können Sie diese Woche vorbeikommen?“</p>
+                    <div class="app-lead__actions">
+                      <button class="app-button app-button--quiet app-contact-sim" type="button" aria-label="Kontakt simulieren – Paula Beispiel">Kontakt simulieren</button>
+                      <label>Status
+                        <select class="app-status-select" aria-label="Status für Paula Beispiel">
+                          <option value="new" selected>Neu</option><option value="waiting">Wartend</option><option value="appointment">Termin</option><option value="won">Auftrag</option>
+                        </select>
+                      </label>
+                    </div>
+                    <details class="app-detail"><summary aria-label="Anfragedetails anzeigen – Paula Beispiel">Anfragedetails anzeigen</summary><p>Gewünschter Rückruf: vormittags. Anhang: ein fiktives Beispielfoto. In einem echten Projekt werden nur vereinbarte Felder gespeichert.</p></details>
+                  </article>
+
+                  <article class="app-lead" data-status="new" data-value="0">
+                    <div class="app-lead__top">
+                      <div><h4 class="app-lead__name">Beispielwerk GmbH (fiktiv)</h4><p class="app-lead__meta">Gewerbe · über Website · gestern, 16:10 Uhr (Beispiel)</p></div>
+                      <span class="app-lead__status">Neu</span>
+                    </div>
+                    <p class="app-lead__message">„Wir planen zwei neue Waschplätze. Bitte melden Sie sich für eine Vor-Ort-Aufnahme.“</p>
+                    <div class="app-lead__actions">
+                      <button class="app-button app-button--quiet app-contact-sim" type="button" aria-label="Kontakt simulieren – Beispielwerk GmbH (fiktiv)">Kontakt simulieren</button>
+                      <label>Status
+                        <select class="app-status-select" aria-label="Status für Beispielwerk GmbH (fiktiv)">
+                          <option value="new" selected>Neu</option><option value="waiting">Wartend</option><option value="appointment">Termin</option><option value="won">Auftrag</option>
+                        </select>
+                      </label>
+                    </div>
+                    <details class="app-detail"><summary aria-label="Anfragedetails anzeigen – Beispielwerk GmbH (fiktiv)">Anfragedetails anzeigen</summary><p>Ansprechperson und Betriebsgröße sind in dieser Demo frei erfunden. Echte Daten werden nicht aus Vermutungen ergänzt.</p></details>
+                  </article>
+
+                  <article class="app-lead" data-status="waiting" data-value="0">
+                    <div class="app-lead__top">
+                      <div><h4 class="app-lead__name">Karim Beispiel</h4><p class="app-lead__meta">Privat · über Empfehlung · Montag, 11:25 Uhr (Beispiel)</p></div>
+                      <span class="app-lead__status">Wartend</span>
+                    </div>
+                    <p class="app-lead__message">„Wir möchten das Bad umbauen. Welche Angaben brauchen Sie für einen Besichtigungstermin?“</p>
+                    <div class="app-lead__actions">
+                      <button class="app-button app-button--quiet app-contact-sim" type="button" aria-label="Kontakt simulieren – Karim Beispiel">Kontakt simulieren</button>
+                      <label>Status
+                        <select class="app-status-select" aria-label="Status für Karim Beispiel">
+                          <option value="new">Neu</option><option value="waiting" selected>Wartend</option><option value="appointment">Termin</option><option value="won">Auftrag</option>
+                        </select>
+                      </label>
+                    </div>
+                    <details class="app-detail"><summary aria-label="Anfragedetails anzeigen – Karim Beispiel">Anfragedetails anzeigen</summary><p>Beispiel-Automatik: Eine freigegebene Erinnerung könnte nach drei Tagen ohne Reaktion ausgelöst werden. Der konkrete Ablauf wird vereinbart.</p></details>
+                  </article>
+
+                  <article class="app-lead" data-status="appointment" data-value="0">
+                    <div class="app-lead__top">
+                      <div><h4 class="app-lead__name">Musterhof Verwaltung (fiktiv)</h4><p class="app-lead__meta">Gewerbe · über Website · Freitag, 09:05 Uhr (Beispiel)</p></div>
+                      <span class="app-lead__status">Termin</span>
+                    </div>
+                    <p class="app-lead__message">„Für vier Wohnungen steht die jährliche Wartung an. Können wir einen Sammeltermin abstimmen?“</p>
+                    <div class="app-lead__actions">
+                      <button class="app-button app-button--quiet app-contact-sim" type="button" aria-label="Kontakt simulieren – Musterhof Verwaltung (fiktiv)">Kontakt simulieren</button>
+                      <label>Status
+                        <select class="app-status-select" aria-label="Status für Musterhof Verwaltung (fiktiv)">
+                          <option value="new">Neu</option><option value="waiting">Wartend</option><option value="appointment" selected>Termin</option><option value="won">Auftrag</option>
+                        </select>
+                      </label>
+                    </div>
+                    <details class="app-detail"><summary aria-label="Anfragedetails anzeigen – Musterhof Verwaltung (fiktiv)">Anfragedetails anzeigen</summary><p>Fiktiver Termin: Dienstag, 10:00 Uhr. Es gibt in dieser Demo keine Kalender-Verbindung und keine echte Benachrichtigung.</p></details>
+                  </article>
+
+                  <article class="app-lead" data-status="won" data-value="3200">
+                    <div class="app-lead__top">
+                      <div><h4 class="app-lead__name">Nina Demo</h4><p class="app-lead__meta">Privat · über Website · 8. Juli, 14:30 Uhr (Beispiel)</p></div>
+                      <span class="app-lead__status">Auftrag</span>
+                    </div>
+                    <p class="app-lead__message">„Bitte erstellen Sie ein Angebot für den Austausch von Heizkörpern in drei Räumen.“</p>
+                    <div class="app-lead__actions">
+                      <button class="app-button app-button--quiet app-contact-sim" type="button" aria-label="Kontakt simulieren – Nina Demo">Kontakt simulieren</button>
+                      <label>Status
+                        <select class="app-status-select" aria-label="Status für Nina Demo">
+                          <option value="new">Neu</option><option value="waiting">Wartend</option><option value="appointment">Termin</option><option value="won" selected>Auftrag</option>
+                        </select>
+                      </label>
+                    </div>
+                    <details class="app-detail"><summary aria-label="Anfragedetails anzeigen – Nina Demo">Anfragedetails anzeigen</summary><p>Frei erfundener Auftragswert: 3.200 €. Dieser Betrag belegt weder einen echten Auftrag noch einen Erfolg des Systems.</p></details>
+                  </article>
+                </div>
+              </section>
+
+              <section class="app-panel" id="panel-ueberblick" role="tabpanel" aria-labelledby="tab-ueberblick">
+                <div class="app-panel__head">
+                  <div><h3>Überblick</h3><p>Rein rechnerische Auswertung der Demo-Datensätze</p></div>
+                </div>
+                <div class="app-chart">
+                  <div class="app-card">
+                    <h4>Status-Verteilung</h4>
+                    <p>Die Balken ändern sich, wenn Sie in „Anfragen“ einen Status umstellen.</p>
+                    <div class="app-bars">
+                      <div><div class="app-bar__label"><span>Neu</span><span id="bar-new-label">2</span></div><div class="app-bar__track"><span class="app-bar__fill" id="bar-new" style="width:40%"></span></div></div>
+                      <div><div class="app-bar__label"><span>Wartend</span><span id="bar-waiting-label">1</span></div><div class="app-bar__track"><span class="app-bar__fill" id="bar-waiting" style="width:20%"></span></div></div>
+                      <div><div class="app-bar__label"><span>Termin</span><span id="bar-appointment-label">1</span></div><div class="app-bar__track"><span class="app-bar__fill" id="bar-appointment" style="width:20%"></span></div></div>
+                      <div><div class="app-bar__label"><span>Auftrag</span><span id="bar-won-label">1</span></div><div class="app-bar__track"><span class="app-bar__fill" id="bar-won" style="width:20%"></span></div></div>
+                    </div>
+                  </div>
+                  <div class="app-card">
+                    <h4>Beispielwerte</h4>
+                    <p>Keine echten Abschluss- oder Umsatzzahlen.</p>
+                    <table class="app-table">
+                      <thead><tr><th scope="col">Kennzahl</th><th scope="col">Wert</th></tr></thead>
+                      <tbody>
+                        <tr><td>Datensätze</td><td id="overview-total">5</td></tr>
+                        <tr><td>Status „Auftrag“</td><td id="overview-won">1</td></tr>
+                        <tr><td>Erfasster Beispielwert</td><td id="overview-value">3.200 €</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <p class="app-demo-note"><strong>Grenze dieser Ansicht:</strong> Aus diesen fiktiven Datensätzen lässt sich keine Wirkung ableiten. Ein echter Pilot beginnt mit einem Messpunkt und vergleicht den Ablauf vor und nach der Einführung.</p>
+              </section>
+
+              <section class="app-panel" id="panel-einstellungen" role="tabpanel" aria-labelledby="tab-einstellungen">
+                <div class="app-panel__head">
+                  <div><h3>Einstellungen</h3><p>Bedienbare Vorschau – es wird nichts gespeichert oder versendet</p></div>
+                </div>
+                <form class="app-settings" id="app-settings-form">
+                  <div class="app-setting">
+                    <div class="app-setting__row">
+                      <div><h4>Eingangsbestätigung</h4><p>Eine freigegebene Nachricht bestätigt den Eingang und fragt fehlende Angaben ab.</p></div>
+                      <label class="app-switch"><input type="checkbox" checked> Aktiv</label>
+                    </div>
+                    <label for="reply-template">Beispieltext
+                      <textarea id="reply-template">Danke für Ihre Anfrage. Damit wir Ihr Anliegen einordnen können: Senden Sie uns bitte ein Foto und nennen Sie Ihren gewünschten Zeitraum. Wir melden uns am nächsten Werktag.</textarea>
+                    </label>
+                  </div>
+                  <div class="app-setting">
+                    <div class="app-setting__row">
+                      <div><h4>Nachfass-Erinnerung</h4><p>Nur für Vorgänge ohne Kundenreaktion und nach einem vereinbarten Zeitraum.</p></div>
+                      <label class="app-switch"><input type="checkbox" checked> Aktiv</label>
+                    </div>
+                    <label for="followup-delay">Demo-Zeitraum
+                      <select id="followup-delay"><option>2 Tage</option><option selected>3 Tage</option><option>5 Tage</option><option>7 Tage</option></select>
+                    </label>
+                  </div>
+                  <div class="app-setting">
+                    <div class="app-setting__row">
+                      <div><h4>Bewertungsanfrage</h4><p>Kann nach einem abgeschlossenen Auftrag einmalig ausgelöst werden. Eine positive Bewertung wird nicht vorausgesetzt.</p></div>
+                      <label class="app-switch"><input type="checkbox"> Inaktiv</label>
+                    </div>
+                  </div>
+                  <div><button class="app-button" type="submit">Demo-Einstellungen anwenden</button></div>
+                </form>
+                <p class="app-demo-note">Diese Vorschau zeigt mögliche Bedienelemente. Der konkrete Funktionsumfang wird vor dem Auftrag schriftlich abgegrenzt.</p>
+              </section>
+            </div>
+          </div>
+        </div>
+
+        <noscript><p style="margin:1rem 0 0;color:#c7d0cf">JavaScript ist ausgeschaltet. Deshalb stehen alle App-Bereiche untereinander; Filter und Statuswechsel sind in diesem Modus nicht aktiv.</p></noscript>
       </div>
-      <div class="lead-status ${lead.status}"><span class="status-dot ${lead.status}"></span>${sc.label}</div>
-      ${lead.revenue?`<div class="lead-revenue">+${lead.revenue.toLocaleString('de-DE')} &euro;</div>`:''}
-      ${lead.followup&&lead.status==='waiting'?`<div class="lead-followup"><svg class="svg-ic" viewBox="0 0 24 24" style="width:14px;height:14px;color:var(--orange)"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Nachfass verschickt — Kunde hat bisher nicht geantwortet</div>`:''}
-      <div class="status-select">
-        <button class="status-option ${lead.status==='new'?'sel-new':''}" onclick="changeStatus(${lead.id},'new')">Neu</button>
-        <button class="status-option ${lead.status==='waiting'?'sel-waiting':''}" onclick="changeStatus(${lead.id},'waiting')">Wartend</button>
-        <button class="status-option ${lead.status==='appointment'?'sel-appointment':''}" onclick="changeStatus(${lead.id},'appointment')">Termin</button>
-        <button class="status-option ${lead.status==='won'?'sel-won':''}" onclick="changeStatus(${lead.id},'won')">Auftrag</button>
-        <button class="status-option ${lead.status==='lost'?'sel-lost':''}" onclick="changeStatus(${lead.id},'lost')">Verloren</button>
+    </section>
+
+    <section class="demo-section demo-section--dark" aria-labelledby="angebot-heading">
+      <div class="demo-wrap demo-offer">
+        <div class="demo-offer__copy">
+          <p class="demo-kicker" style="color:#62d5ff">Das echte Angebot</p>
+          <h2 id="angebot-heading">Erst den Ablauf klären. Dann die App bauen.</h2>
+          <p>Das Anfragen-System mit Kunden-App kostet 490 € einmalig und 49 € pro Monat. Die Mindestlaufzeit beträgt sechs Monate. Danach ist es monatlich kündbar. Ob dieses System zu Ihrem Betrieb passt, wird vor dem Auftrag geklärt.</p>
+          <div class="demo-cta">
+            <a href="/#kontakt">Anfragen-System besprechen</a>
+            <a href="mailto:info@artur.ae">info@artur.ae</a>
+          </div>
+        </div>
+        <div class="demo-offer__facts" aria-label="Preis und Rahmen">
+          <div class="demo-offer__fact"><span>Einrichtung</span><strong>490 € einmalig</strong></div>
+          <div class="demo-offer__fact"><span>Betrieb</span><strong>49 € pro Monat</strong></div>
+          <div class="demo-offer__fact"><span>Mindestlaufzeit</span><strong>6 Monate</strong></div>
+          <div class="demo-offer__fact"><span>Danach</span><strong>monatlich kündbar</strong></div>
+          <div class="demo-offer__fact"><span>Wichtig</span><strong>keine Erfolgs- oder Umsatzgarantie</strong></div>
+        </div>
       </div>
-      <div class="revenue-input ${lead.status==='won'&&!lead.revenue?'show':''}" id="rev-input-${lead.id}">
-        <input type="number" placeholder="Umsatz &euro;" id="rev-val-${lead.id}">
-        <button onclick="saveRevenue(${lead.id})">OK</button>
+    </section>
+  </main>
+
+  <footer class="demo-footer">
+    <div class="demo-wrap demo-footer__row">
+      <span>© <span data-current-year>2026</span> Artur WebDesign · Artur Stol · Umsätze gemäß § 19 UStG umsatzsteuerfrei</span>
+      <span><a href="/">Startseite</a> · <a href="automatisierung-demo.html">Automatisierungs-Demo</a> · <a href="impressum.html">Impressum</a> · <a href="datenschutz.html">Datenschutz</a></span>
+    </div>
+  </footer>
+
+  <div class="demo-toast" id="demo-toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <template id="lead-template">
+    <article class="app-lead" data-status="new" data-value="0" tabindex="-1">
+      <div class="app-lead__top">
+        <div><h4 class="app-lead__name">Neue Demo-Anfrage</h4><p class="app-lead__meta">Privat · über Website · gerade eben (Beispiel)</p></div>
+        <span class="app-lead__status">Neu</span>
       </div>
-    </div>`;
-}
+      <p class="app-lead__message">„Die Heizung zeigt eine Störung. Welche Angaben brauchen Sie für eine erste Einordnung?“</p>
+      <div class="app-lead__actions">
+        <button class="app-button app-button--quiet app-contact-sim" type="button" aria-label="Kontakt simulieren – Neue Demo-Anfrage">Kontakt simulieren</button>
+        <label>Status
+          <select class="app-status-select" aria-label="Status für Neue Demo-Anfrage"><option value="new" selected>Neu</option><option value="waiting">Wartend</option><option value="appointment">Termin</option><option value="won">Auftrag</option></select>
+        </label>
+      </div>
+      <details class="app-detail"><summary aria-label="Anfragedetails anzeigen – Neue Demo-Anfrage">Anfragedetails anzeigen</summary><p>Auch dieser nachträglich erzeugte Vorgang ist vollständig fiktiv und wird nicht gespeichert.</p></details>
+    </article>
+  </template>
 
-function toggleSection(key){
-  collapsedSections[key]=!collapsedSections[key];
-  renderLeads();
-}
+  <script src="assets/site.js?v=74" defer></script>
+  <script>
+  (function(){
+    'use strict';
 
-// Foto-Ansicht (Demo: Platzhalter-Kacheln statt echter Bilder)
-function showPhotos(id){
-  const lead=leads.find(l=>l.id===id);
-  if(!lead||!lead.photos)return;
-  document.getElementById('po-title').textContent='Fotos zur Anfrage — '+(lead.kind==='firma'?lead.firma:lead.name);
-  let tiles='';
-  for(let i=1;i<=lead.photos;i++){
-    tiles+=`<div class="photo-tile"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>Beispiel-Foto ${i}</div>`;
-  }
-  document.getElementById('photo-grid').innerHTML=tiles;
-  document.getElementById('photo-overlay').style.display='flex';
-}
-function closePhotos(){
-  document.getElementById('photo-overlay').style.display='none';
-}
+    var tabs=[].slice.call(document.querySelectorAll('.demo-tab'));
+    var panels=[].slice.call(document.querySelectorAll('.app-panel'));
+    var leads=document.getElementById('app-leads');
+    var toast=document.getElementById('demo-toast');
+    var toastTimer;
+    var statusLabels={new:'Neu',waiting:'Wartend',appointment:'Termin',won:'Auftrag'};
 
-// Weitere Benachrichtigungs-Empfänger hinzufügen (+) / entfernen (×)
-function addEmpfaenger(){
-  const liste=document.getElementById('empf-liste');
-  if(liste.querySelectorAll('.empf-row').length>=5){alert('Maximal 5 Empfänger.');return}
-  const row=document.createElement('div');
-  row.className='empf-row';
-  row.innerHTML='<input type="email" placeholder="weitere@adresse.de"><button class="empf-remove" onclick="this.parentElement.remove()" title="Adresse entfernen">×</button>';
-  liste.appendChild(row);
-  row.querySelector('input').focus();
-}
+    function say(message){
+      if(!toast){return;}
+      toast.textContent=message;
+      toast.classList.add('is-visible');
+      window.clearTimeout(toastTimer);
+      toastTimer=window.setTimeout(function(){toast.classList.remove('is-visible');},2800);
+    }
 
-let toastTimer=null;
-function showToast(text){
-  const el=document.getElementById('toast');
-  el.textContent=text;
-  el.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer=setTimeout(()=>el.classList.remove('show'),2200);
-}
+    function activateTab(button,focusPanel){
+      tabs.forEach(function(tab){
+        var active=tab===button;
+        tab.setAttribute('aria-selected',active?'true':'false');
+        tab.tabIndex=active?0:-1;
+      });
+      panels.forEach(function(panel){panel.hidden=panel.id!==button.getAttribute('data-panel');});
+      if(focusPanel){
+        var target=document.getElementById(button.getAttribute('data-panel'));
+        if(target){target.setAttribute('tabindex','-1');target.focus({preventScroll:true});}
+      }
+    }
 
-function changeStatus(id,status){
-  const lead=leads.find(l=>l.id===id);
-  if(lead){
-    lead.status=status;
-    if(status!=='won')lead.revenue=null;
-    if(status!=='waiting')lead.followup=false;
-    renderFilter();
-    renderLeads();
-    renderStats();
-    showToast('Status geändert: '+statusConfig[status].label);
-  }
-}
+    tabs.forEach(function(tab,index){
+      tab.addEventListener('click',function(){activateTab(tab,false);});
+      tab.addEventListener('keydown',function(event){
+        var next=index;
+        if(event.key==='ArrowRight'||event.key==='ArrowDown'){next=(index+1)%tabs.length;}
+        else if(event.key==='ArrowLeft'||event.key==='ArrowUp'){next=(index-1+tabs.length)%tabs.length;}
+        else if(event.key==='Home'){next=0;}
+        else if(event.key==='End'){next=tabs.length-1;}
+        else{return;}
+        event.preventDefault();tabs[next].focus();activateTab(tabs[next],false);
+      });
+    });
+    if(tabs[0]){activateTab(tabs[0],false);}
 
-function saveRevenue(id){
-  const val=parseInt(document.getElementById('rev-val-'+id).value)||0;
-  const lead=leads.find(l=>l.id===id);
-  if(lead){
-    lead.revenue=val;renderFilter();renderLeads();renderStats();
-    showToast('+'+val.toLocaleString('de-DE')+' € erfasst — Statistik aktualisiert');
-  }
-}
+    function allLeadCards(){return [].slice.call(leads.querySelectorAll('.app-lead'));}
 
-// Vorführ-Moment: eine neue Beispiel-Anfrage trifft "live" ein
-let simZaehler=0;
-const simBeispiele=[
-  {name:'Fr. Krause',msg:'Guten Abend, unsere Heizung wird nicht mehr richtig warm. Können Sie diese Woche vorbeischauen?'},
-  {name:'Herr Lehmann',msg:'Wir planen den Umstieg auf eine Wärmepumpe. Beraten Sie dazu auch vor Ort?'},
-  {name:'Fr. Weber',msg:'Im Gäste-WC läuft die Spülung durch. Was würde die Reparatur ungefähr kosten?'}
-];
-function simuliereAnfrage(){
-  if(simZaehler>=simBeispiele.length){showToast('Demo: genug Beispiele — Seite neu laden setzt zurück.');return}
-  const b=simBeispiele[simZaehler];simZaehler++;
-  const neueId=Math.max(...leads.map(l=>l.id))+1;
-  leads.push({id:neueId,name:b.name,kind:'privat',firma:null,size:null,time:'gerade eben — 21:48',msg:b.msg,status:'new',revenue:null,followup:false,photos:1,source:'Google Ads'});
-  renderFilter();renderLeads();renderStats();
-  document.getElementById('app-screen').scrollTo({top:0,behavior:'smooth'});
-  showToast('Neue Anfrage eingetroffen (Beispiel)');
-}
+    function formatEuro(value){return new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(value);}
 
-function renderStats(){
-  const total=leads.length;
-  const won=leads.filter(l=>l.status==='won');
-  const rev=won.reduce((s,l)=>s+(l.revenue||0),0);
-  const rate=total>0?Math.round((won.length/total)*100):0;
-  document.getElementById('stat-total').textContent=total;
-  document.getElementById('stat-won').textContent=won.length;
-  document.getElementById('stat-rate').textContent=rate+'%';
-  document.getElementById('stat-rev').textContent=rev.toLocaleString('de-DE')+' \u20ac';
-  const months=['Feb','Mär','Apr','Mai','Jun','Jul'];
-  const data=[8,12,15,18,14,total];
-  const wonData=[3,5,6,8,6,won.length];
-  const maxVal=Math.max(...data);
-  document.getElementById('chart-bars').innerHTML=months.map((m,i)=>{
-    const h=(data[i]/maxVal)*100;
-    const wh=data[i]>0?(wonData[i]/data[i])*100:0;
-    return `<div class="chart-bar"><div class="bar" style="height:${h}%;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden"><div class="bar won" style="height:${wh}%;border-radius:0"></div></div><div class="lbl">${m}</div></div>`;
-  }).join('');
-  const dists=[
-    {label:'Neu',count:leads.filter(l=>l.status==='new').length,color:'#ef4444'},
-    {label:'Wartend',count:leads.filter(l=>l.status==='waiting').length,color:'#eab308'},
-    {label:'Termin',count:leads.filter(l=>l.status==='appointment').length,color:'#eab308'},
-    {label:'Auftrag',count:won.length,color:'#22c55e'},
-    {label:'Verloren',count:leads.filter(l=>l.status==='lost').length,color:'#3f3f46'}
-  ];
-  document.getElementById('dist-list').innerHTML=dists.map(d=>`<div class="dist-row"><span class="dist-dot" style="background:${d.color}"></span><span class="dist-label">${d.label}</span><span class="dist-val">${d.count}</span></div>`).join('');
-  const quellen={};
-  leads.forEach(l=>{if(l.source){quellen[l.source]=(quellen[l.source]||0)+1}});
-  const qFarben={'Google Ads':'#3b82f6','Website':'#22c55e','Empfehlung':'#eab308'};
-  document.getElementById('source-list').innerHTML=Object.keys(quellen).map(q=>`<div class="dist-row"><span class="dist-dot" style="background:${qFarben[q]||'#6b7088'}"></span><span class="dist-label">${q}</span><span class="dist-val">${quellen[q]}</span></div>`).join('');
-}
+    function countStatus(status){return allLeadCards().filter(function(card){return card.getAttribute('data-status')===status;}).length;}
 
-// Dezente 3D-Neigung des Handy-Rahmens (nur Desktop mit Maus, ohne fremde Server).
-if(window.matchMedia('(hover:hover)').matches && !window.matchMedia('(prefers-reduced-motion:reduce)').matches){
-  const phone=document.querySelector('.phone');
-  document.body.addEventListener('mousemove',e=>{
-    const r=phone.getBoundingClientRect();
-    const cx=r.left+r.width/2, cy=r.top+r.height/2;
-    const dx=Math.max(-1,Math.min(1,(e.clientX-cx)/(r.width)));
-    const dy=Math.max(-1,Math.min(1,(e.clientY-cy)/(r.height)));
-    phone.style.transform='perspective(1200px) rotateY('+(dx*4)+'deg) rotateX('+(dy*-4)+'deg)';
-  });
-  document.body.addEventListener('mouseleave',()=>{phone.style.transform='perspective(1200px) rotateY(0deg) rotateX(0deg)'});
-}
+    function updateStats(){
+      var cards=allLeadCards();
+      var total=cards.length;
+      var appointments=countStatus('appointment');
+      var won=countStatus('won');
+      var open=countStatus('new')+countStatus('waiting')+appointments;
+      var value=cards.reduce(function(sum,card){return card.getAttribute('data-status')==='won'?sum+(Number(card.getAttribute('data-value'))||0):sum;},0);
+      var values={
+        'metric-total':total,'metric-open':open,'metric-appointments':appointments,'metric-value':formatEuro(value),
+        'overview-total':total,'overview-won':won,'overview-value':formatEuro(value)
+      };
+      Object.keys(values).forEach(function(id){var el=document.getElementById(id);if(el){el.textContent=values[id];}});
+      ['new','waiting','appointment','won'].forEach(function(status){
+        var count=countStatus(status);
+        var label=document.getElementById('bar-'+status+'-label');
+        var bar=document.getElementById('bar-'+status);
+        if(label){label.textContent=count;}
+        if(bar){bar.style.width=(total?Math.round(count/total*100):0)+'%';}
+      });
+    }
 
-function sendSupport(){
-  const type=document.getElementById('support-type').value;
-  const msg=document.getElementById('support-msg').value.trim();
-  if(!type){alert('Bitte wählen Sie ein Anliegen.');return;}
-  if(!msg){alert('Bitte beschreiben Sie Ihr Anliegen.');return;}
-  document.getElementById('support-form-wrap').style.display='none';
-  document.getElementById('support-success-wrap').style.display='block';
-}
-</script>
+    function updateCard(card,status){
+      card.setAttribute('data-status',status);
+      var label=card.querySelector('.app-lead__status');
+      if(label){label.textContent=statusLabels[status]||status;}
+      updateStats();
+      var activeButton=document.querySelector('.app-filter__button[aria-pressed="true"]');
+      applyFilter(activeButton?activeButton.getAttribute('data-filter'):'all');
+    }
+
+    leads.addEventListener('change',function(event){
+      if(!event.target.classList.contains('app-status-select')){return;}
+      var card=event.target.closest('.app-lead');
+      updateCard(card,event.target.value);
+      say('Demo-Status geändert: '+statusLabels[event.target.value]+'.');
+    });
+
+    leads.addEventListener('click',function(event){
+      var button=event.target.closest('.app-contact-sim');
+      if(button){say('Demo: Hier würde der vereinbarte Kontaktweg geöffnet. Es wird nichts versendet.');}
+    });
+
+    var filterButtons=[].slice.call(document.querySelectorAll('.app-filter__button'));
+    function applyFilter(filter){
+      var visible=0;
+      allLeadCards().forEach(function(card){
+        var show=filter==='all'||card.getAttribute('data-status')===filter;
+        card.hidden=!show;if(show){visible++;}
+      });
+      var empty=document.getElementById('app-empty');
+      if(visible===0){
+        if(!empty){
+          empty=document.createElement('p');
+          empty.id='app-empty';
+          empty.className='app-empty';
+          empty.textContent='Keine Anfragen für diese Auswahl.';
+          leads.appendChild(empty);
+        }
+      }else if(empty){
+        empty.parentNode.removeChild(empty);
+      }
+      var result=document.getElementById('filter-result');
+      if(result){result.textContent=visible+' Beispielanfrage'+(visible===1?' wird':'n werden')+' angezeigt.';}
+    }
+    filterButtons.forEach(function(button){
+      button.addEventListener('click',function(){
+        var filter=button.getAttribute('data-filter');
+        filterButtons.forEach(function(other){other.setAttribute('aria-pressed',other===button?'true':'false');});
+        applyFilter(filter);
+      });
+    });
+
+    var addButton=document.getElementById('app-add-lead');
+    var template=document.getElementById('lead-template');
+    if(addButton&&template){
+      addButton.addEventListener('click',function(){
+        var clone=template.content.cloneNode(true);
+        var card=clone.querySelector('.app-lead');
+        leads.prepend(clone);
+        filterButtons.forEach(function(button){button.setAttribute('aria-pressed',button.getAttribute('data-filter')==='all'?'true':'false');});
+        allLeadCards().forEach(function(item){item.hidden=false;});
+        var staleEmpty=document.getElementById('app-empty');
+        if(staleEmpty){staleEmpty.parentNode.removeChild(staleEmpty);}
+        document.getElementById('filter-result').textContent=allLeadCards().length+' Beispielanfragen werden angezeigt.';
+        updateStats();
+        if(card){card.focus();}
+        say('Eine neue fiktive Beispielanfrage wurde angelegt.');
+      });
+    }
+
+    var settings=document.getElementById('app-settings-form');
+    if(settings){
+      settings.addEventListener('submit',function(event){event.preventDefault();say('Demo-Einstellungen angewendet. Es wurde nichts gespeichert.');});
+      settings.addEventListener('change',function(event){
+        if(event.target.type==='checkbox'){
+          var switchLabel=event.target.closest('.app-switch');
+          if(switchLabel){switchLabel.lastChild.textContent=event.target.checked?' Aktiv':' Inaktiv';}
+        }
+      });
+    }
+
+    updateStats();
+  }());
+  </script>
 </body>
 </html>
