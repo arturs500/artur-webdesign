@@ -156,11 +156,35 @@
         alpha: true,
         powerPreference: "default",
       });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+      // Schaerfe (V8.45): Deckel von 1,75 auf 2 angehoben. Bei devicePixelRatio 2
+      // (jeder Retina-Mac) wurde vorher mit 87,5 % gerendert und vom Browser wieder
+      // hochskaliert — dieser Zwischenschritt hat JEDE Kante weichgezogen. Mit 2 liegt
+      // ein gerenderter Bildpunkt exakt auf einem Schirm-Bildpunkt. Die Leerlauf-Last
+      // bleibt 0: gerendert wird ausschliesslich ereignisgesteuert (requestRender).
+      // V8.84: Deckel 3 statt 2 — moderne Telefone haben devicePixelRatio 3; mit Deckel 2
+      // bekam genau das Abnahme-Geraet nur 2/3 der Aufloesung (gemessen 724x1172
+      // statt 1086x1758 bei 362x586 CSS). Mehrlast nur bei Interaktion (Leerlauf 0).
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 3));
+      // V8.87 (Arturs Geraete-Befund 'es haengt'): Waehrend einer laufenden
+      // Geste (Drehen, Listen-Scroll) wird mit Deckel 2 gerendert, im Stand
+      // wieder mit 3. Ein Frame @DPR3 + Schatten + frischer Screen-Textur ist
+      // fuer aeltere Telefone pro pointermove zu teuer - halbe Pixelzahl
+      // waehrend der Bewegung ist unsichtbar, der Stand bleibt gestochen.
+      let interaktionsDpr = false;
+      const dprSetzen = (grob) => {
+        if (grob === interaktionsDpr) return;
+        interaktionsDpr = grob;
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, grob ? 2 : 3));
+        if (this._fit) this._fit(); else this.requestRender();
+      };
+      this._dprGrob = dprSetzen;
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = 1.05;
       renderer.shadowMap.enabled = true;
+      // Weicher Kontaktschatten (Design-Vorgabe): PCF glaettet die Schattenkante,
+      // Lichtaufbau bleibt unveraendert (1 Key + 1 Rim/Fill + Hemisphaere, kein Glow).
+      // PCFShadowMap statt PCFSoft: r184 faellt ohnehin darauf zurueck, Optik identisch, 0 Konsolen-Warnung.
       renderer.shadowMap.type = THREE.PCFShadowMap;
       renderer.domElement.setAttribute("aria-hidden", "true");
       this._renderer = renderer;
@@ -174,12 +198,81 @@
       this._camera = camera;
 
       const controls = new controlsModule.OrbitControls(camera, renderer.domElement);
+      // WICHTIG — Reihenfolge ist zwingend: OrbitControls.connect() setzt im Konstruktor
+      // den Inline-Stil touchAction="none". Wirkung gemessen (28.07.2026, 1100px, Touch):
+      // senkrechter Wisch ueber der Buehne = 0 px Scroll statt 538 px — der Finger bleibt
+      // haengen. "pan-y" gibt das senkrechte Scrollen an den Browser zurueck; waagerechtes
+      // Ziehen bleibt beim Drehen, Tippen bleibt beim Bedienen. Die CSS-Regel
+      // .hero-phone__stage{touch-action:pan-y} reicht dafuer NICHT (sitzt auf dem Wrapper,
+      // touch-action vererbt nicht, Inline-Stil schlaegt CSS). Nicht "aufraeumen".
+      renderer.domElement.style.touchAction = "pan-y";
       controls.enableDamping = false;
       controls.enableZoom = false;
       controls.enablePan = false;
       controls.autoRotate = false;
+      // Zwei-Finger-Gesten sind ohnehin aus (kein Zoom, kein Pan) — hier explizit,
+      // damit Pinch/Zwei-Finger-Wisch am Handy die Seite bedient, nicht die Buehne.
+      // V8.84: Ein-Finger-Drehen laeuft NICHT mehr ueber OrbitControls. Grund
+      // (gemessen, Pruef-Workflow 03.08.): pan-y laesst den Browser erst nach
+      // seiner Slop-Strecke entscheiden — bis dahin drehte Orbit schon mit. Im
+      // 45-55-Grad-Band scrollte die Seite UND das Handy zuckte 1,5-18 Grad mit.
+      // Jetzt entscheidet ein eigener Richtungs-Waechter VOR der ersten Drehung:
+      // erst ab 10px Weg und |dx| >= 1,6*|dy| wird gedreht; alles andere gehoert
+      // dem Browser-Scroll. Maus/Stift bleiben unveraendert bei OrbitControls.
+      if (THREE.TOUCH) controls.touches = { ONE: null, TWO: null };
       controls.addEventListener("change", () => this.requestRender());
       this._controls = controls;
+
+      controls.addEventListener("start", () => dprSetzen(true));
+      controls.addEventListener("end", () => dprSetzen(false));
+      const fingerDreh = { id: null, x: 0, y: 0, modus: null };
+      const drehOffset = new THREE.Vector3();
+      const drehKugel = new THREE.Spherical();
+      const fingerDrehen = (dx, dy) => {
+        drehOffset.copy(camera.position).sub(controls.target);
+        drehKugel.setFromVector3(drehOffset);
+        const winkel = (2 * Math.PI) / (renderer.domElement.clientHeight || 1);
+        drehKugel.theta -= dx * winkel * (controls.rotateSpeed || 1);
+        drehKugel.phi -= dy * winkel * (controls.rotateSpeed || 1);
+        drehKugel.phi = Math.min(controls.maxPolarAngle - 1e-4,
+          Math.max(controls.minPolarAngle + 1e-4, drehKugel.phi));
+        drehKugel.makeSafe();
+        drehOffset.setFromSpherical(drehKugel);
+        camera.position.copy(controls.target).add(drehOffset);
+        camera.lookAt(controls.target);
+        this.requestRender();
+        controls.dispatchEvent({ type: "change" });
+      };
+      renderer.domElement.addEventListener("pointerdown", (e) => {
+        if (e.pointerType !== "touch") return;
+        fingerDreh.id = e.pointerId; fingerDreh.x = e.clientX; fingerDreh.y = e.clientY;
+        fingerDreh.modus = null;
+      });
+      renderer.domElement.addEventListener("pointermove", (e) => {
+        if (e.pointerType !== "touch" || e.pointerId !== fingerDreh.id) return;
+        const dx = e.clientX - fingerDreh.x;
+        const dy = e.clientY - fingerDreh.y;
+        if (fingerDreh.modus === null) {
+          if (Math.hypot(dx, dy) < 10) return;
+          // V8.85: Beruehrungen, die auf dem Geraete-Display begonnen haben,
+          // bedienen die App (Flag setzt hero3d-handy.js) - nie drehen.
+          if (renderer.domElement.dataset.displayGriff === "1") { fingerDreh.modus = "browser"; return; }
+          fingerDreh.modus = Math.abs(dx) >= 1.6 * Math.abs(dy) ? "dreht" : "browser";
+          fingerDreh.x = e.clientX; fingerDreh.y = e.clientY;
+          if (fingerDreh.modus === "dreht") controls.dispatchEvent({ type: "start" });
+          return;
+        }
+        if (fingerDreh.modus !== "dreht") return;
+        fingerDrehen(dx, dy);
+        fingerDreh.x = e.clientX; fingerDreh.y = e.clientY;
+      });
+      const fingerEnde = (e) => {
+        if (e.pointerType !== "touch" || e.pointerId !== fingerDreh.id) return;
+        if (fingerDreh.modus === "dreht") controls.dispatchEvent({ type: "end" });
+        fingerDreh.id = null; fingerDreh.modus = null;
+      };
+      renderer.domElement.addEventListener("pointerup", fingerEnde);
+      renderer.domElement.addEventListener("pointercancel", fingerEnde);
 
       scene.add(new THREE.HemisphereLight(0xffffff, 0xd8d2c4, 1));
       const key = new THREE.DirectionalLight(0xffffff, 2.2);
@@ -233,13 +326,25 @@
         part.receiveShadow = true;
       });
 
-      const box = new THREE.Box3().setFromObject(object);
+      // Kamera-Fit NUR ueber die sichtbare Geraete-Geometrie: Sprites, Lichter
+      // und als userData.noFit markierte Effekt-Meshes (z. B. der unsichtbare
+      // Taschenlampen-Kegel) blaehen die Box sonst um ein Mehrfaches auf ->
+      // die Kamera rueckt zu weit weg und das Objekt wirkt winzig.
+      object.updateWorldMatrix(true, true);
+      const box = new THREE.Box3();
+      const partBox = new THREE.Box3();
+      object.traverse((part) => {
+        if (!part.isMesh || part.userData.noFit || !part.geometry) return;
+        if (part.geometry.boundingBox === null) part.geometry.computeBoundingBox();
+        partBox.copy(part.geometry.boundingBox).applyMatrix4(part.matrixWorld);
+        box.union(partBox);
+      });
       if (!box.isEmpty()) {
         this._ground.position.y = box.min.y;
         const sphere = box.getBoundingSphere(new THREE.Sphere());
         const distance =
-          (sphere.radius / Math.tan((this._camera.fov * Math.PI) / 360)) * 0.96;
-        const direction = new THREE.Vector3(0.46, 0.4, 1.7).normalize();
+          (sphere.radius / Math.tan((this._camera.fov * Math.PI) / 360)) * 1.1;
+        const direction = new THREE.Vector3(0, 0.05, 1).normalize();
         this._camera.position
           .copy(sphere.center)
           .add(direction.multiplyScalar(distance));

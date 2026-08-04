@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#07191f">
   <link rel="icon" href="favicon.png" type="image/png">
   <title>Kunden-App ausprobieren | Artur WebDesign</title>
-  <link rel="stylesheet" href="assets/site.css?v=75">
+  <link rel="stylesheet" href="assets/site.css?v=137">
   <script>document.documentElement.classList.replace('no-js','js');</script>
   <style>
     @font-face{font-family:"Demo Space";src:url("assets/fonts/space-grotesk-500.woff2") format("woff2");font-weight:500;font-style:normal;font-display:swap}
@@ -27,6 +27,10 @@
       --demo-red:#b43b33;
       --demo-amber:#a66500;
       --demo-green:#176b4b;
+      /* V8.46: Status "Verloren" — gleicher Grauton wie auf dem 3D-Handy
+         (hero3d-handy.js STAT_COLOR.verloren). Ehrlich: nicht jede Anfrage
+         wird ein Auftrag. */
+      --demo-grey:#3f3f46;
       --demo-max:1180px;
     }
     *,*::before,*::after{box-sizing:border-box}
@@ -39,7 +43,7 @@
     .demo-wrap{width:min(calc(100% - 40px),var(--demo-max));margin-inline:auto}
     .demo-skip{position:fixed;z-index:999;left:1rem;top:1rem;padding:.75rem 1rem;background:#62d5ff;color:var(--demo-ink);font-weight:700;transform:translateY(-160%)}
     .demo-skip:focus{transform:none}
-    .demo-topbar{position:sticky;z-index:50;top:0;background:rgba(7,25,31,.94);color:#fff;border-bottom:1px solid rgba(241,235,222,.16);backdrop-filter:blur(12px)}
+    .demo-topbar{position:sticky;z-index:50;top:0;background:#07191f;color:#fff;border-bottom:1px solid rgba(241,235,222,.16)}
     .demo-topbar__row{min-height:70px;display:flex;align-items:center;justify-content:space-between;gap:1.5rem}
     .demo-brand{display:inline-flex;min-width:44px;min-height:44px;align-items:center;justify-content:center;gap:.72rem;text-decoration:none;font-weight:700;letter-spacing:-.03em}
     .demo-brand__mark{display:grid;place-items:center;width:34px;height:34px;border:1px solid #62d5ff;color:#62d5ff;font-family:"Demo News",serif;font-size:1.45rem}
@@ -107,6 +111,7 @@
     .app-lead[data-status="waiting"]{border-left-color:var(--demo-amber)}
     .app-lead[data-status="appointment"]{border-left-color:var(--demo-aqua-dark)}
     .app-lead[data-status="won"]{border-left-color:var(--demo-green)}
+    .app-lead[data-status="lost"]{border-left-color:var(--demo-grey)}
     .app-lead__top{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1rem;align-items:start}
     .app-lead__name{margin:0;font-size:.95rem}
     .app-lead__meta{margin:.2rem 0 0;color:var(--demo-muted);font-size:.75rem}
@@ -116,6 +121,21 @@
     .app-lead__actions{display:flex;align-items:end;gap:.55rem;flex-wrap:wrap}
     .app-lead__actions label{display:grid;gap:.2rem;color:var(--demo-muted);font-size:.75rem;font-weight:700}
     .app-lead__actions select{min-height:44px;padding:.42rem 2rem .42rem .55rem;border:1px solid #aebbb6;background:#fff;color:var(--demo-ink)}
+    /* V8.46: Anrufen/WhatsApp wie auf dem 3D-Handy — Umriss-Knoepfe mit Symbol,
+       statt eines allgemeinen "Kontakt simulieren". Kontrast auf Papier: der Text
+       nutzt die dunklen Demo-Toene (nicht die hellen Handy-Toene auf Schwarz). */
+    .app-contact{display:inline-flex;align-items:center;gap:.4rem;min-height:44px;padding:.5rem .8rem;border:1px solid;background:transparent;font-size:.78rem;font-weight:700}
+    .app-contact svg{width:15px;height:15px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    .app-contact--call{border-color:#166b45;color:#12583a;background:rgba(23,107,75,.07)}
+    .app-contact--call:hover{background:rgba(23,107,75,.16)}
+    .app-contact--wa{border-color:#0d5f68;color:#0a4f57;background:rgba(7,111,120,.07)}
+    .app-contact--wa:hover{background:rgba(7,111,120,.16)}
+    /* V8.46: Neuigkeiten-Zeile — gleiche Rechnung und gleiches Wording wie die
+       Neuigkeiten-Zeile auf dem 3D-Handy (drawBoardListe). */
+    .app-news{display:flex;align-items:flex-start;gap:.6rem;margin:0 0 1rem;padding:.8rem .9rem;border:1px solid #9cc4c8;background:#e7f2f3;color:#22383a;font-size:.82rem}
+    .app-news svg{width:17px;height:17px;flex:0 0 auto;margin-top:.1rem;fill:none;stroke:var(--demo-aqua-dark);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    .app-news__label{display:block;margin-bottom:.15rem;color:var(--demo-aqua-dark);font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+    .app-news[hidden]{display:none}
     .app-detail{margin-top:.8rem;border-top:1px solid #e1e5e1;padding-top:.65rem}
     .app-detail summary{display:flex;align-items:center;min-height:44px;cursor:pointer;font-size:.75rem;font-weight:700}
     .app-detail p{margin:.55rem 0 0;color:var(--demo-muted);font-size:.76rem}
@@ -209,6 +229,9 @@
       .app-filter legend{font-size:.8rem}
       .app-filter__button{font-size:.82rem;min-height:44px}
       .app-lead__status{font-size:.78rem}
+      .app-contact{font-size:.85rem}
+      .app-news{font-size:1rem}
+      .app-news__label{font-size:.8rem}
       .app-lead__actions label{font-size:.875rem}
       .app-lead__actions select{font-size:.85rem;min-height:44px}
       .app-bar__label{font-size:.8rem}
@@ -279,6 +302,12 @@
                 <button class="demo-tab" id="tab-einstellungen" type="button" role="tab" aria-selected="false" aria-controls="panel-einstellungen" data-panel="panel-einstellungen">Einstellungen</button>
               </div>
               <p class="demo-app__small">Hinweis: Ohne JavaScript stehen alle drei Bereiche untereinander. Es werden keine Eingaben versendet.</p>
+              <!-- V8.46: Das 3D-Handy auf der Startseite zeigt vor der App einen
+                   Login-Schirm. Hier steht dieselbe Aussage als Satz statt als
+                   Zwischenbild: eine Anmeldemaske, die nichts prueft, waere vor
+                   einer Demo zum Durchklicken nur eine Huerde ohne Aussage — und
+                   diese Seite sagt oben ausdruecklich "ohne Anmeldung" zu. -->
+              <p class="demo-app__small">Zugang: Die echte App ist durch Firmencode, PIN und Fehlversuch-Sperre geschützt. Diese Vorführung zeigt sie bewusst ohne Anmeldung.</p>
             </aside>
 
             <div class="demo-app__content">
@@ -288,7 +317,7 @@
                     <h3>Anfragen</h3>
                     <p>Frei erfundene Datensätze für diese Demo</p>
                   </div>
-                  <button class="app-button" id="app-add-lead" type="button">Neue Beispielanfrage</button>
+                  <button class="app-button" id="app-add-lead" type="button">Vorführen: So kommt eine neue Anfrage an</button>
                 </div>
 
                 <div class="app-metrics" aria-label="Zusammenfassung der Beispieldaten">
@@ -298,6 +327,11 @@
                   <div class="app-metric"><span>Beispiel-Auftragswert</span><strong id="metric-value">3.200 €</strong></div>
                 </div>
 
+                <p class="app-news" id="app-news" aria-live="polite">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7"/><path d="M13.7 20a2 2 0 0 1-3.4 0"/></svg>
+                  <span><span class="app-news__label">Neuigkeiten</span><span id="app-news-text"></span></span>
+                </p>
+
                 <fieldset class="app-filter" aria-describedby="filter-result">
                   <legend>Anzeigen:</legend>
                   <button class="app-filter__button" type="button" data-filter="all" aria-pressed="true">Alle</button>
@@ -305,6 +339,7 @@
                   <button class="app-filter__button" type="button" data-filter="waiting" aria-pressed="false">Wartend</button>
                   <button class="app-filter__button" type="button" data-filter="appointment" aria-pressed="false">Termin</button>
                   <button class="app-filter__button" type="button" data-filter="won" aria-pressed="false">Auftrag</button>
+                  <button class="app-filter__button" type="button" data-filter="lost" aria-pressed="false">Verloren</button>
                   <p class="app-filter__result" id="filter-result" aria-live="polite">5 Beispielanfragen werden angezeigt.</p>
                 </fieldset>
 
@@ -316,10 +351,11 @@
                     </div>
                     <p class="app-lead__message">„Seit gestern bleibt das Wasser kalt. Können Sie diese Woche vorbeikommen?“</p>
                     <div class="app-lead__actions">
-                      <button class="app-button app-button--quiet app-contact-sim" type="button" aria-label="Kontakt simulieren – Paula Beispiel">Kontakt simulieren</button>
+                      <button class="app-contact app-contact--call" type="button" data-contact="call" aria-label="Anrufen – Paula Beispiel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 3h3l1.5 4-2 1.5a12 12 0 0 0 5.5 5.5L16 12l4 1.5v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4 6.2 2 2 0 0 1 6 4z"/></svg>Anrufen</button>
+                      <button class="app-contact app-contact--wa" type="button" data-contact="wa" aria-label="WhatsApp – Paula Beispiel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-11 6.6L4.5 19.5 6 15.4A7.5 7.5 0 1 1 20 11.5z"/></svg>WhatsApp</button>
                       <label>Status
                         <select class="app-status-select" aria-label="Status für Paula Beispiel">
-                          <option value="new" selected>Neu</option><option value="waiting">Wartend</option><option value="appointment">Termin</option><option value="won">Auftrag</option>
+                          <option value="new" selected>Neu</option><option value="waiting">Wartend</option><option value="appointment">Termin</option><option value="won">Auftrag</option><option value="lost">Verloren</option>
                         </select>
                       </label>
                     </div>
@@ -333,27 +369,29 @@
                     </div>
                     <p class="app-lead__message">„Wir planen zwei neue Waschplätze. Bitte melden Sie sich für eine Vor-Ort-Aufnahme.“</p>
                     <div class="app-lead__actions">
-                      <button class="app-button app-button--quiet app-contact-sim" type="button" aria-label="Kontakt simulieren – Beispielwerk GmbH (fiktiv)">Kontakt simulieren</button>
+                      <button class="app-contact app-contact--call" type="button" data-contact="call" aria-label="Anrufen – Beispielwerk GmbH (fiktiv)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 3h3l1.5 4-2 1.5a12 12 0 0 0 5.5 5.5L16 12l4 1.5v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4 6.2 2 2 0 0 1 6 4z"/></svg>Anrufen</button>
+                      <button class="app-contact app-contact--wa" type="button" data-contact="wa" aria-label="WhatsApp – Beispielwerk GmbH (fiktiv)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-11 6.6L4.5 19.5 6 15.4A7.5 7.5 0 1 1 20 11.5z"/></svg>WhatsApp</button>
                       <label>Status
                         <select class="app-status-select" aria-label="Status für Beispielwerk GmbH (fiktiv)">
-                          <option value="new" selected>Neu</option><option value="waiting">Wartend</option><option value="appointment">Termin</option><option value="won">Auftrag</option>
+                          <option value="new" selected>Neu</option><option value="waiting">Wartend</option><option value="appointment">Termin</option><option value="won">Auftrag</option><option value="lost">Verloren</option>
                         </select>
                       </label>
                     </div>
                     <details class="app-detail"><summary aria-label="Anfragedetails anzeigen – Beispielwerk GmbH (fiktiv)">Anfragedetails anzeigen</summary><p>Ansprechperson und Betriebsgröße sind in dieser Demo frei erfunden. Echte Daten werden nicht aus Vermutungen ergänzt.</p></details>
                   </article>
 
-                  <article class="app-lead" data-status="waiting" data-value="0">
+                  <article class="app-lead" data-status="waiting" data-value="0" data-followup="1">
                     <div class="app-lead__top">
                       <div><h4 class="app-lead__name">Karim Beispiel</h4><p class="app-lead__meta">Privat · über Empfehlung · Montag, 11:25 Uhr (Beispiel)</p></div>
                       <span class="app-lead__status">Wartend</span>
                     </div>
                     <p class="app-lead__message">„Wir möchten das Bad umbauen. Welche Angaben brauchen Sie für einen Besichtigungstermin?“</p>
                     <div class="app-lead__actions">
-                      <button class="app-button app-button--quiet app-contact-sim" type="button" aria-label="Kontakt simulieren – Karim Beispiel">Kontakt simulieren</button>
+                      <button class="app-contact app-contact--call" type="button" data-contact="call" aria-label="Anrufen – Karim Beispiel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 3h3l1.5 4-2 1.5a12 12 0 0 0 5.5 5.5L16 12l4 1.5v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4 6.2 2 2 0 0 1 6 4z"/></svg>Anrufen</button>
+                      <button class="app-contact app-contact--wa" type="button" data-contact="wa" aria-label="WhatsApp – Karim Beispiel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-11 6.6L4.5 19.5 6 15.4A7.5 7.5 0 1 1 20 11.5z"/></svg>WhatsApp</button>
                       <label>Status
                         <select class="app-status-select" aria-label="Status für Karim Beispiel">
-                          <option value="new">Neu</option><option value="waiting" selected>Wartend</option><option value="appointment">Termin</option><option value="won">Auftrag</option>
+                          <option value="new">Neu</option><option value="waiting" selected>Wartend</option><option value="appointment">Termin</option><option value="won">Auftrag</option><option value="lost">Verloren</option>
                         </select>
                       </label>
                     </div>
@@ -367,10 +405,11 @@
                     </div>
                     <p class="app-lead__message">„Für vier Wohnungen steht die jährliche Wartung an. Können wir einen Sammeltermin abstimmen?“</p>
                     <div class="app-lead__actions">
-                      <button class="app-button app-button--quiet app-contact-sim" type="button" aria-label="Kontakt simulieren – Musterhof Verwaltung (fiktiv)">Kontakt simulieren</button>
+                      <button class="app-contact app-contact--call" type="button" data-contact="call" aria-label="Anrufen – Musterhof Verwaltung (fiktiv)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 3h3l1.5 4-2 1.5a12 12 0 0 0 5.5 5.5L16 12l4 1.5v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4 6.2 2 2 0 0 1 6 4z"/></svg>Anrufen</button>
+                      <button class="app-contact app-contact--wa" type="button" data-contact="wa" aria-label="WhatsApp – Musterhof Verwaltung (fiktiv)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-11 6.6L4.5 19.5 6 15.4A7.5 7.5 0 1 1 20 11.5z"/></svg>WhatsApp</button>
                       <label>Status
                         <select class="app-status-select" aria-label="Status für Musterhof Verwaltung (fiktiv)">
-                          <option value="new">Neu</option><option value="waiting">Wartend</option><option value="appointment" selected>Termin</option><option value="won">Auftrag</option>
+                          <option value="new">Neu</option><option value="waiting">Wartend</option><option value="appointment" selected>Termin</option><option value="won">Auftrag</option><option value="lost">Verloren</option>
                         </select>
                       </label>
                     </div>
@@ -384,10 +423,11 @@
                     </div>
                     <p class="app-lead__message">„Bitte erstellen Sie ein Angebot für den Austausch von Heizkörpern in drei Räumen.“</p>
                     <div class="app-lead__actions">
-                      <button class="app-button app-button--quiet app-contact-sim" type="button" aria-label="Kontakt simulieren – Nina Demo">Kontakt simulieren</button>
+                      <button class="app-contact app-contact--call" type="button" data-contact="call" aria-label="Anrufen – Nina Demo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 3h3l1.5 4-2 1.5a12 12 0 0 0 5.5 5.5L16 12l4 1.5v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4 6.2 2 2 0 0 1 6 4z"/></svg>Anrufen</button>
+                      <button class="app-contact app-contact--wa" type="button" data-contact="wa" aria-label="WhatsApp – Nina Demo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-11 6.6L4.5 19.5 6 15.4A7.5 7.5 0 1 1 20 11.5z"/></svg>WhatsApp</button>
                       <label>Status
                         <select class="app-status-select" aria-label="Status für Nina Demo">
-                          <option value="new">Neu</option><option value="waiting">Wartend</option><option value="appointment">Termin</option><option value="won" selected>Auftrag</option>
+                          <option value="new">Neu</option><option value="waiting">Wartend</option><option value="appointment">Termin</option><option value="won" selected>Auftrag</option><option value="lost">Verloren</option>
                         </select>
                       </label>
                     </div>
@@ -409,6 +449,7 @@
                       <div><div class="app-bar__label"><span>Wartend</span><span id="bar-waiting-label">1</span></div><div class="app-bar__track"><span class="app-bar__fill" id="bar-waiting" style="width:20%"></span></div></div>
                       <div><div class="app-bar__label"><span>Termin</span><span id="bar-appointment-label">1</span></div><div class="app-bar__track"><span class="app-bar__fill" id="bar-appointment" style="width:20%"></span></div></div>
                       <div><div class="app-bar__label"><span>Auftrag</span><span id="bar-won-label">1</span></div><div class="app-bar__track"><span class="app-bar__fill" id="bar-won" style="width:20%"></span></div></div>
+                      <div><div class="app-bar__label"><span>Verloren</span><span id="bar-lost-label">0</span></div><div class="app-bar__track"><span class="app-bar__fill" id="bar-lost" style="width:0%"></span></div></div>
                     </div>
                   </div>
                   <div class="app-card">
@@ -493,30 +534,35 @@
   <footer class="demo-footer">
     <div class="demo-wrap demo-footer__row">
       <span>© <span data-current-year>2026</span> Artur WebDesign · Artur Stol · Umsätze gemäß § 19 UStG umsatzsteuerfrei</span>
+      <span>Artur WebDesign · Artur Stol · <a href="tel:+4917622659649">+49 176 2265 9649</a> · <a href="mailto:info@artur.ae">info@artur.ae</a></span>
       <span><a href="/">Startseite</a> · <a href="automatisierung-demo.html">Automatisierungs-Demo</a> · <a href="impressum.html">Impressum</a> · <a href="datenschutz.html">Datenschutz</a></span>
     </div>
   </footer>
 
   <div class="demo-toast" id="demo-toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
+  <!-- V8.46: Der Vorfuehr-Vorgang ist derselbe wie auf dem 3D-Handy im Hero
+       (hero3d-handy.js SIM_BEISPIEL) — Name, Meta-Zeile, Nachricht und Detailtext
+       zeichengleich. Beide Demos legen also dasselbe Beispiel an. -->
   <template id="lead-template">
     <article class="app-lead" data-status="new" data-value="0" tabindex="-1">
       <div class="app-lead__top">
-        <div><h4 class="app-lead__name">Neue Demo-Anfrage</h4><p class="app-lead__meta">Privat · über Website · gerade eben (Beispiel)</p></div>
+        <div><h4 class="app-lead__name">Fr. Krause (Beispiel)</h4><p class="app-lead__meta">Privat · über Google Ads · gerade eben, 21:48 Uhr (Beispiel)</p></div>
         <span class="app-lead__status">Neu</span>
       </div>
-      <p class="app-lead__message">„Die Heizung zeigt eine Störung. Welche Angaben brauchen Sie für eine erste Einordnung?“</p>
+      <p class="app-lead__message">„Guten Abend, ich habe alte Heizkörper, ca. 60 kg. Holen Sie so etwas ab?“</p>
       <div class="app-lead__actions">
-        <button class="app-button app-button--quiet app-contact-sim" type="button" aria-label="Kontakt simulieren – Neue Demo-Anfrage">Kontakt simulieren</button>
+        <button class="app-contact app-contact--call" type="button" data-contact="call" aria-label="Anrufen – Fr. Krause (Beispiel)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 3h3l1.5 4-2 1.5a12 12 0 0 0 5.5 5.5L16 12l4 1.5v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4 6.2 2 2 0 0 1 6 4z"/></svg>Anrufen</button>
+        <button class="app-contact app-contact--wa" type="button" data-contact="wa" aria-label="WhatsApp – Fr. Krause (Beispiel)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-11 6.6L4.5 19.5 6 15.4A7.5 7.5 0 1 1 20 11.5z"/></svg>WhatsApp</button>
         <label>Status
-          <select class="app-status-select" aria-label="Status für Neue Demo-Anfrage"><option value="new" selected>Neu</option><option value="waiting">Wartend</option><option value="appointment">Termin</option><option value="won">Auftrag</option></select>
+          <select class="app-status-select" aria-label="Status für Fr. Krause (Beispiel)"><option value="new" selected>Neu</option><option value="waiting">Wartend</option><option value="appointment">Termin</option><option value="won">Auftrag</option><option value="lost">Verloren</option></select>
         </label>
       </div>
-      <details class="app-detail"><summary aria-label="Anfragedetails anzeigen – Neue Demo-Anfrage">Anfragedetails anzeigen</summary><p>Auch dieser nachträglich erzeugte Vorgang ist vollständig fiktiv und wird nicht gespeichert.</p></details>
+      <details class="app-detail"><summary aria-label="Anfragedetails anzeigen – Fr. Krause (Beispiel)">Anfragedetails anzeigen</summary><p>Diese Anfrage kam über den Vorführ-Knopf herein — ein frei erfundenes Beispiel dafür, wie eine neue Anfrage oben einsortiert wird.</p></details>
     </article>
   </template>
 
-  <script src="assets/site.js?v=75" defer></script>
+  <script src="assets/site.js?v=137" defer></script>
   <script>
   (function(){
     'use strict';
@@ -526,7 +572,11 @@
     var leads=document.getElementById('app-leads');
     var toast=document.getElementById('demo-toast');
     var toastTimer;
-    var statusLabels={new:'Neu',waiting:'Wartend',appointment:'Termin',won:'Auftrag'};
+    /* V8.46: "Verloren" ergaenzt — gleicher Status-Vorrat wie auf dem 3D-Handy
+       im Hero (hero3d-handy.js STAT_LABEL). Ehrlich: nicht jede Anfrage wird
+       ein Auftrag. */
+    var statusLabels={new:'Neu',waiting:'Wartend',appointment:'Termin',won:'Auftrag',lost:'Verloren'};
+    var statusKeys=['new','waiting','appointment','won','lost'];
 
     function say(message){
       if(!toast){return;}
@@ -581,12 +631,42 @@
         'overview-total':total,'overview-won':won,'overview-value':formatEuro(value)
       };
       Object.keys(values).forEach(function(id){var el=document.getElementById(id);if(el){el.textContent=values[id];}});
-      ['new','waiting','appointment','won'].forEach(function(status){
+      statusKeys.forEach(function(status){
         var count=countStatus(status);
         var label=document.getElementById('bar-'+status+'-label');
         var bar=document.getElementById('bar-'+status);
         if(label){label.textContent=count;}
         if(bar){bar.style.width=(total?Math.round(count/total*100):0)+'%';}
+      });
+      updateNews();
+    }
+
+    /* V8.46: Neuigkeiten-Zeile — dieselbe Rechnung und dasselbe Wording wie auf
+       dem 3D-Handy im Hero (hero3d-handy.js, drawBoardListe): neue Anfragen,
+       wartende Kunden MIT verschicktem Follow-up (data-followup) und offene
+       Termine. Alles live aus den Karten gezaehlt, nichts fest eingetragen. */
+    var newsBox=document.getElementById('app-news');
+    var newsText=document.getElementById('app-news-text');
+    function countFollowup(){
+      return allLeadCards().filter(function(card){
+        return card.getAttribute('data-status')==='waiting'&&card.getAttribute('data-followup')==='1';
+      }).length;
+    }
+    function updateNews(){
+      if(!newsBox||!newsText){return;}
+      var neu=countStatus('new'),warten=countFollowup(),termine=countStatus('appointment');
+      var teile=[];
+      if(neu>0){teile.push([neu+' neue Anfrage'+(neu>1?'n':''),'']);}
+      if(warten>0){teile.push([warten+' Kunde'+(warten>1?'n':''),' wartet seit 3 Tagen auf Antwort']);}
+      if(termine>0){teile.push([termine+' Termin'+(termine>1?'e':''),' offen']);}
+      newsBox.hidden=teile.length===0;
+      while(newsText.firstChild){newsText.removeChild(newsText.firstChild);}
+      teile.forEach(function(teil,i){
+        if(i){newsText.appendChild(document.createTextNode(' · '));}
+        var stark=document.createElement('strong');
+        stark.textContent=teil[0];
+        newsText.appendChild(stark);
+        if(teil[1]){newsText.appendChild(document.createTextNode(teil[1]));}
       });
     }
 
@@ -606,9 +686,15 @@
       say('Demo-Status geändert: '+statusLabels[event.target.value]+'.');
     });
 
+    /* V8.46: Anrufen/WhatsApp statt eines allgemeinen "Kontakt simulieren" —
+       Knoepfe und Ansage wortgleich zum 3D-Handy im Hero (anrufHinweis /
+       whatsappHinweis). Es wird weiterhin nichts gewaehlt und nichts versendet. */
     leads.addEventListener('click',function(event){
-      var button=event.target.closest('.app-contact-sim');
-      if(button){say('Demo: Hier würde der vereinbarte Kontaktweg geöffnet. Es wird nichts versendet.');}
+      var button=event.target.closest('.app-contact');
+      if(!button){return;}
+      say(button.getAttribute('data-contact')==='wa'
+        ?'Echte App: hier öffnet sich WhatsApp. Es wird nichts versendet.'
+        :'Echte App: hier startet der Anruf. Es wird nichts gewählt.');
     });
 
     var filterButtons=[].slice.call(document.querySelectorAll('.app-filter__button'));
@@ -641,10 +727,16 @@
       });
     });
 
+    /* V8.46: Vorfuehr-Knopf wie auf dem 3D-Handy im Hero (vorfuehrAnfrage) —
+       GENAU EIN vorbereitetes Beispiel, danach dieselbe ehrliche Ansage.
+       Beide Demos legen denselben Vorgang an (siehe lead-template). */
     var addButton=document.getElementById('app-add-lead');
     var template=document.getElementById('lead-template');
+    var simZaehler=0;
     if(addButton&&template){
       addButton.addEventListener('click',function(){
+        if(simZaehler>=1){say('Genug Beispiele für diese Demo.');return;}
+        simZaehler++;
         var clone=template.content.cloneNode(true);
         var card=clone.querySelector('.app-lead');
         leads.prepend(clone);
@@ -655,7 +747,7 @@
         document.getElementById('filter-result').textContent=allLeadCards().length+' Beispielanfragen werden angezeigt.';
         updateStats();
         if(card){card.focus();}
-        say('Eine neue fiktive Beispielanfrage wurde angelegt.');
+        say('Neue Anfrage eingetroffen (Beispiel)');
       });
     }
 

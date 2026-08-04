@@ -14,6 +14,11 @@
   window.__treppeGeladen = true;
   var reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
   var desktopMQ = window.matchMedia("(min-width:1400px)");
+  // V8.69: Unter 1400px laeuft nur noch die A-Leiste (Arturs Wunsch: das A auch
+  // auf dem Handy). Treppe, Figur und Wurf-Overlay bleiben dort aus - 120px
+  // Canvas ueber 390px Bildschirm waeren 27 % der Lesebreite, und der
+  // unsichtbare Greif-Bereich wuerde Tipps auf Links schlucken.
+  var nurLeiste = function () { return !desktopMQ.matches; };
   var laeuft = false;
   if (reduce.matches) return;
 
@@ -23,11 +28,22 @@
   var FLIGHT = 6;
   var RAIL_W = 120;
   var X_MIN = 20, X_MAX = 98;
+  // V8.69: Schmal-Geometrie unter 1400px. 120px Spur ueber 390px Bildschirm
+  // waeren 27 % der Lesebreite gewesen - mit STEP_W 8 sind es 7 %.
+  // Zwangsbedingung: STEP_W * (FLIGHT-1) <= X_MAX - X_MIN, sonst laeuft die
+  // Figur aus der Spur (8*3 = 24 = 32-8).
+  var GEO_WEIT = { STEP_W: 13, FLIGHT: 6, RAIL_W: 120, X_MIN: 20, X_MAX: 98 };
+  // V8.81: Spur auf den 14px-Randstreifen VOR dem Textbeginn (x=14) verengt.
+  // Die Figur ist ~13px breit (Arme +-6 um die Achse, Kopf r4.6) - Achse 3..7
+  // haelt alles im Canvas; was die Treppe darueber hinaus zeichnet, schneidet
+  // das 14px-Canvas ab. Vorher (RAIL_W 46) lag die Figur auf Buchstaben.
+  var GEO_SCHMAL = { STEP_W: 5, FLIGHT: 3, RAIL_W: 14, X_MIN: 3, X_MAX: 7 };
+  var FIG_S = 1;   // V8.89: Figur-Massstab (schmale Spur: 0.62, sonst 1)
   var TEMPO_MAX = 0.024;    // ~24 Stufen/s bei 60fps
 
-  var rail, canvas, ctx, overlay, octx, griff;
+  var rail, canvas, ctx, overlay, octx, griff, leiste, anfasser;
   var dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-  var railH = 0, vpW = 0, vpH = 0, docH = 0, maxStufe = 100;
+  var railH = 0, vpW = 0, vpH = 0, docH = 0, maxStufe = 100, leisteTop = 78;
   var current = 0, lastCurrent = 0, idleSeit = 0, lastTs = 0;
   var letzteRichtung = 1;
 
@@ -48,7 +64,7 @@
                springStufe: 0, springDauer: 360, springBogen: 38 };
   var weltPlattformen = [];
   var STAIR_JUMP_X = 150; // ab diesem x springt die Figur seitlich auf die Treppe (statt bis unten zu fallen)
-  var STAIR_ZONE_X = X_MAX + STEP_W + 8; // Treppen-Zone (links): hier ist die Treppe eine solide Landeflaeche
+  var STAIR_ZONE_X = X_MAX + STEP_W + 8; // Treppen-Zone (links): solide Landeflaeche; wird in messen() neu gesetzt
 
   function posAufTreppe(s) {
     var lauf = Math.floor(s / FLIGHT);
@@ -60,6 +76,13 @@
 
   function messen() {
     dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));  // bei Monitorwechsel neu
+    // Geometrie zuerst - RAIL_W geht in die Canvas-Breite ein, STAIR_ZONE_X
+    // haengt an X_MAX. Beim Drehen des Geraets greift das automatisch.
+    var g = nurLeiste() ? GEO_SCHMAL : GEO_WEIT;
+    FIG_S = nurLeiste() ? 0.62 : 1;   // V8.89: volle Figur wirkte in 14px gequetscht (Arturs Befund)
+    STEP_W = g.STEP_W; FLIGHT = g.FLIGHT; RAIL_W = g.RAIL_W;
+    X_MIN = g.X_MIN; X_MAX = g.X_MAX;
+    STAIR_ZONE_X = X_MAX + STEP_W + 8;
     vpW = window.innerWidth; vpH = window.innerHeight;
     docH = document.documentElement.scrollHeight;
     rail.style.height = "";            // Hoehe kommt aus CSS (fixed top:0 bottom:0 = Fensterhoehe)
@@ -69,7 +92,9 @@
     overlay.width = Math.round(vpW * dpr); overlay.height = Math.round(vpH * dpr);
     octx.setTransform(dpr, 0, 0, dpr, 0, 0);
     maxStufe = Math.max(10, Math.floor((docH - 24) / STEP_H));  // bis fast an den Seitenboden
+    if (leiste) leisteTop = leiste.getBoundingClientRect().top || leisteTop; // Header-Hoehe fuer Welt-Y der A-Leiste
     abschnitteAufbauen();
+    heroMessen();
     if (modus === "welt") weltPlattformenBauen();  // Plattformen bei Layout-Aenderung frisch halten
   }
 
@@ -147,8 +172,16 @@
   // Das Canvas bleibt fenstergross; die Treppe scrollt trotzdem mit, weil jede Stufe an ihrer
   // Seiten-Position minus Scroll gezeichnet wird. Segmentweise gefaerbt (Wechsel exakt an Grenze).
   function zeichneTreppe(sy) {
-    var vonStufe = Math.max(0, Math.floor(sy / STEP_H) - 2);
-    var bisStufe = Math.min(maxStufe, Math.ceil((sy + vpH) / STEP_H) + 2);
+    var vonStufe, bisStufe;
+    if (nurLeiste()) {
+      // Nur die Stufen unter den Fuessen: 5 statt ~42. Das Auge liest sie als
+      // Boden, nicht als Kratzer quer durch den Text.
+      vonStufe = Math.max(0, Math.floor(current) - 2);
+      bisStufe = Math.min(maxStufe, Math.ceil(current) + 2);
+    } else {
+      vonStufe = Math.max(0, Math.floor(sy / STEP_H) - 2);
+      bisStufe = Math.min(maxStufe, Math.ceil((sy + vpH) / STEP_H) + 2);
+    }
     ctx.lineWidth = 1;
     ctx.lineCap = "square";
     var paesse = [
@@ -191,6 +224,7 @@
     c.translate(x, y);
     if (rot) c.rotate(rot);
     if (stauch) c.scale(1 + stauch * 0.16, 1 - stauch * 0.20);  // Idee 1: Landungs-Stauchung
+    if (FIG_S !== 1) c.scale(FIG_S, FIG_S);  // V8.89: Mini-Figur passt MIT Kopf und Armen in die 14px-Spur
     c.strokeStyle = farbe.figur; c.fillStyle = farbe.figur;
     c.lineWidth = stauch ? 2 / (1 - stauch * 0.20) : 2; c.lineCap = "round"; c.lineJoin = "round";
     var bob = steht || pose ? 0 : Math.sin(phase * Math.PI * 2) * 1.3;
@@ -257,7 +291,7 @@
     var sy = window.scrollY || 0;
     // Kuratierte, WIEDERKEHRENDE Objekte als Plattformen (keine einzelnen Textzeilen -> ruhiger, sinnvoller):
     // Ueberschriften, Buttons, Karten/Artikel, Bilder, Chips, Demo-Widgets.
-    var sel = "h1,h2,h3,.button,a.button,.service,article,figure,img,blockquote,.pill,.chip,.stat,.price-card,.success-card,.report-sheet,.console-map,.legal-section h2,.footer-links";
+    var sel = "h1,h2,h3,.button,a.button,.service,article,figure,img,blockquote,.pill,.chip,.stat,.price-card,.success-card,.report-sheet,.legal-section h2,.footer-links";
     var els = document.querySelectorAll(sel);
     for (var i = 0; i < els.length && weltPlattformen.length < 180; i++) {
       // Feste/klebende Kopf-/Sticky-Elemente ueberspringen: ihre Seiten-Position driftet beim
@@ -283,30 +317,70 @@
     modus = "welt";
   }
 
+  // V8.69 Akku: Die Schleife forderte bisher BEDINGUNGSLOS jedes Bild neu an -
+  // 60 Bilder je Sekunde, solange die Seite offen ist, auch wenn niemand
+  // scrollt. Am Schreibtisch faellt das nicht auf, auf dem Handy schon.
+  // Im Schmalmodus haelt sie deshalb nach 1,5s Ruhe an und wird vom naechsten
+  // Scrollen geweckt.
+  var LEERLAUF_STOPP_MS = 1500;
   function schleife(ts) {
-    if (!desktopMQ.matches || reduce.matches || document.hidden) { laeuft = false; return; }
+    window.__treppeBilder = (window.__treppeBilder || 0) + 1; // Messpunkt fuer die QA
+    if (reduce.matches || document.hidden) { laeuft = false; return; }
+    if (nurLeiste() && modus === "laufen" && idleSeit > LEERLAUF_STOPP_MS) {
+      laeuft = false;                       // ruht, bis wieder gescrollt wird
+      return;
+    }
     requestAnimationFrame(schleife);
     tick(ts);
   }
   function starten() {
-    if (laeuft || !desktopMQ.matches || reduce.matches || document.hidden) return;
+    if (laeuft || reduce.matches || document.hidden) return;
     laeuft = true;
     lastTs = 0;
+    // WICHTIG: Ruhezaehler zuruecksetzen. Ohne das prueft schleife() sofort
+    // wieder "idleSeit > Grenze" und haelt im selben Bild an - die Figur
+    // wuerde nach dem ersten Leerlauf-Stopp nie wieder gezeichnet und das A
+    // bliebe stehen. (Von Artur auf dem echten Geraet gefunden.)
+    idleSeit = 0;
     requestAnimationFrame(schleife);
   }
 
+  var heroUnterkante = 0;
+  function heroMessen() {
+    var h = document.querySelector(".hero");
+    heroUnterkante = h ? h.getBoundingClientRect().bottom + (window.scrollY || 0) : 0;
+  }
+
   function tick(ts) {
-    if (!rail.offsetWidth) { griff.style.display = "none"; return; }
+    var sy0 = window.scrollY || 0;
+    if (!rail.offsetWidth) { griff.style.display = "none"; leisteAktualisieren(sy0); return; }
+    // Schmalmodus (Handy): Leiste immer, Figur nur unterhalb des Hero-Bereichs.
+    // Sonst stuende sie beim Seitenaufbau mitten auf der Werkprobe - genau der
+    // Schauseite. Nebenwirkung: der erste Bildschirm hat null Canvas-Arbeit.
+    if (nurLeiste()) griff.style.display = "none";
     var dt = lastTs ? Math.min(64, ts - lastTs) : 16;
     lastTs = ts;
-    var sy = window.scrollY || 0;
+    var sy = sy0;
 
     ctx.clearRect(0, 0, RAIL_W, vpH);  // fenstergrosses Canvas ganz loeschen
-    octx.clearRect(0, 0, vpW, vpH);
+    // Das fenstergrosse Overlay ist nur fuer Greifen/Werfen da - mobil beides
+    // aus, also auch nicht loeschen (bei 390x844 und dpr 2 sind das 1,3 Mpx je Bild).
+    if (!nurLeiste()) octx.clearRect(0, 0, vpW, vpH);
+    leisteAktualisieren(sy);
     if (modus === "laufen") {
       // Ziel: die Stufe nahe der Fenstermitte — die Figur verfolgt das Fenster
       var ziel = Math.max(0, Math.min(maxStufe, (sy + vpH * 0.46) / STEP_H));
       var diff = ziel - current;
+      // V8.69, Schmalmodus: Auf dem Handy wird schnell und weit gescrollt. Mit
+      // dem Desktop-Tempo (max. 24 Stufen/s) braeuchte die Figur nach einem
+      // Sprung ueber eine halbe Seite rund 15 Sekunden - sie waere praktisch
+      // nie zu sehen. Ab 25 Stufen Rueckstand setzt sie deshalb einmal nach
+      // (bleibt knapp hinter dem Ziel, laeuft den Rest sichtbar).
+      if (nurLeiste() && Math.abs(diff) > 25) {
+        current = ziel - (diff > 0 ? 6 : -6);
+        diff = ziel - current;
+        warWeitWeg = true;
+      }
       var tempo = 0.004 + Math.min(TEMPO_MAX - 0.004, Math.abs(diff) * 0.0016);
       var maxSchritt = dt * tempo;
       var bewegt = Math.abs(diff) > 0.015;
@@ -327,7 +401,7 @@
       var p = posAufTreppe(current);
       var viewY = p.y - sy;
       figurFarbe(p.y);
-      zeichneTreppe(sy);
+      if (!(nurLeiste() && current * STEP_H < heroUnterkante)) zeichneTreppe(sy);
       var hopf = ts < hopfBis ? -7 * Math.sin((1 - (hopfBis - ts) / 300) * Math.PI) : 0;
       if (mausX >= 0) {
         blickDir = mausX >= p.x ? 1 : -1;
@@ -340,7 +414,13 @@
       var sitzt = steht && ts < sitzBis;
       var koerperDir = steht ? blickDir : letzteRichtung;
       var stauch = ts < stauchBis ? (stauchBis - ts) / 140 : 0;
-      if (viewY > -50 && viewY < vpH + 50) {
+      // Schmalmodus: solange die Figur im Hero-Bereich steht, wird sie nicht
+      // gemalt - dort liegt die Werkprobe, die Schauseite. Die Bewegung oben
+      // laeuft trotzdem weiter; wer sie hier aussperrt, laesst die Figur fuer
+      // immer auf Stufe 0 stehen (beim Bau passiert und gemessen).
+      var imHero = nurLeiste() && current * STEP_H < heroUnterkante;
+      if (imHero) ctx.clearRect(0, 0, RAIL_W, vpH);
+      if (!imHero && viewY > -50 && viewY < vpH + 50) {
         var phaseAus = sitzt ? (ts / 800) % 1 : ((current % 1) + 1) % 1;
         zeichneFigur(ctx, p.x, viewY + hopf, phaseAus, koerperDir, steht, sitzt ? "sitzt" : null, 0, stauch);
         griffSetzen(p.x, viewY, true);
@@ -448,6 +528,25 @@
     }
   }
 
+  // Rechte A-Leiste: der Buchstabe A ZEIGT den Scroll-Stand an, die Farbe
+  // wechselt am Abschnitt (hell/dunkel) wie bei der Treppe.
+  // V8.94 (Arturs Entscheid "es soll nur mitlaufen ohne scroll funktion"):
+  // Das A ist kein Griff mehr. Ziehen, Halte-Riegel, Zitter-Hysterese und die
+  // Wisch-Sperre sind ersatzlos entfernt - die Geschichte steht im git log.
+  // Diese Rechnung hier ist die Rueckfallebene fuer Browser ohne
+  // scroll()-Zeitleiste; sonst zeichnet die scroll-gesteuerte Animation aus
+  // site.css die Lage (V8.92), und zwar neben dem Hauptfaden.
+  function leisteAktualisieren(sy) {
+    if (!leiste || !leiste.offsetWidth) return;
+    var spurH = leiste.clientHeight - 28;
+    var maxScroll = Math.max(1, docH - vpH);
+    var anteil = Math.min(1, Math.max(0, sy / maxScroll));
+    var top = 14 + anteil * (spurH - 40);
+    anfasser.style.top = top + "px";
+    var weltY = sy + leisteTop + top + 20; // A-Mitte in Seiten-Koordinaten
+    anfasser.classList.toggle("auf-papier", istPapierBei(weltY));
+  }
+
   function greifenStart(e) {
     var sy = window.scrollY || 0;
     if (modus === "welt") { zieh.x = welt.wx; zieh.y = welt.wy - sy; }
@@ -512,25 +611,40 @@
     griff.className = "treppe-griff";
     griff.setAttribute("aria-label", "Treppenfigur bewegen – Pfeiltasten oder Leertaste drücken");
     griff.setAttribute("title", "Mit Pfeiltasten oder Leertaste bewegen");
+    leiste = document.createElement("div");
+    leiste.className = "a-leiste";
+    leiste.setAttribute("aria-hidden", "true");
+    anfasser = document.createElement("div");
+    anfasser.className = "a-anfasser";
+    anfasser.textContent = "A";
+    leiste.appendChild(anfasser);
     document.body.appendChild(rail);
     document.body.appendChild(overlay);
     document.body.appendChild(griff);
+    document.body.appendChild(leiste);
+    // V8.94 (Arturs Entscheid): Am A haengt KEIN Zeiger-Listener mehr. Es ist
+    // reiner Anzeiger - Beruehrungen und Klicks gehen hindurch (site.css:
+    // pointer-events:none). Die Geschichte des Griffs steht im git log.
     ctx = canvas.getContext("2d");
     octx = overlay.getContext("2d");
     messen();
     window.addEventListener("resize", messen, { passive: true });
     document.addEventListener("visibilitychange", starten);
+    window.addEventListener("scroll", starten, { passive: true }); // weckt nach Leerlauf-Stopp
     if (desktopMQ.addEventListener) desktopMQ.addEventListener("change", starten);
-    window.addEventListener("mousemove", function (e) { mausX = e.clientX; mausY = e.clientY; letzteMausT = performance.now(); }, { passive: true });
+    if (!nurLeiste()) window.addEventListener("mousemove", function (e) { mausX = e.clientX; mausY = e.clientY; letzteMausT = performance.now(); }, { passive: true });
     setInterval(function () { // Seitenhöhe kann sich ändern (Preis-Tabs etc.)
+      // Im Hintergrund-Tab nichts messen: messen() ruft abschnitteAufbauen(),
+      // das ueber alle Abschnitte laeuft und Layout erzwingt.
+      if (document.hidden) return;
       var h = document.documentElement.scrollHeight;
       if (Math.abs(h - docH) > 40) messen();
-    }, 2000);
+    }, nurLeiste() ? 4000 : 2000);
     griff.addEventListener("pointerdown", greifenStart);
     griff.addEventListener("keydown", griffTastatur);
     reduce.addEventListener && reduce.addEventListener("change", function (e) {
       var aus = e.matches ? "none" : "";
-      rail.style.display = aus; overlay.style.display = aus; griff.style.display = aus;
+      rail.style.display = aus; overlay.style.display = aus; griff.style.display = aus; leiste.style.display = aus;
       if (!e.matches) starten();
     });
     if (window.__treppeDebug) {

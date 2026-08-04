@@ -23,7 +23,7 @@
   <meta name="twitter:title" content="KI-Automatisierung für Handwerk – interaktive Demo">
   <meta name="twitter:description" content="Beispielhafte Abläufe selbst testen – mit klar benannten Annahmen und Grenzen.">
   <meta name="twitter:image" content="https://artur.ae/og-artur-webdesign.png">
-  <link rel="stylesheet" href="assets/site.css?v=75">
+  <link rel="stylesheet" href="assets/site.css?v=137">
   <script>document.documentElement.classList.replace('no-js','js');</script>
   <style>
     @font-face{font-family:"Auto Space";src:url("assets/fonts/space-grotesk-500.woff2") format("woff2");font-weight:500;font-style:normal;font-display:swap}
@@ -53,7 +53,7 @@
     .auto-wrap{width:min(calc(100% - 40px),var(--auto-max));margin-inline:auto}
     .auto-skip{position:fixed;z-index:999;left:1rem;top:1rem;padding:.75rem 1rem;background:#62d5ff;color:var(--auto-ink);font-weight:700;transform:translateY(-160%)}
     .auto-skip:focus{transform:none}
-    .auto-topbar{position:sticky;z-index:50;top:0;background:rgba(7,25,31,.94);color:#fff;border-bottom:1px solid rgba(241,235,222,.16);backdrop-filter:blur(12px)}
+    .auto-topbar{position:sticky;z-index:50;top:0;background:#07191f;color:#fff;border-bottom:1px solid rgba(241,235,222,.16)}
     .auto-topbar__row{min-height:70px;display:flex;align-items:center;justify-content:space-between;gap:1.5rem}
     .auto-brand{display:inline-flex;min-width:44px;min-height:44px;align-items:center;justify-content:center;gap:.72rem;text-decoration:none;font-weight:700;letter-spacing:-.03em}
     .auto-brand__mark{display:grid;place-items:center;width:34px;height:34px;border:1px solid #62d5ff;color:#62d5ff;font-family:"Auto News",serif;font-size:1.45rem}
@@ -145,6 +145,7 @@
     .auto-close__links{display:flex;gap:.55rem;flex-wrap:wrap}
     .auto-close__links a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:.65rem .85rem;border:1px solid var(--auto-ink);background:var(--auto-ink);color:#fff;text-decoration:none;font-size:.76rem;font-weight:700}
     .auto-close__links a:last-child{background:transparent;color:var(--auto-ink)}
+    .auto-annahme{margin-top:.9rem;padding:.7rem .85rem;border-left:2px solid var(--signal,#62d5ff);background:rgba(255,255,255,.04);font-size:.82rem;line-height:1.6}
     .auto-footer{padding:1.5rem 0;background:#07191f;color:#aebcbb;border-top:1px solid rgba(241,235,222,.16);font-size:.76rem}
     .auto-footer__row{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
     .auto-footer a{display:inline-flex;align-items:center;min-height:44px;text-underline-offset:3px}
@@ -157,6 +158,13 @@
       .auto-offers{grid-template-columns:1fr}
       .auto-close{grid-template-columns:1fr}
     }
+    /* V8.92: Diese Seite hat einen EIGENEN Seitenrand (.auto-wrap: 20px breit,
+       unter 560px nur noch 12px) statt der globalen --wrap-Rechnung. Die
+       Treppen-Spur richtet sich in site.css nach --wrap und waere hier 14px
+       breit gewesen - also 2px auf den Buchstaben (gemessen: 17 Textblöcke bei
+       390px). 12px liegt unter beiden Randbreiten dieser Seite, damit kann die
+       Spur den Text an keiner Fensterbreite mehr beruehren. */
+    @media (max-width:1399px){ .js .treppe-rail{width:12px} }
     @media (max-width:560px){
       .auto-wrap{width:min(calc(100% - 24px),var(--auto-max))}
       .auto-topbar__row{min-height:60px}
@@ -200,6 +208,9 @@
       .auto-step__meta strong{font-size:.78rem}
       .auto-message::before{font-size:.75rem}
       .auto-control{font-size:.82rem;min-height:44px}
+      /* V8.81: festes 2-Spalten-Raster statt umbrechendem Flex-Fluss - vorher
+         brachen die 4 gleichrangigen Knoepfe in ein schiefes Gitter um. */
+      .auto-stepper__controls{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
       .auto-stepper__status{font-size:.82rem}
       .auto-input label{font-size:.875rem}
       .auto-input small{font-size:.875rem}
@@ -211,7 +222,7 @@
     }
   </style>
 </head>
-<body class="auto-demo-page">
+<body class="auto-demo-page" data-treppe>
   <a class="auto-skip" href="#inhalt">Zum Inhalt springen</a>
 
   <header class="auto-topbar">
@@ -249,7 +260,7 @@
 
         <div class="auto-assumption">
           <strong>Annahme</strong>
-          <span>Die Demo nimmt einen technisch eingerichteten, getesteten Ablauf an. „Direkt“ bedeutet hier nur: Der Schritt wird nach dem Eingang automatisch ausgelöst. Eine konkrete Reaktionszeit wird vorab nicht garantiert und im Pilot gemessen.</span>
+          <span>Die Demo nimmt einen technisch eingerichteten, getesteten Ablauf an. „Direkt“ bedeutet hier nur: Der Schritt wird nach dem Eingang automatisch ausgelöst. Eine konkrete Reaktionszeit wird vorab nicht garantiert, sondern im Pilot gemessen.</span>
         </div>
 
         <div class="auto-trades" role="group" aria-label="Gewerk für das Beispiel wählen">
@@ -344,8 +355,9 @@
     <section class="auto-section auto-section--dark" aria-labelledby="rechner-heading">
       <div class="auto-wrap">
         <div class="auto-section__head">
-          <h2 id="rechner-heading">Annahmen ändern. Aufwand nachrechnen.</h2>
+          <h2 id="rechner-heading">Ihre Mengen eintragen. Aufwand nachrechnen.</h2>
           <p>Der Rechner addiert einen manuellen Zeitansatz. Er berechnet weder Gewinn noch eine garantierte Ersparnis.</p>
+          <p class="auto-annahme"><b>Woher die Minuten kommen:</b> 12 Minuten je Erstantwort, 8 je Nachfassen, 4 je Terminerinnerung. Das sind <b>gesetzte Annahmen</b>, keine gemessenen Werte — sie stammen aus dem Ablauf, wie ich ihn bei der Einrichtung solcher Systeme veranschlage, nicht aus einer Erhebung. In Ihrem Betrieb kann jede dieser Zahlen deutlich abweichen. Die Mengen links können Sie ändern, die Minuten-Ansätze sind fest — genau deshalb ist das Ergebnis eine Größenordnung und kein Versprechen.</p>
         </div>
 
         <div class="auto-calc">
@@ -357,7 +369,7 @@
               <input id="calc-requests" type="range" min="0" max="30" step="1" value="10">
             </div>
             <div class="auto-input">
-              <label for="calc-followups">Offene Vorgänge zum Nachfassen</label>
+              <label for="calc-followups">Offene Vorgänge zum Nachfassen pro Woche</label>
               <output id="out-followups" for="calc-followups">5</output>
               <small>Rechenannahme: 8 Minuten je manuellem Nachfass</small>
               <input id="calc-followups" type="range" min="0" max="20" step="1" value="5">
@@ -378,7 +390,7 @@
 
           <div class="auto-calc__result" aria-live="polite" aria-atomic="true">
             <div>
-              <p class="label">Manueller Aufwand im Beispiel</p>
+              <p class="label">Manueller Aufwand im Beispiel — pro Woche</p>
               <p class="auto-calc__number" id="calc-result">3,6 Std.</p>
               <p>Dieser Wert zeigt nur, wie viel Zeit die eingestellten Tätigkeiten nach den sichtbaren Annahmen zusammen beanspruchen würden.</p>
               <p class="auto-calc__warning"><strong>Keine Ersparnisgarantie:</strong> Ein Teil der Arbeit bleibt beim Menschen. Ob und wie viel Zeit tatsächlich frei wird, muss im Betrieb gemessen werden.</p>
@@ -450,6 +462,10 @@
 
   <footer class="auto-footer">
     <div class="auto-wrap"><address class="footer-nap" style="font-style:normal;font-size:.76rem;line-height:1.7;margin-bottom:.6rem">Artur WebDesign · Artur Stol · <a href="tel:+4917622659649">+49 176 2265 9649</a> · <a href="mailto:info@artur.ae">info@artur.ae</a></address></div>
+    <!-- Die Beschreibung dieser Seite verspricht "Chemnitz, Leipzig,
+         deutschlandweit", im sichtbaren Text stand beides nirgends. Ergaenzt,
+         damit Zusage und Seite zusammenpassen. -->
+    <div class="auto-wrap"><p style="margin:0 0 .6rem;font-size:.76rem;line-height:1.7">Webdesign, Google Ads und digitale Abläufe für Betriebe in <b>Chemnitz</b>, <b>Leipzig</b> und deutschlandweit.</p></div>
     <div class="auto-wrap auto-footer__row">
       <span>© <span data-current-year>2026</span> Artur WebDesign · Artur Stol · Umsätze gemäß § 19 UStG umsatzsteuerfrei</span>
       <span><a href="/">Startseite</a> · <a href="app-demo.html">Kunden-App</a> · <a href="impressum.html">Impressum</a> · <a href="datenschutz.html">Datenschutz</a></span>
@@ -457,7 +473,7 @@
     </div>
   </footer>
 
-  <script src="assets/site.js?v=75" defer></script>
+  <script src="assets/site.js?v=137" defer></script>
   <script>
   (function(){
     'use strict';

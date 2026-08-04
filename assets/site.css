@@ -37,6 +37,8 @@
   --white:#fbfdfe;
   --signal:#62d5ff;
   --signal-soft:#bcecff;
+  --gold:#ffc46b;
+  --gold-deep:#7d4400;
   --line-dark:rgba(241,235,222,.16);
   --line-paper:rgba(7,25,31,.18);
   --line-input:rgba(7,25,31,.5);
@@ -90,13 +92,34 @@ button{border:0}
 .button--paper{border-color:var(--line-paper);background:transparent;color:var(--ink)}
 .text-link{display:inline-flex;min-height:44px;align-items:center;gap:.65rem;font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
 
-.scroll-progress{position:fixed;inset:0 0 auto;z-index:1600;height:3px;background:rgba(255,255,255,.07)}
+/* V8.67 — Balken an die Unterkante der Kopfzeile statt an den Fensterrand.
+   Grund (gemessen): Zwischen Fensterkante und Logo/Menue-Knopf sind nur 10px
+   frei, die Prozentzahl braucht aber 18,5px. Oben am Rand kann sie also nicht
+   mitlaufen, ohne ueber das Logo zu laufen — auf dem Handy nicht und am
+   Desktop auch nicht. An der Kopfzeilen-Unterkante wird der Balken zur
+   Unterstreichung, und die Zahl haengt frei darunter. Eine Regel, ein
+   Verhalten auf allen Breiten. */
+.scroll-progress{position:fixed;top:var(--header);right:0;left:0;z-index:1600;height:3px;background:rgba(255,255,255,.07)}
 .scroll-progress span{display:block;width:100%;height:100%;background:var(--signal);transform:scaleX(0);transform-origin:left center}
-.scroll-prozent{position:fixed;top:9px;right:10px;z-index:1601;padding:.14rem .5rem;border-radius:999px;background:rgba(7,25,31,.78);border:1px solid rgba(98,213,255,.35);color:var(--signal-soft);font-family:var(--sans);font-size:.75rem;font-weight:600;letter-spacing:.05em;font-variant-numeric:tabular-nums;pointer-events:none;opacity:0;transition:opacity .25s ease}
-@media (max-width:1120px){.scroll-prozent{display:none!important}}
+/* Die Pille wandert waagerecht mit dem Balkenende (transform, kein Layout je
+   Frame). min-width gegen das Zittern: der Text schwankt zwischen "0 %" und
+   "100 %" um 16px Breite, ohne feste Breite hoppelt die Pille beim Scrollen. */
+/* V8.81: rittlings AUF dem Balken statt 6px darunter. Vorher deckte die Pille
+   die ersten 24,5px der obersten Inhaltszeile halb durchscheinend ab - genau
+   beim Lesen. Bei -9px sitzt sie ueber der Balkenlinie (y~57..75), beruehrt
+   das Logo nicht (Brand endet y55) und der Inhalt verliert nur noch ~9px. */
+.scroll-prozent{position:fixed;top:calc(var(--header) - 9px);left:0;right:auto;z-index:1601;
+  min-width:3.5rem;padding:.14rem .5rem;border-radius:999px;background:var(--ink);
+  border:1px solid rgba(98,213,255,.35);color:var(--signal-soft);font-family:var(--sans);
+  font-size:.75rem;line-height:1;font-weight:600;letter-spacing:.05em;text-align:center;
+  font-variant-numeric:tabular-nums;pointer-events:none;opacity:0;transition:opacity .25s ease}
 .scroll-prozent.sichtbar{opacity:1}
+/* Bei offenem Menue wuerde sie ueber der Vollbild-Navigation schweben. */
+body.menu-open .scroll-prozent{opacity:0}
 @media (prefers-reduced-motion:reduce){.scroll-prozent{transition:none}}
-.site-header{position:fixed;inset:0 0 auto;z-index:1500;border-bottom:1px solid var(--line-dark);background:rgba(7,25,31,.94)}
+/* Voll deckend (Abnahme 03.08.2026): bei rgba .94/.96 blieb heller Seitentext
+   als lesbare Geisterschrift in der Leiste stehen (Papier 241 gegen Tinte 7). */
+.site-header{position:fixed;inset:0 0 auto;z-index:1500;border-bottom:1px solid var(--line-dark);background:var(--ink)}
 .header-row{height:var(--header);display:flex;align-items:center;gap:2rem}
 .brand{display:inline-flex;min-height:44px;align-items:center;gap:.75rem;text-decoration:none;min-width:max-content}
 .brand-mark{display:grid;width:38px;height:44px;place-items:center;color:var(--signal)}
@@ -108,7 +131,15 @@ button{border:0}
 .nav>a:not(.button):hover{color:var(--signal)}
 .nav .button{min-height:44px;padding:.65rem .9rem}
 .menu-toggle{display:none;width:46px;height:46px;margin-left:auto;border:1px solid var(--line-dark);background:transparent;color:var(--white);cursor:pointer}
-.menu-glyph{display:block;width:22px;height:2px;margin:auto;background:currentColor;box-shadow:0 -6px 0 currentColor,0 6px 0 currentColor}
+.menu-glyph{display:block;width:22px;height:2px;margin:auto;background:currentColor;box-shadow:0 -6px 0 currentColor,0 6px 0 currentColor;position:relative;transition:background .15s ease}
+/* V8.82: Offenes Menue zeigt ein X statt dreier Striche (Blind-Pruefer-Fund).
+   Mittelstrich wird unsichtbar, die beiden Aussenstriche entstehen als
+   gedrehte Pseudo-Striche - kein Markup-Umbau, aria-expanded steuert. */
+.menu-toggle[aria-expanded="true"] .menu-glyph{background:transparent;box-shadow:none}
+.menu-glyph::before,.menu-glyph::after{content:"";position:absolute;inset:0;background:currentColor;opacity:0;transition:transform .15s ease,opacity .15s ease}
+.menu-toggle[aria-expanded="true"] .menu-glyph::before{opacity:1;transform:rotate(45deg)}
+.menu-toggle[aria-expanded="true"] .menu-glyph::after{opacity:1;transform:rotate(-45deg)}
+@media (prefers-reduced-motion:reduce){.menu-glyph,.menu-glyph::before,.menu-glyph::after{transition:none}}
 
 .hero{position:relative;min-height:100svh;padding:calc(var(--header) + clamp(2.8rem,6vh,4.8rem)) 0 clamp(4.5rem,8vh,7rem);overflow:clip;background:var(--ink)}
 .hero::before{content:"";position:absolute;inset:var(--header) 0 0;pointer-events:none;background-image:linear-gradient(var(--line-dark) 1px,transparent 1px),linear-gradient(90deg,var(--line-dark) 1px,transparent 1px);background-size:72px 72px;opacity:.32}
@@ -127,28 +158,6 @@ button{border:0}
 .hero-facts{display:flex;gap:1.5rem 2.2rem;margin-top:2.4rem;padding-top:1.25rem;border-top:1px solid var(--line-dark);flex-wrap:wrap}
 .hero-facts span{position:relative;padding-left:.85rem;color:var(--muted-dark);font-size:.75rem;font-weight:700;letter-spacing:.04em}
 .hero-facts span::before{content:"/";position:absolute;left:0;color:var(--signal)}
-
-.signal-console{position:relative;min-width:0;border:1px solid rgba(98,213,255,.32);background:rgba(7,25,31,.86);box-shadow:var(--shadow)}
-.console-head{display:flex;align-items:center;justify-content:space-between;padding:.85rem 1rem;border-bottom:1px solid var(--line-dark);font-size:.75rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
-.console-live{display:inline-flex;align-items:center;gap:.45rem;color:var(--signal)}
-.console-live::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--signal);box-shadow:0 0 0 5px rgba(98,213,255,.1)}
-.console-stage{position:relative;min-height:410px;padding:1.5rem;overflow:hidden}
-.console-map{position:absolute;inset:1.5rem;width:calc(100% - 3rem);height:calc(100% - 3rem);overflow:hidden;background-image:linear-gradient(rgba(241,235,222,.11) 1px,transparent 1px),linear-gradient(90deg,rgba(241,235,222,.11) 1px,transparent 1px);background-size:33.333% 33.333%}
-.signal-line{position:absolute;left:10%;height:1px;background:rgba(98,213,255,.6);transform-origin:left center}
-.signal-line--a{top:18%;width:78%;transform:rotate(30deg)}
-.signal-line--b{top:20%;width:76%;transform:rotate(12deg)}
-.console-node{position:absolute;width:116px;padding:.75rem;border:1px solid var(--line-dark);background:var(--ink);font-size:.75rem;letter-spacing:.08em;text-transform:uppercase}
-.console-node b{display:block;margin-bottom:.28rem;color:var(--signal);font-size:.78rem}
-.console-node--a{left:1.5rem;top:2rem}
-.console-node--b{right:1.5rem;top:42%}
-.console-node--c{left:16%;bottom:2rem}
-.console-cursor{position:absolute;left:46%;top:48%;display:grid;width:74px;height:74px;place-items:center;border:1px solid var(--signal);border-radius:50%;color:var(--signal);font-family:var(--serif);font-size:1.4rem;font-style:italic}
-.console-cursor::before,.console-cursor::after{content:"";position:absolute;background:rgba(98,213,255,.34)}
-.console-cursor::before{width:1px;height:110px}
-.console-cursor::after{width:110px;height:1px}
-.console-foot{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--line-dark)}
-.console-foot span{padding:1rem;font-size:.75rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase}
-.console-foot span+span{border-left:1px solid var(--line-dark);color:var(--signal)}
 
 .diagnostic{overflow:clip}
 .diagnostic-head{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(260px,.55fr);gap:3rem;align-items:end}
@@ -184,7 +193,10 @@ button{border:0}
 .report-sheet{position:relative;padding:clamp(1.5rem,4vw,3.2rem);border:1px solid var(--line-paper);background:#f8f2e6;box-shadow:18px 18px 0 rgba(7,25,31,.09);transform:rotate(1deg)}
 .report-sheet::before{content:"WEBSITE-CHECK";position:absolute;right:-1px;top:-28px;padding:.5rem .75rem;background:var(--ink);color:var(--signal);font-size:.75rem;font-weight:700;letter-spacing:.13em}
 .report-head{display:flex;justify-content:space-between;gap:1rem;padding-bottom:1rem;border-bottom:2px solid var(--ink);font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
-.report-row{display:grid;grid-template-columns:52px 1fr auto;gap:1rem;align-items:center;padding:1.2rem 0;border-bottom:1px solid var(--line-paper)}
+.report-row{display:grid;grid-template-columns:52px 1fr auto;gap:.3rem 1rem;align-items:center;padding:1.2rem 0;border-bottom:1px solid var(--line-paper)}
+.report-row .report-status{grid-row:1 / span 2}
+.report-row strong{justify-self:end}
+.report-row small{grid-column:2 / -1}
 .report-status{display:grid;width:38px;height:38px;place-items:center;border:1px solid var(--ink);border-radius:50%;font-family:var(--serif);font-style:italic}
 .report-status.status-gruen{background:#1a7340;border-color:#1a7340;color:#f1ebde}
 .report-status.status-gelb{background:#c98a00;border-color:#c98a00;color:#07191f}
@@ -192,9 +204,52 @@ button{border:0}
 .report-row b{display:block;font-size:.82rem}
 .report-row small{display:block;color:var(--muted-paper);font-size:.75rem}
 .report-row strong{font-family:var(--serif);font-size:1.25rem;font-weight:500}
-.report-foot{display:grid;grid-template-columns:1fr 1fr;margin-top:1.4rem;border:1px solid var(--ink)}
+/* Seit V8.56 nur noch die Preiszeile — die zweite Spalte („Umfang vor Start
+   schriftlich festhalten") stand wortgleich schon bei den Preisen und in der FAQ. */
+.report-foot{display:grid;grid-template-columns:1fr;margin-top:1.4rem;border:1px solid var(--ink)}
 .report-foot span{padding:.9rem;font-size:.75rem}
-.report-foot span+span{border-left:1px solid var(--ink)}
+
+/* ===== Muster-Gegenueberstellung (V8.61) =====
+   Selbst gebautes Schema statt Bild einer fremden Website. Die "Textzeilen"
+   sind reine CSS-Streifen — so bleibt nichts echtes unter dem 12-px-Boden. */
+.muster{display:block;margin-top:clamp(2.6rem,5vw,4rem);padding-top:clamp(1.8rem,3.5vw,2.6rem);border-top:1px solid var(--line-paper)}
+.muster-kopf{position:relative;display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.5rem 1.5rem;min-height:44px;padding-right:2.2rem;cursor:pointer;list-style:none}
+.muster-kopf::-webkit-details-marker{display:none}
+.muster-kopf::after{position:absolute;top:0;right:0;display:grid;width:2rem;min-height:44px;place-items:center;content:"+";color:var(--ink);font-family:var(--sans);font-size:1.2rem;font-weight:700}
+.muster[open]>.muster-kopf::after{content:"−"}
+.muster-titel{margin:0;font-family:var(--serif);font-size:clamp(1.6rem,3vw,2.4rem);font-weight:400;letter-spacing:-.03em;line-height:1.05}
+.muster-marke{margin:0;color:var(--muted-paper);font-size:.75rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.muster-body{display:grid;grid-template-columns:minmax(0,290px) minmax(0,1fr);gap:clamp(1.2rem,3vw,2.4rem);align-items:start;margin-top:1.3rem}
+.muster-paar{display:grid;grid-template-columns:1fr 1fr;gap:clamp(.7rem,1.6vw,1.1rem)}
+.muster-fall{margin:0}
+.muster-fall figcaption{display:flex;flex-wrap:wrap;align-items:center;gap:.45rem .6rem;margin-top:.6rem;color:var(--muted-paper);font-size:.75rem}
+.muster-fahne{padding:.15rem .5rem;font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.muster-fahne--alt{background:#b3402e;color:#f8f2e6}
+.muster-fahne--neu{background:#1a7340;color:#f8f2e6}
+.mini{position:relative;display:block;overflow:hidden;aspect-ratio:4/5;padding:12px;border:1px solid var(--ink);background:#f8f2e6}
+.mini-kopf,.mini-text{display:block}
+.mini--alt .mini-kopf{width:168%;height:7px;background:repeating-linear-gradient(to right,rgba(7,25,31,.75) 0 30px,transparent 30px 42px)}
+.mini--alt .mini-text{width:168%;height:calc(100% - 15px);margin-top:8px;background:repeating-linear-gradient(to bottom,rgba(7,25,31,.62) 0 2px,transparent 2px 7px)}
+.mini--neu .mini-kopf{width:78%;height:13px;background:var(--ink)}
+.mini--neu .mini-text{width:100%;height:42%;margin-top:12px;background:repeating-linear-gradient(to bottom,rgba(7,25,31,.5) 0 5px,transparent 5px 17px)}
+.mini-cta{position:absolute;right:12px;bottom:12px;left:12px;display:grid;min-height:34px;place-items:center;background:var(--ink);color:var(--paper);font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+/* Numerierung statt Ampel: die Ampel bewertet im Pruefbogen Ihre Seite. Am Muster
+   gibt es nichts zu bewerten — dieselben Farben mit anderer Bedeutung waeren ein
+   Widerspruch. Die Ziffer ordnet nur, sie urteilt nicht. */
+.muster-punkte{display:grid;gap:1px;margin:0;padding:0;counter-reset:mp;list-style:none;border:1px solid var(--line-paper);background:var(--line-paper)}
+.muster-punkte li{display:grid;grid-template-columns:auto auto 1fr;align-items:center;gap:.4rem .8rem;padding:.8rem 1rem;background:var(--paper);color:var(--muted-paper);font-size:.8rem}
+.muster-punkte li::before{display:grid;width:26px;height:26px;place-items:center;counter-increment:mp;content:counter(mp);border:1px solid var(--line-paper);color:var(--muted-paper);font-size:.75rem;font-weight:700}
+.muster-punkte b{color:var(--ink);font-size:.82rem}
+.muster-punkte .vn{color:var(--ink);font-weight:700}
+.muster-fuss{margin:.9rem 0 0;color:var(--muted-paper);font-size:.8rem}
+@media (max-width:720px){
+  /* Zugeklappt braucht die Zeile keinen 70-px-Anlauf (V8.62, Scrollweg). */
+  .muster{margin-top:1.7rem;padding-top:1.3rem}
+  .muster-body{grid-template-columns:1fr;gap:1.1rem}
+  .muster-punkte li{grid-template-columns:auto 1fr;padding:.65rem .85rem}
+  .muster-punkte li>span:last-child{grid-column:1 / -1}
+  .muster-fall figcaption{margin-top:.45rem}
+}
 
 .sequence-head{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,.42fr);gap:4rem;align-items:end}
 
@@ -230,7 +285,16 @@ button{border:0}
 .price-tab{min-height:44px;padding:.65rem .9rem;border:1px solid var(--line-paper);background:transparent;color:var(--ink);font-size:.75rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;cursor:pointer}
 .price-tab[aria-selected="true"]{background:var(--ink);color:var(--white)}
 .price-panel{margin-top:1rem;border-top:2px solid var(--ink)}
+/* V8.57: Die Panel-Kennungen sind echte Sprungziele (z. B. /#panel-wachstum aus dem
+   Ratgeber). Ohne diesen Zuschlag landet der Sprung so, dass die Reiterleiste knapp
+   ueber dem Bildrand liegt (gemessen: Leiste bei -25 px) — der Besucher saehe die
+   Preise, aber nicht, welcher Bereich offen ist und dass es drei weitere gibt.
+   8rem = 128 px liegt ueber dem Abstand Panel->Reiterleiste (Handy 113, Desktop 60). */
+.price-panel{scroll-margin-top:8rem}
 .price-panel[hidden]{display:none}
+/* Der Bereichstitel ersetzt den Reiter, wenn ohne JavaScript alle vier Bereiche
+   offen untereinander stehen. Mit JavaScript beschriftet der Reiter selbst. */
+.price-panel-title{display:none;margin-bottom:.35rem;font-family:var(--serif);font-size:2rem;font-weight:500;letter-spacing:-.03em}
 .price-row{display:grid;grid-template-columns:minmax(220px,1fr) minmax(180px,.55fr) minmax(130px,.32fr);gap:2rem;align-items:center;min-height:104px;border-bottom:1px solid var(--line-paper)}
 .price-row h3{font-family:var(--serif);font-size:clamp(1.35rem,2.4vw,2.3rem);font-weight:500;line-height:1}
 .price-row p{color:var(--muted-paper);font-size:.75rem}
@@ -239,6 +303,11 @@ button{border:0}
 .price-wa:hover{color:var(--ink);border-bottom-color:var(--ink)}
 .price-wa::before{content:"";width:16px;height:16px;flex:0 0 auto;background:currentColor;-webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 2a10 10 0 0 0-8.6 15L2 22l5.2-1.4A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3.1.8.8-3-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.6.1a6.7 6.7 0 0 1-2-1.2 7.4 7.4 0 0 1-1.4-1.7c-.1-.3 0-.4.1-.5l.4-.5c.1-.2.2-.3.3-.5a.5.5 0 0 0 0-.5c-.1-.1-.6-1.4-.8-1.9s-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3A2.9 2.9 0 0 0 6.7 9a5 5 0 0 0 1.1 2.7 11.4 11.4 0 0 0 4.4 3.9 14.5 14.5 0 0 0 1.5.5 3.5 3.5 0 0 0 1.6.1 2.6 2.6 0 0 0 1.7-1.2 2.1 2.1 0 0 0 .1-1.2c0-.1-.2-.2-.4-.3Z'/></svg>") center/contain no-repeat;mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 2a10 10 0 0 0-8.6 15L2 22l5.2-1.4A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3.1.8.8-3-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.6.1a6.7 6.7 0 0 1-2-1.2 7.4 7.4 0 0 1-1.4-1.7c-.1-.3 0-.4.1-.5l.4-.5c.1-.2.2-.3.3-.5a.5.5 0 0 0 0-.5c-.1-.1-.6-1.4-.8-1.9s-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3A2.9 2.9 0 0 0 6.7 9a5 5 0 0 0 1.1 2.7 11.4 11.4 0 0 0 4.4 3.9 14.5 14.5 0 0 0 1.5.5 3.5 3.5 0 0 0 1.6.1 2.6 2.6 0 0 0 1.7-1.2 2.1 2.1 0 0 0 .1-1.2c0-.1-.2-.2-.4-.3Z'/></svg>") center/contain no-repeat}
 .terms-grid{display:grid;grid-template-columns:repeat(4,1fr);margin-top:2rem;border:1px solid var(--line-paper)}
+/* Grundsaetze im Demo-Kapitel: seit V8.56 nur noch zwei Aussagen (die dritte stand
+   wortgleich in der FAQ) — zwei Spalten statt zwei leerer Rasterfelder. */
+.terms-grid--zwei{grid-template-columns:repeat(2,1fr)}
+/* Beide Ratgeber-Verweise in einer Zeile statt in zwei Absaetzen untereinander. */
+.ratgeber-zeile{display:flex;flex-wrap:wrap;gap:.6rem 2rem;margin-top:2rem}
 .term{min-height:140px;padding:1.1rem;border-right:1px solid var(--line-paper);font-size:.75rem}
 .term:last-child{border-right:0}
 .term b{display:block;margin-bottom:.6rem;font-size:.75rem;text-transform:uppercase}
@@ -271,10 +340,8 @@ button{border:0}
 .contact-links{display:grid;gap:.55rem;margin-top:2rem}
 .contact-links a{display:flex;min-height:44px;align-items:center;gap:.8rem;text-decoration:none;font-size:.82rem}
 .contact-form{padding:clamp(1.4rem,3vw,2.4rem);background:var(--paper);color:var(--ink);box-shadow:var(--shadow)}
-.form-head{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;padding-bottom:1rem;border-bottom:2px solid var(--ink)}
-.form-head h3{font-family:var(--serif);font-size:clamp(2rem,4vw,3.5rem);font-weight:500;letter-spacing:-.04em;line-height:.95}
-.form-head p{margin-top:.45rem;color:var(--muted-paper);font-size:.75rem}
-.form-tag{padding:.35rem .5rem;border:1px solid var(--ink);font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+/* Seit V8.56 traegt der Umschalter selbst die Ueberschrift des Formulars. */
+.form-pflicht{margin-top:.7rem;color:var(--muted-paper);font-size:.75rem}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1.4rem}
 .field{min-width:0}
 .field--wide{grid-column:1/-1}
@@ -289,7 +356,7 @@ button{border:0}
 .form-meta{margin-top:.75rem;color:var(--muted-paper);font-size:.75rem;text-align:center}
 .hp{position:absolute!important;left:-9999px!important;width:1px!important;height:1px!important;opacity:0!important}
 
-.site-footer{border-top:1px solid var(--line-dark);background:var(--ink)}
+.site-footer{border-top:1px solid var(--line-dark);background:var(--ink);color:var(--white)}
 .footer-main{display:grid;grid-template-columns:1fr auto;gap:3rem;padding:3rem 0}
 .footer-main .brand{align-self:start}
 .footer-copy{max-width:440px;margin-top:1.25rem;color:var(--muted-dark);font-size:.76rem}
@@ -300,7 +367,7 @@ button{border:0}
 
 /* Shared styles for legal and demo subpages */
 .subpage{background:var(--paper);color:var(--ink)}
-.subpage .site-header{background:rgba(7,25,31,.96);color:var(--white)}
+.subpage .site-header{background:var(--ink);color:var(--white)}
 .subhero{padding:calc(var(--header) + 5rem) 0 4rem;background:var(--ink);color:var(--white)}
 .subhero h1{max-width:900px;margin-top:1rem;font-family:var(--serif);font-size:clamp(3.8rem,9vw,9rem);font-weight:400;letter-spacing:-.06em;line-height:.82}
 .subhero p{max-width:650px;margin-top:1.4rem;color:var(--muted-dark)}
@@ -311,7 +378,14 @@ button{border:0}
 .legal-nav a{display:inline-flex;min-height:44px;align-items:center;font-size:.75rem;font-weight:700;text-transform:uppercase}
 .legal-content{min-width:0}
 .legal-content section{padding:0 0 2.4rem;margin-bottom:2.4rem;border-bottom:1px solid var(--line-paper)}
-.legal-content h2{margin-bottom:1rem;font-family:var(--serif);font-size:clamp(1.8rem,4vw,3rem);font-weight:500;line-height:1}
+/* V8.91 (Blind-Pruefer): "Verbraucherstreitbeilegung" ist ein unteilbares Wort von
+   332,9px. Bei 320px Fensterbreite stehen 298px zur Verfuegung - 34,9px standen
+   ueber und waren wegen overflow-x:clip nicht erreichbar (WCAG 1.4.10). Die
+   clamp-Untergrenze 1.8rem bleibt (die Ueberschrift soll gross sein); stattdessen
+   darf das Wort umbrechen: hyphens:auto setzt dabei einen echten Trennstrich
+   (lang="de" steht am html-Element), overflow-wrap:anywhere ist nur das Netz,
+   falls kein Trennpunkt gefunden wird. Ab 360px aendert sich nichts (einzeilig). */
+.legal-content h2{margin-bottom:1rem;font-family:var(--serif);font-size:clamp(1.8rem,4vw,3rem);font-weight:500;line-height:1;overflow-wrap:anywhere;hyphens:auto;-webkit-hyphens:auto}
 .legal-content h3{margin:1.4rem 0 .7rem;font-size:.8rem;text-transform:uppercase}
 .legal-content p,.legal-content li{color:var(--muted-paper);font-size:.84rem}
 .legal-content p+p{margin-top:.85rem}
@@ -339,9 +413,20 @@ button{border:0}
 
 @media (max-width:980px){
   .hero-grid,.diagnostic-head,.check-grid,.sequence-head,.price-intro,.faq-contact,.contact-grid{grid-template-columns:1fr}
+  /* V8.81: der 4rem-Spalten-Abstand wurde einspaltig zum Drittel-Bildschirm-Loch
+     zwischen Preis-Ueberschrift und Erklaertext. V8.82: dieselbe Mechanik beim
+     Diagnose-Kopf (gap:3rem) - nach dem Anker-Sprung zum 60-Sekunden-Check
+     wirkte die Landeposition leer, das Fragen-Panel lag unterm Falz. */
+  .price-intro,.diagnostic-head{gap:1rem}
+  /* V8.81: Pfeil des zweizeiligen Ratgeber-Links klebte allein an der A-Linie.
+     .text-link ist inline-FLEX (Z.93): beim Umbruch verteilte er Text links
+     und Pfeil rechts auf die volle Breite. inline-block stellt INNEN normalen
+     Textfluss her (aussen rechnet der Flex-Elternteil ihn zu block um - egal);
+     der nowrap-span im HTML bindet den Pfeil ans letzte Wort. min-height:44px
+     bleibt wirksam, Tap-Ziel unveraendert. */
+  .ratgeber-zeile .text-link{display:inline-block}
   .hero{min-height:auto}
   .hero-grid{gap:4rem}
-  .signal-console{max-width:660px}
   .diagnostic-head .section-lead{margin-top:0}
   .diagnostic-shell{grid-template-columns:1fr}
   .diagnostic-form{border-right:0;border-bottom:1px solid var(--line-paper)}
@@ -359,8 +444,17 @@ button{border:0}
 }
 
 @media (max-width:720px){
-  :root{--wrap:calc(100% - 28px);--header:66px}
-  body{font-size:16px;padding-bottom:calc(64px + env(safe-area-inset-bottom))}
+  :root{--wrap:calc(100% - 28px);--header:66px;--dock-h:calc(48px + .7rem + 1px)}
+  /* V8.89: Pille GANZ ins Kopfband (Arturs Befund 'der text ist noch
+     ueberlappt' - sie fuhr beim Scrollen ueber die oberste Zeile). Waagerecht
+     klemmt site.js sie in den freien Korridor zwischen Logo und Menue-Knopf. */
+  .scroll-prozent{top:calc(var(--header) - 24px)}
+  /* V8.81: Die 64px-Reserve fuer die untere Knopfleiste gilt nur noch auf den
+     3 Seiten, die die Leiste haben (body.hat-dock). Vorher stand auf den 6
+     Seiten ohne Leiste ein leeres helles Farbband unter der Fusszeile. */
+  body{font-size:16px}
+  body.hat-dock{padding-bottom:calc(64px + env(safe-area-inset-bottom))}
+  .success-card{box-shadow:none}
   .section{padding:4.7rem 0}
   .site-header{background:var(--ink)}
   .header-row{height:var(--header)}
@@ -378,20 +472,17 @@ button{border:0}
   .hero-lead{font-size:1rem}
   .hero-actions{align-items:stretch;flex-direction:column}
   .hero-actions .button{width:100%}
-  .hero-actions .quiet-link{display:inline-flex;min-height:44px;align-items:center;align-self:center;justify-content:center;font-size:.8rem}
+  /* V8.52: Der zweite Hero-Weg "Alle Festpreise ansehen" lag auf mehreren gaengigen
+     Handygroessen hinter der fixierten Schnellzugriff-Leiste (gemessen mit
+     elementFromPoint auf der Linkmitte: 375x667, 390x844, 393x852 -> der Tipp traf
+     "WhatsApp"). Ein Weg, der nicht antippbar ist, ist kein Weg. Er entfaellt hier,
+     weil die Leiste mit "Festpreise" genau dasselbe Ziel (#preise) anbietet - es geht
+     also kein Ziel verloren. Wo die Leiste ausgeblendet ist (sehr kleine Displays),
+     kommt der Link zurueck: siehe Regel weiter unten. */
+  .hero-actions .quiet-link{display:none}
   .hero-facts{display:grid;grid-template-columns:1fr 1fr;gap:.65rem 1rem}
-  /* Auf kleinen Displays folgt der Check direkt auf die Kernaussage.
-     Die rein illustrative Konsole und das Laufband kosten dort nur Scrollweg. */
-  .signal-console,.marquee{display:none}
-  .console-stage{min-height:350px;padding:1rem}
-  .console-map{inset:1rem;width:calc(100% - 2rem);height:calc(100% - 2rem)}
-  .console-node{width:104px;padding:.6rem}
-  .console-node--a{left:1rem;top:1.2rem}
-  .console-node--b{right:1rem}
-  .console-node--c{left:1rem;bottom:1.2rem}
-  .console-cursor{left:43%;width:60px;height:60px}
-  .console-cursor::before{height:84px}
-  .console-cursor::after{width:84px}
+  /* Auf kleinen Displays kostet das Laufband nur Scrollweg. */
+  .marquee{display:none}
   .diagnostic-head .section-title,.section-title{font-size:clamp(3.35rem,16vw,5.6rem)}
   .diagnostic-shell{margin-top:2.5rem}
   .diagnostic-form{padding:1rem}
@@ -401,11 +492,9 @@ button{border:0}
   .diagnostic-result h3{margin-top:3.5rem;font-size:clamp(2.6rem,13vw,4rem)}
   .check-grid{gap:3.5rem}
   .report-sheet{padding:1.2rem;box-shadow:9px 10px 0 rgba(7,25,31,.08)}
-  .report-row{grid-template-columns:42px 1fr;gap:.7rem}
-  .report-row strong{grid-column:2;text-align:left}
-  .report-foot{grid-template-columns:1fr}
-  .report-foot span+span{border-left:0;border-top:1px solid var(--ink)}
-  .work-card{min-height:510px;padding:1.2rem}
+  .report-row{grid-template-columns:42px 1fr auto;gap:.3rem .7rem;padding:1rem 0}
+  .report-row strong{font-size:1.1rem}
+  .work-card{padding:1.2rem}
   .process-step{grid-template-columns:44px 1fr;min-height:0;padding:1.6rem 0}
   .price-row{grid-template-columns:1fr;gap:.45rem;padding:1.1rem 0}
   .price-row strong{text-align:left}
@@ -428,14 +517,13 @@ button{border:0}
   .subhero .status-line{font-size:.75rem}
   .legal-content p,.legal-content li{font-size:.84rem}
   .legal-nav a{display:inline-flex;min-height:44px;align-items:center;font-size:.75rem}
-  .scroll-prozent{display:none}
 
   /* Lesbarkeitsboden für Beschriftungen und Bedienelemente:
      Kein sichtbarer Nutztext bleibt unter 12 px. */
   .section-kicker,.eyebrow,.micro,.hero-kicker,.hero-facts span,
   .step-line,.result-index,.result-price,.report-head,.flow-step,
   .service-index,.term b,.proof span,.price-tab,.field label,
-  .form-tag,.footer-links a,.footer-bottom,.text-link,.price-wa{
+  .footer-links a,.footer-bottom,.text-link,.price-wa{
     font-size:.75rem;
   }
   .choice b,.choice small{font-size:.8rem}
@@ -447,15 +535,90 @@ button{border:0}
   .brand-copy{font-size:.75rem}
   .hero h1{font-size:3.85rem}
   .hero-facts{grid-template-columns:1fr}
-  .console-foot{grid-template-columns:1fr}
-  .console-foot span+span{border-left:0;border-top:1px solid var(--line-dark)}
   .footer-links{grid-template-columns:1fr}
 }
 
+/* V8.53 — Der Hero-Hauptknopf lag auf dem Handy hinter der Schnellzugriff-Leiste.
+   Messweg: document.elementFromPoint auf der Mitte von "60-SEKUNDEN-CHECK STARTEN"
+   bei scrollY=0, Handy-Kennung. Belegt: 428x745 Knopf 712-764, Leiste ab 685, der
+   Tipp traf "WhatsApp"; ebenso 430x745, 412x780, 393x745, 390x760, 375x600, 414x736.
+   Ursache -> Mechanismus -> Wirkung: die Ueberschrift laeuft ab 381 px Breite mit
+   21vw auf FUENF Zeilen (gemessen 361 px) und schiebt alles darunter nach unten; die
+   Leiste ist fixiert und liegt darueber - der wichtigste Weg der Seite war nicht
+   antippbar.
+
+   WARUM svh UND KEIN @media (max-height): das mobile Safari legt Medienabfragen und
+   vh auf die GROSSE Viewporthoehe aus (bei einem 390x844-Geraet also immer 844), auch
+   waehrend die Leisten sichtbar sind und der Mensch nur 736 px sieht. Eine Regel
+   "@media (max-height:790px)" haette also genau auf dem Geraet NICHT gegriffen, um
+   das es geht - sie haette nur im Browser-Testfenster gewirkt. svh ist die Hoehe MIT
+   sichtbaren Leisten, ist auf beiden Wegen dieselbe Zahl und aendert sich beim
+   Scrollen nicht (kein Nachspringen des Layouts, wenn die Leisten einklappen).
+   min(alt, svh-Anteil) heisst: auf hohen Geraeten bleibt der bisherige Wert stehen,
+   auf niedrigen greift der kleinere. Browser ohne svh (vor 2022) verwerfen die Zeile
+   und behalten die Werte darueber - die Seite bleibt dort unveraendert nutzbar. */
+@media (max-width:720px){
+  .hero{padding-top:calc(var(--header) + min(4.2rem, 5svh))}
+  .hero-kicker{margin-bottom:min(1.6rem, 1.8svh)}
+  .hero h1{font-size:clamp(3rem, min(21vw, 9svh), 7rem)}
+  .hero-lead{margin-top:min(2rem, 2.4svh)}
+  .hero-actions{margin-top:min(2rem, 2.4svh)}
+}
+/* Schmale Geraete behalten ihre eigene Schriftgroesse (die Regel oben setzt 3,85rem);
+   9svh waeren dort GROESSER als bisher und wuerden den Knopf naeher an die Leiste
+   schieben statt weg. Deshalb hier derselbe Gedanke, aber auf 3,85rem gedeckelt. */
+@media (max-width:380px){
+  .hero h1{font-size:min(3.85rem, 8.5svh)}
+}
+
+/* V8.57 — Auf gaengigen Laptop-Hoehen lag KEIN Hero-Knopf ueber der Falz.
+   Messweg (Chrome, Desktop-Kennung, devicePixelRatio 1, Startseite):
+   1512x850 -> "60-Sekunden-Check starten" top 856 (ganz drunter), Zeile
+   "Website-Check ab 49 €" endete bei 987; 1440x900 -> Knopf 849..901, Zeile 979;
+   1366x768 -> Knopf 830..882; 1280x720 -> Knopf 771..823. Ueber der Falz standen
+   nur Ueberschrift, Unterzeile und das 3D-Handy.
+
+   Ursache -> Mechanismus -> Wirkung: Der Hero war auf JEDER Hoehe rund 1140 px hoch,
+   weil (a) der obere Innenabstand mit 6vh nur bis 4,8rem waechst, aber nie schrumpft,
+   (b) die Riesen-Ueberschrift bei 9vw in der 648-px-Spalte auf bis zu sechs Zeilen
+   lief (gemessen 476 px allein fuer die Ueberschrift) und (c) die Spalten mittig
+   ausgerichtet waren: die Textspalte hing damit in der Mitte der 940 px hohen
+   Handy-Spalte, jede Ersparnis wirkte nur zur HAELFTE nach oben.
+
+   Die Gegenmassnahme setzt an allen drei Stellen an, ohne das Handy anzufassen
+   (dessen Buehne bleibt 438x709 - Fund 4 haengt daran) und ohne die grosse Serifen-
+   Typografie aufzugeben: die Ueberschrift wird nur noch von der Viewport-HOEHE
+   gedeckelt (14svh statt fester Riesengroesse), nicht generell verkleinert.
+   Nachgemessen nach der Aenderung: 1512x850 Knopf endet 723, Zeile 784;
+   1440x900 746/806; 1366x768 604/664; 1280x720 584/644; 1920x1080 940/1001 —
+   ueberall vollstaendig ueber der Falz.
+   Warum svh und nicht vh: identisch auf dem Desktop, aber ohne Sprung, falls ein
+   Browser dynamische Leisten mitrechnet (gleiche Begruendung wie beim Handy oben). */
+@media (min-width:981px) and (max-height:1100px){
+  .hero{padding-top:calc(var(--header) + 2.2rem);padding-bottom:3.2rem}
+  /* Textspalte oben statt mittig: sonst verpufft die Haelfte jeder Ersparnis. */
+  .hero-grid{align-items:start}
+  .hero h1{font-size:clamp(3.4rem, min(9vw, 14svh), 9.4rem)}
+  .hero-lead{margin-top:1.4rem}
+  .hero-actions{margin-top:1.4rem}
+  .hero-facts{margin-top:1.6rem;padding-top:1rem}
+}
+/* Sehr flache Fenster (unter 780 px, z. B. 1024x700): dort reicht die Hoehen-Deckelung
+   oben noch nicht, weil 9vw bei schmaleren Fenstern der kleinere Wert ist und die
+   Ueberschrift trotzdem vier Zeilen braucht. */
+@media (min-width:981px) and (max-height:780px){
+  .hero{padding-top:calc(var(--header) + 1.6rem)}
+  .hero h1{font-size:clamp(3rem, min(9vw, 11.5svh), 9.4rem)}
+}
+
 @media (max-width:340px) and (max-height:650px){
+  :root{--dock-h:0px}
   .mobile-dock{display:none}
   body{padding-bottom:0}
   .footer-bottom{padding-bottom:2rem}
+  /* Ohne Schnellzugriff-Leiste verdeckt nichts mehr - und ohne sie waere #preise
+     im ersten Bildschirm sonst gar nicht erreichbar. Deshalb hier zurueck. */
+  .hero-actions .quiet-link{display:inline-flex;min-height:44px;align-items:center;align-self:center;justify-content:center;font-size:.8rem}
 }
 
 /* Selbst auf 320 × 568 px bleibt die Hauptaktion im ersten Bildschirm.
@@ -502,7 +665,7 @@ button{border:0}
 /* ===== OZEAN-MOTION (V8.1) — Bewegungssprache nach motionsites-Vorbild, in Arturs Marke ===== */
 
 /* Hero: Aurora-Schein hinter dem Inhalt (nur transform/opacity, GPU-guenstig) */
-.hero-aurora{position:absolute;inset:0;z-index:0;pointer-events:none;background:radial-gradient(52rem 36rem at 76% 16%,rgba(98,213,255,.17),transparent 62%),radial-gradient(42rem 32rem at 12% 86%,rgba(98,213,255,.08),transparent 60%);animation:aurora-drift 16s ease-in-out infinite alternate}
+.hero-aurora{position:absolute;inset:0;z-index:0;pointer-events:none;background:radial-gradient(52rem 36rem at 76% 16%,rgba(98,213,255,.17),transparent 62%),radial-gradient(42rem 32rem at 12% 86%,rgba(255,196,107,.10),transparent 60%);animation:aurora-drift 16s ease-in-out infinite alternate}
 @keyframes aurora-drift{from{transform:translate3d(-2%,-1.5%,0) scale(1)}to{transform:translate3d(2.5%,2%,0) scale(1.07)}}
 .hero .wrap{position:relative;z-index:1}
 .hero h1 em{text-shadow:0 0 22px rgba(98,213,255,.42),0 0 90px rgba(98,213,255,.20)}
@@ -614,10 +777,32 @@ button{border:0}
 .flow-step{font-size:.75rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--signal)}
 .flow-card h3{font-family:var(--serif);font-size:clamp(1.7rem,2.4vw,2.4rem);font-weight:400;letter-spacing:-.03em;line-height:1.05}
 .flow-card p{color:var(--muted-dark);font-size:.9rem}
-.flow-card .flow-result{margin-top:auto;padding:.8rem .95rem;border:1px solid rgba(98,213,255,.4);color:var(--signal-soft);font-size:.8rem;font-weight:700}
 @media (max-width:980px){
   .flow-grid{grid-template-columns:1fr}
   .flow-card{min-height:0}
+}
+
+/* ===== Mitwirkungs-Liste im Ablauf (V8.61) =====
+   Aufklappbar wie die FAQ: geschlossen trägt die Kopfzeile die ganze Botschaft
+   (fünf Punkte, rund anderthalb Stunden), aufgeklappt stehen die Einzelheiten.
+   Spart mobil rund 700 px Scrollstrecke, ohne einen Satz zu streichen. */
+.mitwirkung{margin-top:clamp(1.8rem,3.5vw,2.6rem);padding:clamp(1.3rem,2.6vw,2.2rem);border:1px solid var(--line-dark)}
+.mitwirkung-kopf{position:relative;display:flex;flex-wrap:wrap;align-items:baseline;gap:.3rem 1.2rem;min-height:44px;padding-right:2.2rem;cursor:pointer;list-style:none}
+.mitwirkung-kopf::-webkit-details-marker{display:none}
+.mitwirkung-kopf::after{position:absolute;top:0;right:0;display:grid;width:2rem;min-height:44px;place-items:center;content:"+";color:var(--signal);font-family:var(--sans);font-size:1.2rem;font-weight:700}
+.mitwirkung[open]>.mitwirkung-kopf::after{content:"−"}
+.mitwirkung-kopf h3{margin:0;font-family:var(--serif);font-size:clamp(1.6rem,3vw,2.2rem);font-weight:400;letter-spacing:-.03em;line-height:1.05}
+.mitwirkung-kopf p{margin:0;color:var(--signal);font-size:.8rem;font-weight:700}
+.mitwirkung-liste{display:grid;grid-template-columns:1fr 1fr;gap:1px;margin:1.3rem 0 0;padding:0;border:1px solid var(--line-dark);background:var(--line-dark);list-style:none}
+.mitwirkung-liste li{padding:.8rem 1rem;background:var(--ink)}
+.mitwirkung-liste li:last-child{grid-column:1 / -1}
+.mitwirkung-liste b{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:.2rem .8rem;font-size:.85rem}
+.mitwirkung-liste .mit-zeit{color:var(--signal);font-size:.75rem;font-weight:700;letter-spacing:.04em;white-space:nowrap}
+.mitwirkung-liste .mit-text{display:block;margin-top:.3rem;color:var(--muted-dark);font-size:.8rem}
+.mitwirkung-fuss{margin:1.1rem 0 0;color:var(--muted-dark);font-size:.8rem}
+.mitwirkung-fuss strong{color:var(--white)}
+@media (max-width:720px){
+  .mitwirkung-liste{grid-template-columns:1fr}
 }
 
 /* ===== Treppen-Laeufer links (dekorativ, 21.07.2026) ===== */
@@ -634,7 +819,90 @@ button{border:0}
 .treppe-griff:active{cursor:grabbing}
 .treppe-griff:focus-visible{outline:3px solid var(--signal);outline-offset:3px;border-radius:.35rem}
 @media (prefers-reduced-motion:reduce){ .treppe-overlay,.treppe-griff{display:none!important} }
-@media (max-width:1399px){.treppe-rail,.treppe-overlay,.treppe-griff{display:none!important}}
+
+/* Rechte A-Leiste: der Buchstabe A zeigt den Scroll-Stand an (V8.94 - Arturs
+   Entscheid: nur mitlaufen, nicht ziehen).
+   V8.68: pointer-events:none auf der Leiste. Vorher schluckte der 46px-Streifen
+   alles darunter - am Desktop u. a. das Etikett von .report-sheet (right:-1px).
+   Auf dem Handy waere daraus ein blockierter "Anfrage"-Knopf geworden
+   (gemessen: 32 % verdeckt). Diese eine Zeile loest die Verdeckungsfrage
+   strukturell, unabhaengig von z-index. Seit V8.94 gilt sie auch fuer das A
+   selbst - es faengt gar nichts mehr ab. */
+.a-leiste{position:fixed;right:0;top:var(--header);
+  bottom:calc(var(--dock-h, 0px) + env(safe-area-inset-bottom) + 6px);
+  width:clamp(28px, 3.6vw, 46px);z-index:1450;display:none;pointer-events:none}
+.js .a-leiste{display:none}
+@media (min-width:1400px){ .js .a-leiste{display:block} }
+@media (prefers-reduced-motion:reduce){ .a-leiste{display:none!important} }
+.a-leiste::before{content:"";position:absolute;left:50%;top:14px;bottom:14px;width:1px;background:rgba(126,140,144,.4)}
+/* V8.94 (Arturs Entscheid "es soll nur mitlaufen ohne scroll funktion"):
+   Das A ist REINER ANZEIGER. pointer-events:none - Beruehrungen und Klicks
+   gehen hindurch, an dieser Stelle verhaelt sich die Seite damit exakt so wie
+   14px daneben. Damit entfallen auch cursor:grab (es gibt nichts zu greifen)
+   und jede touch-action-Sonderregel (ohne Zeiger-Ereignisse gibt es keine
+   Geste, die man lenken muesste). Die Zieh-Funktion samt Halte-Riegel ist aus
+   treppe.js entfernt; ihre Geschichte steht im git log. */
+.a-anfasser{position:absolute;left:50%;top:14px;transform:translateX(-50%);width:34px;height:40px;display:grid;place-items:center;font-family:var(--serif);font-style:normal;font-weight:500;font-size:1.7rem;line-height:1;color:var(--signal);user-select:none;-webkit-user-select:none;pointer-events:none}
+/* Groessere Trefflaeche am Finger-Geraet bleibt als OPTIK erhalten (das A ist
+   dort etwas groesser); getroffen wird nichts mehr - siehe pointer-events oben. */
+@media (pointer: coarse){
+  .a-anfasser{width:40px;height:52px}
+}
+.a-anfasser.auf-papier{color:var(--ink)}
+/* V8.92 (Arturs Geraete-Befund "das A laggt immer noch") — DAS A FOLGT JETZT AUF
+   DEM COMPOSITOR, nicht mehr ueber den Hauptfaden.
+   Befund vorweg: In treppe.js rechnet leisteAktualisieren() die Position schon
+   immer 1:1 aus window.scrollY, ohne Glaettung - gemessen ueber 644 Bilder,
+   Abweichung 0,0px, auch bei 4- und 6-fach gedrosseltem Rechner. Es gab also
+   nichts wegzunehmen. Was blieb: Die Seite scrollt auf dem Compositor-Faden,
+   das A wurde per JavaScript auf dem HAUPTFADEN nachgesetzt. Beim Schwung-
+   Scrollen auf einem echten Geraet haengt der Hauptfaden hinterher (waehrend
+   des Nachschwingens werden Bild-Rueckrufe sogar gedrosselt) - das A kommt ein
+   paar Bilder zu spaet. Genau das sieht man als "laggt".
+   Eine scroll-gesteuerte Animation laeuft im Browser NEBEN dem Hauptfaden, wie
+   der Schieber einer echten Bildlaufleiste. Der Fortschritt von scroll(root
+   block) ist scrollY / (scrollHeight - innerHeight) - dieselbe Rechnung wie in
+   treppe.js, nur ohne Hauptfaden.
+   Die Endlage: top laeuft von 14px bis clientHeight-54px (Spur = Hoehe-28,
+   A-Feld 40 hoch) - zeichengleich zur JS-Formel.
+   V8.94: Es gibt keine Ausnahme mehr fuer einen Zieh-Zustand - das A wird
+   ausschliesslich vom Scrollstand gefuehrt.
+   Browser ohne scroll()-Zeitleiste behalten den JS-Weg - der schreibt weiter
+   jedes Bild und ist damit die Rueckfallebene. */
+@supports (animation-timeline: scroll()) {
+  @keyframes a-folgt-scroll { from { top: 14px } to { top: calc(100% - 54px) } }
+  .a-anfasser{animation:a-folgt-scroll linear both;animation-timeline:scroll(root block)}
+}
+/* V8.69: Nur noch die Treppen-Teile bleiben unter 1400px aus. Die A-Leiste
+   ist jetzt auch auf dem Handy da (Arturs Wunsch) - schmaler, ueber dem Dock
+   endend und durchlaessig. */
+/* Overlay und Greif-Feld bleiben mobil aus: das unsichtbare 44x48-Feld folgt
+   der Figur und wuerde Tipps auf Links schlucken, wo immer sie gerade steht. */
+@media (max-width:1399px){.treppe-overlay,.treppe-griff{display:none!important}}
+/* Die Spur selbst ist mobil da, aber nur noch 14px breit (V8.81): Der Text
+   beginnt bei x=14 - die fruehere 46px-Spur legte Kopf und Arme der Figur
+   auf Buchstaben (gemessen: an 15 von 36 Scroll-Positionen). 14px ist exakt
+   der leere Randstreifen VOR dem Text: Figur voll sichtbar, 0px Ueberdeckung,
+   0px Platzverlust. Geometrie dazu in treppe.js (GEO_SCHMAL). */
+/* V8.92: Die 14px waren an die Annahme "der Text beginnt bei x=14" geknuepft -
+   die stimmt erst ab 390px Fensterbreite. Darunter schrumpft der Seitenrand
+   (--wrap wird enger: bei 360px beginnt der Text schon bei 11px), die Spur lag
+   also 3px auf den Buchstaben. Gemessen an allen 6 Inhaltsseiten. Jetzt folgt
+   die Spurbreite genau demselben Rand wie der Text - hoechstens 14px, sonst so
+   breit wie der Rand wirklich ist. Ab 390px aendert sich dadurch nichts. */
+@media (max-width:1399px){ .js .treppe-rail{display:block;width:min(14px, calc((100vw - var(--wrap)) / 2))} }
+@media (max-width:1399px){ .js .a-leiste{display:block} }
+/* A kleiner, sonst raegte es aus einer 28px-Leiste 13px nach jeder Seite.
+   Trefferflaeche bleibt ueber 24x24 (WCAG 2.5.8). Die touch-action-Regel fuer
+   Finger steht weiter oben im Block (pointer: coarse). */
+@media (max-width:1399px){
+  /* Nach links geholt: ganz aussen zeigt der Browser beim Scrollen seine
+     eigene Leiste - die Leiste soll ihr nicht im Weg stehen (Arturs Befund). */
+  .a-leiste{right:8px}
+  /* V8.89/V8.94: Das A-Feld ist 40x52 (Arturs Ansage 'mehr anklickbar' - die
+     Groesse blieb als Optik erhalten); gegriffen wird hier nichts mehr. */
+  .a-anfasser{width:40px;height:52px;font-size:clamp(1.15rem, 1.4vw, 1.7rem)}
+}
 
 /* Lesbarkeits-Boden auch fuer Preiszeilen + Konditionen (21.07.2026) */
 @media (max-width:720px){
@@ -646,32 +914,475 @@ button{border:0}
 .handy-cbtn{min-height:44px;padding:.45rem .8rem;border:1px solid var(--line-dark);border-radius:.5rem;background:transparent;color:inherit;font:inherit;font-size:.8rem;cursor:pointer;transition:border-color .2s ease,color .2s ease}
 .handy-cbtn:hover{border-color:var(--signal)}
 
-/* === Neutrales Hero-3D-Handy (Three.js lokal; Fallback = Diagramm) === */
-.hero-visual{position:relative}
-.hero-phone{display:none}
-@media (max-width:720px){ .hero-visual{display:none} }
-@media (min-width:1024px) and (hover:hover) and (prefers-reduced-motion:no-preference){
-  .hero-visual{min-height:940px} /* reserviert die 3D-Handy-Hoehe -> kein Layout-Sprung beim Nachladen */
-  .hero3d .hero-visual .signal-console{display:none}
-  .hero3d .hero-visual .hero-phone{display:flex;flex-direction:column;align-items:center}
+/* === Neutrales Hero-3D-Handy (Three.js lokal; Ersatz = 2D-Werkprobe) === */
+/* min-width:0 wie bei .hero-copy (Z.148) und aus demselben Grund: Ab 980px steht
+   der Hero EINSPALTIG (Z.408, grid-template-columns:1fr). 1fr heisst
+   minmax(AUTO,1fr) - die Spalte kann also nicht schmaler werden als der
+   breiteste Inhalt eines ihrer Kinder. Die 2D-Werkprobe (.handy-2d, sichtbar bei
+   reduzierter Bewegung und wenn 3D nicht laedt) hat eine Mindestbreite von
+   315,7px. Bei 320px Fensterbreite stehen aber nur 298px zur Verfuegung: die
+   Spalte blieb 315,7px breit und schob den GESAMTEN Hero-Text 6,7px ueber die
+   Bildschirmkante - abgeschnitten und wegen overflow-x:clip nicht erreichbar.
+   GEMESSEN (Chromium+WebKit, 320px, reduzierte Bewegung): H1-Kante vorher 326,7
+   bei 320px Fenster, nachher 309,0. Bei 344px und mehr unveraendert. */
+.hero-visual{position:relative;min-width:0}
+.hero-phone{display:none;position:relative;overflow-x:clip}
+@media (max-width:720px){
+  .hero-grid{gap:2.2rem}
 }
+/* V8.83: Das 3D-Handy laeuft jetzt auf ALLEN Geraeten (Arturs Ansage 03.08.:
+   "auf dem Handy genauso wie auf dem Mac - real"). Die Regeln aus dem alten
+   1024er-Fenster gelten deshalb ueberall; nur reduced-motion bleibt bei der
+   2D-Werkprobe. Ablauf unveraendert: waehrend das 3D laedt, wird NICHTS
+   gezeigt (reservierte Hoehe haelt das Layout), die 2D-Werkprobe erscheint
+   nur ohne JavaScript, bei reduced-motion oder wenn Laden/WebGL scheitert
+   (.hero3d-fehlt). */
+@media (prefers-reduced-motion:no-preference){
+  /* Reserve = Buehnenhoehe (min(Breite,480px)*1,62) + Beiwerk (Titel/Hinweis/
+     Knopf/Zeilen). Das Beiwerk waechst nach unten, weil die Zeilen auf schmalen
+     Schirmen mehrzeilig umbrechen - Stufen unten. GEMESSEN 03.08.2026 (WebKit):
+     echt 320:744 / 375:807 / 430:844 / 768:970 - jede Stufe liegt knapp
+     drueber, damit beim Nachladen nichts springt. */
+  .js .hero-visual{min-height:calc(min(100vw - 28px, 480px)*1.62 + 205px)}
+  .js .hero-visual .handy-2d{display:none}
+  .hero3d .hero-visual .hero-phone{display:flex;flex-direction:column;align-items:center}
+  .hero3d-fehlt .hero-visual .handy-2d{display:block}
+  .hero3d-fehlt .hero-visual{min-height:0}
+}
+/* V8.84: Waehrend die 3D-Kette laedt, war die reservierte Flaeche ein leeres
+   Loch (Pruef-Fund). Reiner CSS-Platzhalter: dezenter Geraeteumriss + Zeile,
+   verschwindet von selbst, sobald .hero3d (fertig) oder .hero3d-fehlt
+   (2D-Ersatz) am Wurzelelement steht. */
+.js:not(.hero3d):not(.hero3d-fehlt) .hero-visual::before{content:"";position:absolute;
+  left:50%;top:26px;transform:translateX(-50%);width:min(62%,296px);aspect-ratio:1/2.05;
+  border:1px solid rgba(98,213,255,.30);border-radius:clamp(28px,14.5%,46px);
+  background:linear-gradient(160deg,rgba(98,213,255,.05),rgba(7,25,31,.0) 55%)}
+.js:not(.hero3d):not(.hero3d-fehlt) .hero-visual::after{content:"Werkprobe l\00E4 dt \2026";
+  position:absolute;left:50%;top:300px;transform:translateX(-50%);
+  color:#7f93a6;font-size:.85rem;letter-spacing:.04em}
+@media (prefers-reduced-motion:reduce){
+  .js .hero-visual::before,.js .hero-visual::after{content:none}
+}
+
+/* Beiwerk-Stufen (siehe Messwerte oben): schmaler = mehr Zeilenumbrueche. */
+@media (prefers-reduced-motion:no-preference) and (max-width:400px){
+  .js .hero-visual{min-height:calc((100vw - 28px)*1.62 + 255px)}
+}
+@media (prefers-reduced-motion:no-preference) and (max-width:340px){
+  .js .hero-visual{min-height:calc((100vw - 28px)*1.62 + 280px)}
+}
+/* V8.84: Querformat-Handys (Hoehe < 500px): Buehne an der Hoehe deckeln,
+   sonst ist nur ein Mittel-Ausschnitt des Geraets sichtbar. Kamera-Fit
+   zieht ueber den Resize-Pfad automatisch nach. */
+@media (orientation:landscape) and (max-height:500px){
+  .hero-phone__stage{max-height:82vh;max-height:82svh;max-width:calc(82svh / 1.62)}
+}
+/* V8.84: Zeilen unter der Buehne mobil straffen - der Reset-Knopf lag bei
+   zentrierter Buehne ~6px unter der Falz (Pruef-Fund, Kosmetik). */
+@media (max-width:720px){
+  .hero-phone__hint{margin-top:.3rem}
+  .hero-phone .handy-controls{margin-top:.3rem}
+  .hero-phone__links{margin-top:.4rem}
+  .hero-phone__proof{margin-top:.4rem}
+  /* Hinweis + Reset-Knopf VOR die Link-Zeile (rein visuell, Fokus-Reihenfolge
+     unberuehrt - der Knopf traegt tabindex=-1): sonst lag der Knopf bei
+     zentrierter Buehne 6px unter der Falz. */
+  .hero-phone__links{order:2}
+  .hero-phone__proof{order:3}
+}
+@media (prefers-reduced-motion:no-preference) and (min-width:981px){
+  /* Zweispaltiger Hero: Buehnenbreite haengt an der Spalte, nicht am Fenster.
+     Bewaehrter Desktop-Wert (echt gemessen 781-911px). */
+  .js .hero-visual{min-height:940px}
+}
+/* Produktzeile ueber der Buehne: benennt die Werkprobe, immer sichtbar */
+.hero-phone__title{margin:0 0 .55rem;font-size:.92rem;font-weight:600;letter-spacing:.02em;text-align:center;color:#dbe6f2}
 /* Die <three-d-stage> fuellt diese Box; ihre Groesse gibt den Handy-Rahmen im Hero vor. */
+/* touch-action hier allein reicht NICHT: OrbitControls setzt auf der Leinwand den
+   Inline-Stil touch-action:none, und touch-action vererbt nicht. Der wirksame Fix
+   steht in hero3d-stage.js (renderer.domElement.style.touchAction). Diese Zeile
+   bleibt als zweite Sicherung fuer den Fall ohne Leinwand. */
 .hero-phone__stage{width:100%;max-width:480px;aspect-ratio:1/1.62;touch-action:pan-y}
 .hero-phone__stage:empty{display:none}
 .hero-phone__hint{margin:.5rem 0 0;font-size:.8rem;letter-spacing:.02em;color:#c3d0e2}
 /* Steuerleiste: statisch, EIN Knopf, mittig */
 .hero-phone .handy-controls{position:static;margin-top:.5rem;display:flex;justify-content:center}
-/* Konversion + Produkt-Link im DOM (barrierefrei) — bewusst zweitrangig hinter den Hero-CTAs links */
-.hero-phone__links{margin:.7rem 0 0;font-size:.82rem;text-align:center;color:#7f93a6}
+/* Konversion + Produkt-Link direkt unter der Buehne (barrierefrei im DOM) */
+.hero-phone__links{margin:.6rem 0 0;font-size:.9rem;text-align:center;color:#7f93a6}
 .hero-phone__links a{color:var(--signal);text-decoration:none;font-weight:600;border-bottom:1px solid rgba(98,213,255,.35);padding-bottom:1px}
 .hero-phone__links a:hover{border-bottom-color:var(--signal)}
 .hero-phone__links span{margin:0 .5rem;opacity:.5}
 /* Ehrlichkeits-Zeile: macht die Show zum Moat-Beweis */
 .hero-phone__proof{max-width:380px;margin:.55rem auto 0;font-size:.8rem;line-height:1.5;text-align:center;color:#c3d0e2}
 
+/* === 2D-Werkprobe (V8.48, ab V8.59 der einzige Ersatz) =====================
+   Dieselben Beispieldaten und dieselbe Farbfamilie wie das 3D-Handy und
+   app-demo.html, aber als normales HTML: 0 zusaetzliche Requests, kein WebGL,
+   echte Knoepfe (Tastatur + Vorlese-Software).
+   V8.59: Sie ist jetzt ueberall sichtbar, wo das 3D-Handy NICHT laeuft — also auch
+   in schmalen Fenstern (721-1023 px), bei reduzierter Bewegung, auf Touch-Geraeten
+   ohne Mauszeiger und ohne JavaScript. Genau diese Plaetze hatte vorher das alte
+   Schema-Diagramm besetzt. Ausgeblendet wird sie nur dort, wo das 3D-Handy steht
+   (Regel weiter oben) — beide zusammen gibt es nie.
+   Farbwerte 1:1 aus hero3d-handy.js (APP_BG/APP_CARD/... und STAT_TEXT). */
+.handy-2d{--h2d-bg:#0a0a14;--h2d-card:#1a1a2e;--h2d-card2:#22223e;--h2d-line:rgba(255,255,255,.10);
+  --h2d-ink:#e8eaf0;--h2d-muted:#8890a8;--h2d-text:#a6adc4;
+  --h2d-neu:#f26d64;--h2d-wartend:#e39a3b;--h2d-termin:#39c4d1;--h2d-auftrag:#37cf6a;--h2d-verloren:#8890a8;
+  /* Gehaeuse-Toene (V8.65). Vorher standen sie hart im Verlauf und in den
+     Pseudoelementen; als Variablen ist ein Farbwechsel eine Zeile statt vier.
+     Werte gespiegelt aus dem 3D-Modell (hero3d-handy.js: matBezel, matButton,
+     matChamfer, appHomeIndicator). */
+  --h2d-case-1:#2c303b;--h2d-case-2:#12141c;--h2d-case-3:#0c0e14;--h2d-case-4:#252936;
+  --h2d-case-edge:rgba(255,255,255,.22);
+  --h2d-case-bezel:#08080a;
+  --h2d-case-btn:#3c3c42;
+  --h2d-case-island:#04050a;
+  --h2d-case-lens:#0b0e15;--h2d-case-lens-iris:#16233a;--h2d-case-glint:rgba(130,160,210,.55);
+  --h2d-case-home:rgba(255,255,255,.85);
+  display:block}
+/* Ueber 720px steht die Werkprobe in einer breiten Spalte: Handybreite halten und
+   mittig setzen, sonst zoege sich das Geraet quer ueber die halbe Buehne. */
+@media (min-width:721px){ .handy-2d{max-width:420px;margin-inline:auto} }
+/* V8.76: Auf dem Handy etwas schmaler als die Textspalte. Arturs Befund am
+   echten Geraet: das Geraet darf kleiner sein, damit man daran vorbeiscrollen
+   kann - links und rechts
+   bleiben so je ~22px freie Flaeche, auf der die Wischgeste sicher die Seite
+   scrollt und nicht auf dem Geraet landet. */
+@media (max-width:720px){ .handy-2d__frame{max-width:86%;margin-inline:auto} }
+/* Pflicht: .h2d-card & Co. setzen display:flex und wuerden das UA-[hidden] sonst
+   ueberstimmen — der Filter haette nichts ausgeblendet (gemessen: 3 statt 2 Karten). */
+.handy-2d [hidden]{display:none}
+.handy-2d__title{margin:0 0 .3rem;font-size:0.8rem;font-weight:600;letter-spacing:.02em;color:#dbe6f2}
+/* V8.63 — Geraete-Optik statt flacher Karte.
+   Ursache des Funds: auf Handys laeuft das 3D-Handy nicht (Regel oben: erst ab
+   1024px mit Mauszeiger). Sichtbar war deshalb nur eine Karte mit 16px-Ecken —
+   kein Geraet. Da genau dieser Besucher vom Handy kommt, bekommt die 2D-Werkprobe
+   hier den Geraeterahmen: Aussenrahmen + Kamera-Pille + Home-Balken, wie am
+   3D-Handy. Alles reines CSS: 0 zusaetzliche Requests, kein Bild, kein WebGL,
+   kein JavaScript — wirkt auch ohne JS und bei reduzierter Bewegung.
+   Kosten (gemessen, nicht geschaetzt): rund 14px Lesebreite (4 %). Die Hoehe
+   bleibt vom Inhalt bestimmt; ein erzwungenes 9/19.5-Format haette bei 330px
+   Bildschirmbreite rund 175px Leerflaeche erzeugt. */
+/* V8.65 — vier Lagen statt zwei, Radien aus dem eigenen 3D-Modell.
+   Befund davor: Der Steg war mit 9px fast richtig (3D: 8,24px), aber falsch
+   AUFGETEILT — 1px Rand + 8px grauer Verlauf ergaben einen dicken grauen Ring.
+   Ein Geraet hat: Metallkante, polierte Fase, SCHWARZEN Bezel, dann Schirm.
+   Dazu war die Schirm-Rundung mit 27px (7,9 % der Breite) nur halb so gross
+   wie noetig; echte Geraete liegen bei 14,0-15,4 %, das 3D-Modell bei 14,55 %.
+   Rechnung: aussen 59 = Bezel-Aussenradius 57 + 2px Rahmenpolster; innen
+   57 - 7px Border = 50px = 14,5 % von 344px Schirmbreite. Konzentrisch, also
+   keine "aufgeklebte" Ecke. Schirmbreite bleibt 344px — keine Lesebreite weg. */
+.handy-2d__frame{position:relative;padding:2px;border:0;border-radius:59px;
+  background:linear-gradient(158deg,var(--h2d-case-1) 0%,var(--h2d-case-2) 38%,var(--h2d-case-3) 62%,var(--h2d-case-4) 100%);
+  box-shadow:0 18px 40px rgba(0,0,0,.45),inset 0 0 0 1px var(--h2d-case-edge)}
+/* Squircle fuer Browser, die es koennen (Chrome ab 139, rund zwei Drittel der
+   Besucher): echte Geraete haben keine Kreisbogen-Ecke, sondern eine stetige
+   Kruemmung. Safari/Firefox bekommen weiter die normale Rundung — kein Bruch. */
+@supports (corner-shape: squircle){
+  .handy-2d__frame{corner-shape:squircle}
+  .handy-2d__screens{corner-shape:squircle}
+}
+/* Seitentasten: fuenf Kapseln auf EINEM Pseudoelement, Laengen und Hoehen aus
+   den 3D-Tastenmassen in Prozent der Geraetehoehe umgerechnet (power 12,42 %,
+   Lautstaerke je 7,94 %, Aktion/Kamera je 4,74 %). Hoehenverankert, nicht
+   breitenverankert — sonst ueberschnitten sich die beiden Lautstaerketasten,
+   weil dieses Geraet kuerzer ist als das 3D-Vorbild. z-index:-1 legt sie hinter
+   den Rahmen; sichtbar bleiben nur die 3px, die seitlich herausragen. */
+.handy-2d__frame::before{content:"";position:absolute;z-index:-1;inset:0 -3px;pointer-events:none;
+  border-radius:59px;
+  background:
+    linear-gradient(var(--h2d-case-btn),var(--h2d-case-btn)) right 0 top 27.16%/3px 12.42% no-repeat,
+    linear-gradient(var(--h2d-case-btn),var(--h2d-case-btn)) right 0 top 46.85%/3px 4.74% no-repeat,
+    linear-gradient(var(--h2d-case-btn),var(--h2d-case-btn)) left 0 top 18.51%/3px 4.74% no-repeat,
+    linear-gradient(var(--h2d-case-btn),var(--h2d-case-btn)) left 0 top 30.45%/3px 7.94% no-repeat,
+    linear-gradient(var(--h2d-case-btn),var(--h2d-case-btn)) left 0 top 40.22%/3px 7.94% no-repeat}
+/* Home-Balken: 3D-Mass 23,6 % Breite, 11px dick, 29px ueber der Schirmkante -
+   umgerechnet 81 x 6px. Vorher 104 x 4px, also zu breit und zu duenn. */
+.handy-2d__frame::after{content:"";position:absolute;z-index:2;bottom:24px;left:50%;transform:translateX(-50%);
+  width:81px;height:6px;border-radius:999px;background:var(--h2d-case-home)}
+/* Der schwarze Bezel ist ein 7px-Border, kein eigenes Element: CSS rechnet den
+   Innenradius selbst aus (57 - 7 = 50). background-clip haelt den Schirm-Ton
+   aus dem Border heraus. */
+.handy-2d__screens{display:block;position:relative;padding:16px .45rem 30px;
+  border:7px solid var(--h2d-case-bezel);border-radius:57px;background:var(--h2d-bg);
+  background-clip:padding-box;overflow:hidden;overflow:clip;touch-action:pan-y}
+/* Statusleiste im Schirm: EINMAL fuer alle drei Bildschirme, deshalb ausserhalb
+   der [data-h2d-screen]-Bloecke — sie ist damit eine Konstante fuer die
+   Hoehenangleichung in site.js und wird von zeige() nie ausgeblendet.
+   Bewusst OHNE Prozentzahl und ohne Netzkennung: eine erfundene "86 %" neben
+   der echten Statusleiste des Besuchers waere genau die Art Behauptung, die
+   diese Seite sonst vermeidet. Die Uhr dagegen ist echt (site.js). */
+.handy-2d__status{position:relative;display:flex;align-items:center;justify-content:space-between;
+  height:24px;margin:0 0 6px;padding:0 22px 0 22px}
+.handy-2d__status::before{content:"";position:absolute;left:50%;top:0;transform:translateX(-50%);
+  width:78px;height:24px;border-radius:999px;background:var(--h2d-case-island)}
+/* Frontkamera: drei Kreise wie im 3D (Fassung, Iris, Lichtpunkt), 22px rechts
+   der Mitte — die Pille waechst im Original um genau diese Linse herum. */
+.handy-2d__status::after{content:"";position:absolute;left:calc(50% + 22px);top:50%;
+  transform:translate(-50%,-50%);width:12.5px;height:12.5px;border-radius:50%;
+  background:
+    radial-gradient(circle at 38% 34%, var(--h2d-case-glint) 0 1.1px, transparent 1.2px),
+    radial-gradient(circle, var(--h2d-case-lens-iris) 0 3.6px, var(--h2d-case-lens) 3.7px)}
+.handy-2d__clock{position:relative;z-index:1;font-size:0.85rem;font-weight:700;letter-spacing:.01em;
+  font-variant-numeric:tabular-nums;color:var(--h2d-ink)}
+.handy-2d__sys{position:relative;z-index:1;display:flex;align-items:center;gap:6px}
+/* Vier Empfangsbalken, Hoehen 4/7/9/12px wie im 3D — reine Form, keine Aussage
+   ueber die Verbindung des Besuchers. */
+.handy-2d__bars{display:block;width:22.75px;height:12px;
+  background:
+    linear-gradient(var(--h2d-ink),var(--h2d-ink)) left 0 bottom 0/4px 4px no-repeat,
+    linear-gradient(var(--h2d-ink),var(--h2d-ink)) left 6.25px bottom 0/4px 7px no-repeat,
+    linear-gradient(var(--h2d-ink),var(--h2d-ink)) left 12.5px bottom 0/4px 9px no-repeat,
+    linear-gradient(var(--h2d-ink),var(--h2d-ink)) left 18.75px bottom 0/4px 12px no-repeat}
+.handy-2d__bat{position:relative;width:28px;height:14px;border:1px solid var(--h2d-ink);
+  border-radius:4px;opacity:.92}
+.handy-2d__bat::before{content:"";position:absolute;left:2px;top:2px;bottom:2px;width:18px;
+  border-radius:2px;background:var(--h2d-ink)}
+.handy-2d__bat::after{content:"";position:absolute;left:100%;top:50%;transform:translateY(-50%);
+  margin-left:1.5px;width:2px;height:6px;border-radius:0 2px 2px 0;background:var(--h2d-ink)}
+/* Live-Modus (site.js hat uebernommen): EIN Bildschirm, feste Hoehe -> kein Sprung */
+.handy-2d[data-h2d-live] .handy-2d__screens{min-height:24rem} /* Notboden vor der JS-Messung */
+.handy-2d__screen{display:flex;flex-direction:column}
+/* Fusszeile klebt am unteren Rand — ein Handy-Bildschirm ist nun einmal so hoch
+   wie er ist; Inhalt oben, Ehrlichkeitszeile unten (wie im 3D-Handy). */
+.handy-2d__foot{margin:auto 0 0;padding-top:.55rem;text-align:center;font-size:0.75rem;color:var(--h2d-muted)}
+.handy-2d__screen+.handy-2d__screen{margin-top:.7rem;padding-top:.7rem;border-top:1px solid var(--h2d-line)}
+.handy-2d[data-h2d-live] .handy-2d__screen+.handy-2d__screen{margin-top:0;padding-top:0;border-top:0}
+
+.handy-2d__bar{display:flex;align-items:center;gap:.5rem;padding:.15rem .25rem .55rem;border-bottom:1px solid var(--h2d-line)}
+.handy-2d__bartitle{display:flex;min-width:0;flex:1;flex-direction:column}
+.handy-2d__bartitle b{font-size:1rem;font-weight:700;letter-spacing:.01em;color:var(--h2d-ink)}
+.handy-2d__bartitle small{font-size:0.75rem;line-height:1.3;color:var(--h2d-muted)}
+.handy-2d__badge{flex:none;padding:.15rem .45rem;border-radius:999px;background:var(--signal);color:var(--ink);
+  font-size:0.75rem;font-weight:700;letter-spacing:.08em}
+.handy-2d__lock,.handy-2d__back{flex:none;display:inline-flex;min-height:44px;align-items:center;padding:0 .6rem;
+  border:1px solid var(--h2d-line);border-radius:.5rem;background:var(--h2d-card);color:var(--h2d-ink);
+  font:inherit;font-size:0.75rem;font-weight:600;cursor:pointer}
+.handy-2d__lock{border-color:transparent;background:transparent;color:var(--h2d-muted);font-weight:500}
+.handy-2d__lock:hover{color:var(--h2d-ink)}
+.h2d-detail__head{margin:.55rem 0 0;font-size:0.78rem;font-weight:700;color:var(--h2d-ink)}
+.h2d-detail__note{margin-top:.25rem!important}
+.handy-2d__back{flex:none;margin-right:auto;justify-content:flex-start;gap:.3rem}
+.handy-2d__lock:focus-visible,.handy-2d__back:focus-visible,.h2d-pill:focus-visible,.h2d-card:focus-visible,
+.h2d-act:focus-visible,.h2d-login__go:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+
+.handy-2d__filters{display:flex;gap:.35rem;margin:.35rem 0 .35rem}
+.h2d-pill{min-height:44px;padding:.3rem .6rem;border:1px solid var(--h2d-line);border-radius:999px;
+  background:var(--h2d-card);color:var(--h2d-text);font:inherit;font-size:0.75rem;font-weight:600;cursor:pointer;white-space:nowrap}
+.h2d-pill b{font-weight:700;color:var(--h2d-ink)}
+.h2d-pill.is-on{border-color:var(--signal);background:rgba(98,213,255,.14);color:var(--h2d-ink)}
+
+.handy-2d__list{display:flex;flex-direction:column;gap:.4rem}
+.h2d-group{margin:.25rem 0 0;font-size:0.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--h2d-muted)}
+.h2d-card{display:flex;flex-direction:column;gap:.18rem;width:100%;min-height:44px;padding:.5rem .6rem;
+  border:1px solid var(--h2d-line);border-left:3px solid var(--h2d-neu);border-radius:.6rem;
+  background:var(--h2d-card);color:var(--h2d-text);font:inherit;text-align:left;cursor:pointer}
+.h2d-card[data-h2d-stat="wartend"]{border-left-color:var(--h2d-wartend)}
+.h2d-card__top{display:flex;align-items:center;gap:.5rem}
+.h2d-card__name{flex:1;min-width:0;overflow:hidden;font-size:0.86rem;font-weight:700;color:var(--h2d-ink);text-overflow:ellipsis;white-space:nowrap}
+.h2d-stat{flex:none;padding:.1rem .42rem;border-radius:999px;background:var(--h2d-card2);
+  font-size:0.75rem;font-weight:700;letter-spacing:.04em;color:var(--h2d-neu)}
+.h2d-stat--wartend{color:var(--h2d-wartend)}
+/* Abstand vor der Zahl kommt aus dem CSS, nicht als Leerzeichen im Markup -
+   ohne JavaScript bleibt sonst eine haengende Luecke stehen. */
+.h2d-pill b:not(:empty)::before{content:"\00a0"}
+/* Neuigkeiten-Zeile: dieselbe Rechnung wie in app-demo.html, gleiche Optik
+   wie der Kasten dort. Leer -> hidden, damit keine Luecke stehen bleibt. */
+.h2d-news{display:flex;gap:.4rem;align-items:flex-start;margin:.35rem 0 0;padding:.4rem .55rem;
+  border-radius:10px;background:var(--h2d-card);border:1px solid var(--h2d-line);
+  font-size:0.75rem;line-height:1.35;color:var(--h2d-text)}
+.h2d-news::before{content:"";flex:none;width:14px;height:14px;margin-top:.1rem;
+  background:var(--h2d-wartend);
+  -webkit-mask:radial-gradient(circle at 50% 88%,#000 2.4px,transparent 2.5px),
+    linear-gradient(#000,#000) center 2px/10px 8px no-repeat;
+  mask:radial-gradient(circle at 50% 88%,#000 2.4px,transparent 2.5px),
+    linear-gradient(#000,#000) center 2px/10px 8px no-repeat}
+.h2d-news strong{color:var(--h2d-ink);font-weight:700}
+/* Vorfuehr-Knopf: gestrichelt wie im 3D-Board, damit er sich von echten
+   Bedienelementen unterscheidet. */
+.h2d-sim{display:block;width:100%;min-height:44px;margin-top:.45rem;padding:.4rem .6rem;
+  border:1px dashed rgba(255,255,255,.28);border-radius:10px;background:transparent;
+  color:var(--h2d-text);font:inherit;font-size:0.75rem;line-height:1.3;text-align:center;cursor:pointer}
+.h2d-sim:hover{border-color:var(--signal);color:var(--h2d-ink)}
+.h2d-sim:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+.h2d-sim[disabled]{opacity:.5;cursor:default}
+.h2d-act--status{border-color:rgba(98,213,255,.4)}
+/* Reiterleiste wie im 3D-Board. Der vierte Reiter "Support" fehlt bewusst -
+   im 3D ist er ausgegraut und tot; ein toter Reiter verspricht mehr, als da ist. */
+.h2d-tabs{display:flex;gap:.15rem;margin:.15rem 0 .35rem;border-bottom:1px solid var(--h2d-line)}
+.h2d-tab{flex:1;min-height:44px;padding:.3rem .2rem;border:0;border-bottom:2px solid transparent;
+  background:transparent;color:var(--h2d-muted);font:inherit;font-size:0.75rem;font-weight:600;
+  cursor:pointer}
+.h2d-tab.is-on{color:var(--signal);border-bottom-color:var(--signal)}
+.h2d-tab:focus-visible{outline:2px solid var(--signal);outline-offset:-2px}
+.h2d-tab-kopf{margin:.5rem 0 .3rem;font-size:0.75rem;font-weight:700;letter-spacing:.03em;
+  text-transform:uppercase;color:var(--h2d-muted)}
+.h2d-kacheln{display:grid;grid-template-columns:1fr 1fr;gap:.4rem}
+.h2d-kachel{display:flex;flex-direction:column;gap:.1rem;margin:0;padding:.5rem .55rem;
+  border-radius:10px;background:var(--h2d-card);border:1px solid var(--h2d-line)}
+.h2d-kachel b{font-size:1.15rem;font-weight:800;line-height:1.1;color:var(--h2d-ink);
+  font-variant-numeric:tabular-nums}
+.h2d-kachel span{font-size:0.75rem;line-height:1.25;color:var(--h2d-muted)}
+.h2d-verteilung{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:.25rem}
+.h2d-verteilung li{display:flex;align-items:center;gap:.45rem;font-size:0.75rem;color:var(--h2d-text)}
+.h2d-verteilung i{flex:none;width:9px;height:9px;border-radius:50%;background:currentColor}
+.h2d-verteilung b{margin-left:auto;font-weight:700;color:var(--h2d-ink);font-variant-numeric:tabular-nums}
+.h2d-grenze{margin:.5rem 0 0;font-size:0.75rem;line-height:1.4;color:var(--h2d-muted)}
+.h2d-grenze b{color:var(--h2d-wartend)}
+.h2d-schalter{display:flex;align-items:center;gap:.5rem;min-height:44px;font-size:0.76rem;
+  line-height:1.3;color:var(--h2d-text);cursor:pointer}
+.h2d-schalter input{flex:none;width:18px;height:18px;accent-color:var(--signal)}
+/* Statusfarben 1:1 aus hero3d-handy.js (STAT_TEXT) - die Werkprobe muss
+   dieselben Farben zeigen wie die grosse Demo. */
+.h2d-stat--termin{color:var(--h2d-termin)}
+.h2d-stat--auftrag{color:var(--h2d-auftrag)}
+.h2d-stat--verloren{color:var(--h2d-verloren)}
+.h2d-card__meta{font-size:0.75rem;line-height:1.35;color:var(--h2d-muted)}
+.h2d-card__msg{overflow:hidden;font-size:0.76rem;line-height:1.35;color:var(--h2d-text);
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+.h2d-card__flag{font-size:0.75rem;line-height:1.3;color:var(--h2d-wartend)}
+
+.h2d-detail{padding:.6rem .25rem .1rem}
+.h2d-detail__top{display:flex;align-items:center;gap:.5rem;margin:0}
+.h2d-detail__name{flex:1;min-width:0;font-size:0.98rem;font-weight:700;color:var(--h2d-ink)}
+.h2d-detail__meta{margin:.25rem 0 0;font-size:0.75rem;color:var(--h2d-muted)}
+.h2d-detail__msg{margin:.5rem 0 0;padding:.5rem .6rem;border:1px solid var(--h2d-line);
+  border-left:3px solid var(--h2d-neu);border-radius:.5rem;background:var(--h2d-card);
+  font-size:0.82rem;line-height:1.45;color:var(--h2d-ink)}
+.h2d-detail__msg[data-stat="wartend"]{border-left-color:var(--h2d-wartend)}
+.h2d-detail__note{margin:.5rem 0 0;padding:.5rem .6rem;border:1px solid var(--h2d-line);border-radius:.5rem;
+  background:var(--h2d-card);font-size:0.75rem;line-height:1.45;color:var(--h2d-text)}
+.h2d-detail__acts{display:flex;gap:.4rem;margin:.55rem 0 0}
+.h2d-act{flex:1;min-height:44px;border:1px solid var(--h2d-line);border-radius:.5rem;background:var(--h2d-card2);
+  color:var(--h2d-ink);font:inherit;font-size:0.76rem;font-weight:600;cursor:pointer}
+.h2d-detail__hint{margin:.4rem 0 0;font-size:0.75rem;line-height:1.4;color:var(--signal-soft)}
+.h2d-detail__hint:empty{margin:0}
+
+.h2d-login{padding:.6rem .25rem .1rem}
+.h2d-login__ico{display:grid;width:56px;height:56px;margin:0 auto .6rem;place-items:center;
+  border-radius:16px;background:var(--signal);color:var(--ink)}
+.h2d-login__ico svg{width:34px;height:34px}
+.h2d-login__alt{display:flex;width:100%;min-height:48px;align-items:center;justify-content:center;margin-top:.4rem;
+  border:1px solid var(--h2d-line);border-radius:.5rem;background:var(--h2d-card);color:var(--h2d-ink);
+  font:inherit;font-size:0.78rem;font-weight:600;cursor:pointer}
+.h2d-login__alt:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+.h2d-login__field{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin:0 0 .5rem;
+  padding:.55rem .65rem;border:1px solid var(--h2d-line);border-radius:.5rem;background:var(--h2d-card)}
+.h2d-login__field span{font-size:0.75rem;font-weight:600;color:var(--h2d-muted)}
+.h2d-login__field b{font-size:0.86rem;font-weight:700;letter-spacing:.06em;color:var(--h2d-ink)}
+.h2d-login__go{display:flex;width:100%;min-height:48px;align-items:center;justify-content:center;gap:.4rem;
+  border:1px solid transparent;border-radius:.5rem;background:var(--signal);color:var(--ink);
+  font:inherit;font-size:0.82rem;font-weight:700;letter-spacing:.04em;cursor:pointer}
+.h2d-login__note{margin:.55rem 0 0;font-size:0.75rem;line-height:1.45;color:var(--h2d-muted)}
+
+.handy-2d__legal{margin:.45rem 0 0;font-size:0.75rem;line-height:1.45;color:#c3d0e2}
+.handy-2d__legal b{color:var(--signal-soft)}
+/* V8.66 — zweispaltig statt untereinander. Vorher standen Knopf (48px) und
+   Link (44px) plus Luecke uebereinander: 100px nur fuer zwei Ziele. Nebeneinander
+   ist es die Hoehe des hoeheren, also rund die Haelfte. Beide bleiben ueber
+   44px Trefferhoehe. 1.35fr/1fr, weil der Knopf der laengere Text ist. */
+.handy-2d__actions{display:grid;grid-template-columns:1.35fr 1fr;align-items:stretch;
+  gap:.4rem;margin-top:.5rem}
+.handy-2d__actions .button{width:100%;min-height:48px;font-size:0.75rem;
+  padding-inline:.6rem;text-align:center;line-height:1.25}
+.handy-2d__actions .quiet-link{display:inline-flex;min-height:44px;align-items:center;
+  justify-content:center;text-align:center;font-size:0.75rem;line-height:1.25}
+/* Unter 340px wird zweispaltig zu eng - dort wieder untereinander. */
+@media (max-width:340px){
+  .handy-2d__actions{grid-template-columns:1fr}
+}
+/* Bottom-Bar auf dem Handy-Screen: echtes HTML-<button>, hero3d-handy.js projiziert die
+   Screen-Unterkante und setzt left/top/width/height. Sanftes Ein-/Ausblenden;
+   visibility nimmt den Knopf im ausgeblendeten Zustand aus Tab-Reihenfolge + Vorlese-Software. */
+.handy-cta{position:absolute;z-index:3;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .28s ease,visibility 0s linear .28s}
+.handy-cta.is-on{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .28s ease}
+.handy-cta__btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.1rem;width:100%;height:auto;min-height:44px;padding:.4rem 1rem;border:1px solid rgba(255,255,255,.16);border-radius:14px;background:rgba(13,16,24,.9);color:#fff;font:inherit;cursor:pointer;box-shadow:0 10px 26px rgba(0,0,0,.35);transition:border-color .2s ease,background .2s ease}
+.handy-cta__btn:hover{border-color:var(--signal);background:rgba(16,21,31,.96)}
+.handy-cta__btn:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+.handy-cta__main{font-size:.9rem;font-weight:600;letter-spacing:.01em;line-height:1.2}
+.handy-cta__sub{font-size:.75rem;line-height:1.2;color:rgba(255,255,255,.66)}
+@media (prefers-reduced-motion:reduce){ .handy-cta,.handy-cta.is-on,.handy-cta__btn{transition:none} }
+/* Uebernahme-Zeilen am Kontaktformular: je eine fuer Handy-Demo und
+   60-Sekunden-Check, beide nur sichtbar, wenn wirklich etwas uebernommen wurde.
+   Abstand oben statt unten: die Zeilen stehen jetzt UNTER dem Umschalter. Ein
+   Geschwister-Abstand (+) waere falsch — [hidden] entfernt kein Geschwister aus
+   dem Baum, die Regel haette also auch bei nur EINER sichtbaren Zeile gegriffen
+   und sie in den Umschalter gezogen (gemessen 28.07.2026). */
+.form-uebernahme{margin:1rem 0 0;padding:.55rem .85rem;border:1px solid rgba(31,102,138,.35);border-radius:.5rem;background:rgba(98,213,255,.12);font-size:.85rem;line-height:1.45;color:var(--ink)}
+
+/* ===== V8.49: zwei Anfrage-Wege (kurz / ausfuehrlich) in EINEM Formular =====
+   Der Umschalter ist standardmaessig unsichtbar. Sichtbar wird er erst, wenn
+   site.js ihn verdrahtet hat (data-modus-live). Ursache -> Wirkung: faellt das
+   Skript aus, gibt es keinen Knopf, der nichts tut — das volle Formular bleibt
+   stehen und absendbar. Deckt zugleich den <noscript>-Fall ab. */
+.kontakt-modus{display:none}
+.kontakt-modus[data-modus-live]{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:1.3rem}
+.kontakt-modus__tab{display:flex;min-height:56px;flex-direction:column;justify-content:center;gap:.15rem;padding:.6rem .75rem;border:1px solid var(--line-paper);background:transparent;color:var(--ink);font:inherit;text-align:left;cursor:pointer;transition:background .18s ease,border-color .18s ease,color .18s ease}
+.kontakt-modus__tab b{font-size:.8rem;font-weight:700;letter-spacing:.03em}
+.kontakt-modus__tab small{font-size:.75rem;line-height:1.3;color:var(--muted-paper)}
+.kontakt-modus__tab:hover{border-color:var(--ink)}
+.kontakt-modus__tab[aria-selected="true"]{border-color:var(--ink);background:var(--ink);color:var(--white)}
+.kontakt-modus__tab[aria-selected="true"] small{color:rgba(255,255,255,.74)}
+.kontakt-modus__tab:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){ .kontakt-modus__tab{transition:none} }
+/* ===== V8.50: Vorlagen, Foto-Weg und Erwartungs-Zeile am Formular =====
+   Vorlagen-Knoepfe sprechen dieselbe Formensprache wie der Modus-Umschalter
+   (eckig, Rahmen, aktiv = Tinte). Sie sind echte <button type="button">:
+   Tastatur, Screenreader und aria-pressed kommen ohne Zusatzarbeit mit. */
+.vorlagen{margin-bottom:.7rem}
+.vorlagen__titel{margin-bottom:.45rem;color:var(--muted-paper);font-size:.75rem;line-height:1.35}
+.vorlagen__reihe{display:flex;flex-wrap:wrap;gap:.4rem} /* umbruchfaehig statt Querscroll */
+.vorlage{min-height:44px;padding:.5rem .7rem;border:1px solid var(--line-paper);background:transparent;color:var(--ink);font:inherit;font-size:.8rem;font-weight:700;letter-spacing:.01em;text-align:left;cursor:pointer;transition:background .18s ease,border-color .18s ease,color .18s ease}
+.vorlage:hover{border-color:var(--ink)}
+.vorlage[aria-pressed="true"]{border-color:var(--ink);background:var(--ink);color:var(--white)}
+.vorlage:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){ .vorlage{transition:none} }
+/* Ehrliche Warnung vor dem Ersetzen + Rueckweg danach. */
+.vorlagen__hinweis{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.5rem;color:var(--muted-paper);font-size:.8rem;line-height:1.4}
+.vorlagen__zurueck{min-height:44px;padding:.35rem .6rem;border:1px solid var(--ink);background:transparent;color:var(--ink);font:inherit;font-size:.8rem;font-weight:700;cursor:pointer;text-decoration:underline}
+.vorlagen__zurueck:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+/* Foto-Weg: eigener Kasten mit zwei echten Tippzielen. Steht in beiden Anfrage-Wegen
+   und noch einmal auf der Danke-Seite, weil das Formular selbst keine Dateien annimmt. */
+.fotoweg{margin-top:1.1rem;padding:.9rem 1rem;border:1px solid var(--line-paper);background:rgba(7,25,31,.035)}
+.fotoweg .fotoweg__titel{margin:0;font-family:var(--serif);font-size:1.35rem;font-weight:500;letter-spacing:-.02em;line-height:1.15;color:var(--ink)}
+.fotoweg .fotoweg__text{max-width:52ch;margin:.5rem 0 0;color:var(--muted-paper);font-size:.8rem;line-height:1.45}
+.fotoweg .fotoweg__text strong{color:var(--ink)}
+.fotoweg__wege{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:.5rem;margin-top:.75rem}
+.fotoweg__knopf{display:inline-flex;min-height:48px;align-items:center;justify-content:center;gap:.5rem;padding:.6rem .85rem;border:1px solid var(--ink);color:var(--ink);font-size:.8rem;font-weight:700;text-align:center;text-decoration:none;transition:background-color .18s ease,color .18s ease}
+.fotoweg__knopf svg{flex:0 0 auto}
+.fotoweg__knopf:hover{background:var(--ink);color:var(--white)}
+.fotoweg__knopf:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.fotoweg .fotoweg__hinweis{max-width:52ch;margin:.6rem 0 0;color:var(--muted-paper);font-size:.75rem;line-height:1.4}
+.fotoweg .fotoweg__hinweis a{color:var(--ink);font-weight:700;text-decoration:underline}
+.fotoweg--danke{margin-top:2rem;padding:1.2rem 1.3rem}
+@media (prefers-reduced-motion:reduce){ .fotoweg__knopf{transition:none} }
+/* Erwartungs-Zeile: letzte Zeile vor dem Absenden, in beiden Wegen sichtbar. */
+.form-erwartung{margin:0 0 .9rem;padding-left:.8rem;border-left:2px solid var(--ink);color:var(--ink);font-size:.8rem;line-height:1.45}
+.form-meta:empty{margin-top:0} /* leere Statuszeile bleibt im Baum, nimmt aber keinen Platz */
+@media (max-width:720px){
+  /* Zwei Knoepfe nebeneinander: die Wahl bleibt als Paar erkennbar.
+     Hoehe waechst mit dem Umbruch, Boden 48 px wie im mobilen Dock. */
+  .kontakt-modus[data-modus-live]{gap:.4rem}
+  .kontakt-modus__tab{min-height:48px;padding:.55rem .6rem}
+  .kontakt-modus__tab b{font-size:.875rem} /* wie .field label — die Wahl ist ein Bedienelement */
+  .fotoweg__wege{grid-template-columns:1fr} /* Foto-Wege gestapelt: volle Breite fuer den Daumen */
+  .fotoweg__knopf{font-size:.875rem}
+  .vorlagen__titel{font-size:.875rem} /* Mikro-Label wie .field label */
+  /* Zwei Spalten wie der Modus-Umschalter: gleiche Formensprache, ruhiger Block,
+     statt fuenf verschieden breiter Zeilen. Der fuenfte Knopf nimmt die volle
+     Breite, damit unten keine halbe Luecke stehen bleibt. */
+  .vorlagen__reihe{display:grid;grid-template-columns:1fr 1fr;gap:.4rem}
+  .vorlage{min-height:48px;font-size:.875rem}
+  .vorlagen__reihe .vorlage:nth-child(5){grid-column:1/-1}
+  .vorlagen__zurueck{font-size:1rem} /* so groß wie der Hinweis daneben */
+}
+
 /* Finale mobile Kaskade: spaetere Komponentenregeln duerfen den
    Lesbarkeitsboden nicht wieder unterschreiten. */
-.price-panel-title{display:none}
+/* Ohne JavaScript stehen alle Preisbereiche offen untereinander — dann brauchen
+   sie ihren eigenen Titel und eine sichtbare Trennung. */
+.no-js .price-panel-title{display:block}
+.no-js .price-panel+.price-panel{margin-top:1.2rem;border-top:2px solid var(--ink)}
 .noscript-diagnostic{margin-top:2rem;padding:1.4rem;border:1px solid var(--line-paper);background:#f8f2e6;color:var(--ink)}
 .noscript-diagnostic h3{font-family:var(--serif);font-size:1.8rem;font-weight:500;line-height:1}
 .noscript-diagnostic p{margin-top:.8rem}
@@ -689,26 +1400,32 @@ button{border:0}
 
 @media (max-width:720px){
   .service-index,.flow-step,.proof span{font-size:.75rem}
-  .price-tabs{display:none}
-  .price-panel{padding-top:2rem}
-  .price-panel+.price-panel{margin-top:1.2rem;border-top:2px solid var(--ink)}
-  .price-panel-title{display:block;margin-bottom:.35rem;font-family:var(--serif);font-size:2rem;font-weight:500;letter-spacing:-.03em}
+  /* Reiter auch am Handy (V8.56): ein Preisbereich statt vier untereinander. */
+  .price-tabs{margin-top:2rem}
+  .price-tab{flex:1 1 auto}
+  .price-panel{padding-top:1.4rem}
+  /* Karten muessen am Handy nicht auf gleiche Hoehe gezwungen werden — sie
+     stehen untereinander, die erzwungene Hoehe waere reiner Leerraum. */
+  .work-card{min-height:0}
 
   /* Fließtext bleibt für die überwiegend mobilen, oft älteren Betriebsinhaber
      bei mindestens 16 px. Mikro-Labels behalten ihren eigenen 12-px-Boden. */
   .diagnostic-result>p:not(.result-price),
   .service p,.service-note,
   .work-card>p,.app-preview-row,.timeline-point,
-  .flow-card p,.flow-card .flow-result,
+  .flow-card p,
   .price-row p,.term,
   .limit-list li,.limits-note,
   .faq-list details p,
   .contact-copy>p,.contact-links a,
-  .form-head p,.privacy-note,.form-meta,
+  .form-pflicht,.privacy-note,.form-meta,
+  .form-erwartung,.vorlagen__hinweis,
   .footer-copy,
   .legal-content p,.legal-content li{
     font-size:1rem;
   }
+  /* Eigene Spezifitaet, weil der Foto-Kasten seine Absaetze selbst setzt. */
+  .fotoweg .fotoweg__text,.fotoweg .fotoweg__hinweis{font-size:1rem}
 
   .field label{font-size:.875rem}
 }
@@ -733,4 +1450,108 @@ div.legal-section p+p{margin-top:.85rem}
 div.legal-section>p{max-width:70ch}
 /* Sichtbare Anschrift im Footer (NAP fuer Local SEO, exakt eine Schreibweise ueberall) */
 .footer-nap{font-style:normal;font-size:.8rem;line-height:1.7;color:#8a9bab;margin-bottom:1rem}
-.footer-nap a{color:inherit}
+.footer-nap a{color:inherit;display:inline-flex;min-height:44px;align-items:center}
+
+/* ===== V8.43: Preise hervorheben (Gold) + Preis-Kaskade (Chef-Kritiker-Entscheid, Teil B) =====
+   Gold NUR auf der Seite — nie im 3D-Handy/Board (Demo-Treue V8.42).
+   Kontraste nachgerechnet: #7d4400 auf #f1ebde = 6,3:1, #ffc46b auf #07191f = 11,4:1. */
+.price-row strong{color:var(--gold-deep);width:fit-content;justify-self:end;border-bottom:2px solid var(--gold);padding-bottom:.12rem}
+@media (max-width:720px){.price-row strong{justify-self:start}}
+.price-badge{display:inline-block;margin-left:.55rem;padding:.26rem .6rem;border-radius:999px;background:var(--gold);color:var(--ink);font-family:var(--sans);font-size:.75rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;vertical-align:.3em}
+.price-row--empfohlen{background:linear-gradient(90deg,rgba(255,196,107,.16),transparent 65%)}
+.service-price{color:var(--gold);transition:text-shadow .5s ease}
+.service.is-passed .service-price{text-shadow:0 0 14px rgba(255,196,107,.45)}
+
+/* Preis-Kaskade: Zeilen gleiten nacheinander ein — rein CSS ueber :not([hidden]),
+   kein JS, keine Kopplung ans 2600-ms-rAF-Netz. Ersetzt die Block-Animation Z.550. */
+.price-panel:not([hidden]){animation:none}
+.price-panel:not([hidden]) .price-panel-title,
+.price-panel:not([hidden]) .price-row{animation:panel-in .45s cubic-bezier(.22,1,.36,1) both}
+.price-panel:not([hidden]) .price-row:nth-child(2){animation-delay:60ms}
+.price-panel:not([hidden]) .price-row:nth-child(3){animation-delay:120ms}
+.price-panel:not([hidden]) .price-row:nth-child(4){animation-delay:180ms}
+.price-panel:not([hidden]) .price-row:nth-child(5){animation-delay:240ms}
+.price-panel:not([hidden]) .price-row:nth-child(6){animation-delay:300ms}
+@media (prefers-reduced-motion:reduce){
+  .price-panel:not([hidden]) .price-panel-title,
+  .price-panel:not([hidden]) .price-row{animation:none!important}
+  .service-price{transition:none}
+}
+
+/* ===== V8.60: Preis-Rechner in #preise =====
+   Aufbau wie die Diagnose-Schale: Fragen links auf Papier, Ergebnis rechts auf
+   Tinte. .rechner[hidden] ist Pflicht — sonst wuerde das display:grid das
+   hidden-Attribut ueberstimmen und der Block waere ohne JavaScript sichtbar,
+   obwohl dann keine einzige Zahl gesetzt ist. */
+/* V8.62: Huelle als <details>. Am Handy zugeklappt (rund 1.150 px weniger
+   Scrollweg), ab 981 px klappt site.js sie auf. Die Huelle traegt jetzt das
+   hidden-Attribut — ohne JavaScript gibt es weder Rechner noch Weg-Link. */
+.rechner-huelle{margin-top:2.6rem}
+.rechner-huelle[hidden]{display:none}
+.rechner-summary{position:relative;display:grid;gap:.2rem;min-height:44px;padding:.9rem 3rem .9rem 1rem;border:1px solid rgba(7,25,31,.35);background:var(--paper);cursor:pointer;list-style:none}
+.rechner-summary::-webkit-details-marker{display:none}
+.rechner-summary::after{position:absolute;top:0;right:0;display:grid;width:3rem;height:100%;min-height:44px;place-items:center;content:"+";color:var(--ink);font-family:var(--sans);font-size:1.2rem;font-weight:700}
+.rechner-huelle[open] .rechner-summary::after{content:"−"}
+.rechner-summary__titel{color:var(--ink);font-size:.8rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.rechner-summary__text{color:var(--muted-paper);font-size:.8rem}
+.rechner-huelle[open] .rechner-summary{border-bottom:0}
+.preis-weg{color:var(--ink);font-weight:700;text-decoration:underline;text-underline-offset:.25em;white-space:nowrap}
+.preis-weg[hidden]{display:none}
+.rechner{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(300px,.72fr);border:1px solid rgba(7,25,31,.35);background:var(--paper)}
+.rechner[hidden]{display:none}
+.rechner-fragen{padding:clamp(1.2rem,2.6vw,2rem);border-right:1px solid var(--line-paper)}
+.rechner-kicker{color:var(--muted-paper);font-size:.75rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase}
+.rechner-title{margin-top:.45rem;font-family:var(--serif);font-size:clamp(2rem,3.6vw,3rem);font-weight:500;letter-spacing:-.035em;line-height:1}
+.rechner-title em{font-style:italic}
+.rechner-step{padding:1.1rem 0;border-bottom:1px solid var(--line-paper)}
+.rechner-step:last-child{padding-bottom:0;border-bottom:0}
+.rechner-wahlen{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+.rechner-wahl{display:flex;min-height:48px;flex-direction:column;justify-content:center;padding:.55rem .7rem;border:1px solid var(--line-input);background:transparent;color:var(--ink);text-align:left;cursor:pointer;transition:background-color .2s ease,color .2s ease,transform .2s ease}
+.rechner-wahl:hover{border-color:var(--ink);transform:translateY(-2px)}
+.rechner-wahl[aria-checked="true"]{border-color:var(--ink);background:var(--ink);color:var(--white)}
+.rechner-wahl b{font-size:.79rem;font-weight:700;line-height:1.25}
+.rechner-wahl small{margin-top:.18rem;font-size:.75rem;line-height:1.3;opacity:.72}
+.rechner-wahl small[hidden]{display:none}
+
+.rechner-ergebnis{display:flex;flex-direction:column;padding:clamp(1.3rem,2.6vw,2rem);background:var(--ink);color:var(--white)}
+.rechner-ergebnis :focus-visible{outline-color:var(--signal)}
+.rechner-index{display:flex;align-items:center;justify-content:space-between;color:var(--signal);font-size:.75rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.rechner-index span:last-child{display:grid;width:34px;height:34px;place-items:center;border:1px solid rgba(98,213,255,.35);border-radius:50%;font-family:var(--serif);font-size:1rem;font-style:italic}
+.rechner-leer{margin-top:1.1rem;color:var(--muted-dark);font-size:.875rem}
+.rechner-leer[hidden],.rechner-liste[hidden],.rechner-summe[hidden],.rechner-hinweis[hidden],.rechner-kombi[hidden],.rechner-summe div[hidden]{display:none}
+.rechner-liste{margin-top:1.1rem;list-style:none}
+.rechner-liste li{display:flex;justify-content:space-between;gap:1rem;padding:.5rem 0;border-bottom:1px solid var(--line-dark)}
+.rechner-liste b{font-size:.875rem;font-weight:500}
+.rechner-liste b small{display:block;margin-top:.12rem;color:var(--muted-dark);font-size:.75rem;line-height:1.3}
+.rechner-liste span{color:var(--gold);font-family:var(--serif);font-size:1rem;white-space:nowrap}
+.rechner-summe{margin-top:1rem;padding-top:.75rem;border-top:2px solid rgba(251,253,254,.32)}
+.rechner-summe div{display:flex;align-items:baseline;justify-content:space-between;gap:1rem;padding:.25rem 0}
+.rechner-summe dt{color:var(--muted-dark);font-size:.75rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.rechner-summe dd{margin:0;color:var(--gold);font-family:var(--serif);font-size:1.3rem;white-space:nowrap}
+/* "steht nach Sichtung fest" statt einer Zahl: darf umbrechen, sonst laeuft die
+   Zeile aus der Spalte. Gesetzt wird das Attribut nur dort, wo eine Spanne
+   gewaehlt ist und deshalb kein Betrag feststeht. */
+.rechner-summe dd[data-lang]{font-family:var(--sans);font-size:.875rem;line-height:1.3;text-align:right;white-space:normal}
+.rechner-hinweis{margin-top:.9rem;color:var(--muted-dark);font-size:.875rem}
+.rechner-kombi{margin-top:.9rem;padding:.8rem;border:1px solid rgba(98,213,255,.35)}
+.rechner-kombi__kopf{color:var(--signal);font-size:.75rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.rechner-kombi__text{margin-top:.4rem;font-size:.875rem}
+.rechner-kombi__fuss{margin-top:.35rem;color:var(--muted-dark);font-size:.75rem}
+.rechner-orientierung{margin-top:1rem;color:var(--muted-dark);font-size:.875rem}
+.rechner-aktionen{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem 1rem;margin-top:auto;padding-top:1.2rem}
+.rechner-aktionen .button[aria-disabled="true"]{opacity:.45;cursor:not-allowed;pointer-events:none}
+.rechner-reset{display:inline-flex;min-height:44px;align-items:center;padding:.4rem 0;background:transparent;color:var(--muted-dark);font-size:.75rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;text-decoration:underline;text-underline-offset:.25em;cursor:pointer}
+.rechner-reset:hover{color:var(--signal)}
+.rechner-reset[hidden]{display:none}
+
+@media (max-width:980px){
+  .rechner{grid-template-columns:1fr}
+  .rechner-fragen{border-right:0;border-bottom:1px solid var(--line-paper)}
+}
+@media (max-width:720px){
+  /* Lesbarkeitsboden auch hier: Fliesstext im Ergebnis auf 16 px. */
+  .rechner-leer,.rechner-hinweis,.rechner-kombi__text,.rechner-orientierung{font-size:1rem}
+  .rechner-wahl b{font-size:.875rem}
+  .rechner-liste b{font-size:1rem}
+}
+@media (prefers-reduced-motion:reduce){ .rechner-wahl{transition:none} }
