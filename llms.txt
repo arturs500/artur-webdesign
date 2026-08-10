@@ -6,6 +6,7 @@
 - [Startseite](https://artur.ae/): Leistungen, Festpreise, der kostenlose 60-Sekunden-Check (kurze Diagnose), ein Preis-Rechner zum Zusammenstellen der Leistungen (Orientierung, kein Angebot), die Mitwirkungs-Liste „Was ich von Ihnen brauche" (fünf Punkte mit geschätzten Zeit-Richtwerten) und Kontakt. Im Abschnitt Website-Check steht eine Vorher/Nachher-Gegenüberstellung an einem selbst gebauten Muster – kein Kundenprojekt, keine fremde Website abgebildet.
 - [Was kostet eine Handwerker-Website?](https://artur.ae/handwerker-website-kosten.html): ehrlicher Kosten-Ratgeber.
 - [Website-Check für Handwerker](https://artur.ae/website-check-handwerker.html): was der Check prüft, was er kostet (49, 79 oder 129 €) und was er bringt – mit Zahlen aus 57 geprüften Betrieben.
+- [KI-Automatisierung – interaktive Demo](https://artur.ae/automatisierung-demo.html): drei beispielhafte Abläufe im Handwerksbetrieb zum Selbst-Durchspielen; Annahmen und Grenzen offen gekennzeichnet.
 - [Impressum](https://artur.ae/impressum.html): Anbieterkennzeichnung nach § 5 DDG.
 - [Datenschutz](https://artur.ae/datenschutz.html): Datenschutzerklärung (DSGVO).
 
