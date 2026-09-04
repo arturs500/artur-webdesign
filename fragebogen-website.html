@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Fragebogen für Ihre neue Website – Artur WebDesign</title>
+<style>
+  :root{--paper:#ece9e1;--paperw:#f7f5ef;--ink:#101313;--soft:#171b1a;--accent:#3eb8e5;--accentd:#1b7fa8;--muted:#58605b;--line:#c9c7be;--ok:#2e8b57}
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);font:16px/1.55 -apple-system,"Helvetica Neue",Arial,sans-serif;-webkit-text-size-adjust:100%}
+  .wrap{max-width:760px;margin:0 auto;padding:24px 18px 120px}
+  header{border-bottom:2px solid var(--ink);padding-bottom:14px;margin-bottom:22px}
+  .marke{font-family:ui-serif,Georgia,serif;font-size:20px}
+  .marke small{display:block;font:12px/1.3 ui-monospace,Menlo,monospace;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-top:2px}
+  h1{font-family:ui-serif,Georgia,serif;font-weight:600;font-size:clamp(26px,5vw,36px);line-height:1.15;margin:18px 0 10px;letter-spacing:-.01em}
+  h1 span{color:var(--accentd)}
+  .lead{font-size:17px;color:#2a302d;margin:0 0 8px}
+  .hinweis{font-size:14px;color:var(--muted)}
+  h2{font:600 12px/1.2 ui-monospace,Menlo,monospace;text-transform:uppercase;letter-spacing:.12em;color:var(--accentd);margin:34px 0 10px;padding-top:12px;border-top:1px solid var(--line)}
+  .frage{background:var(--paperw);border:1px solid var(--line);border-radius:12px;padding:16px 16px 12px;margin:0 0 14px}
+  .frage label.q{display:block;font-weight:600;margin:0 0 4px}
+  .frage .bsp{font-size:14px;color:var(--muted);margin:0 0 10px}
+  input[type=text],input[type=email],input[type=tel],input[type=url],textarea,select{width:100%;font:inherit;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:8px;padding:11px 12px}
+  textarea{min-height:96px;resize:vertical}
+  input:focus,textarea:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
+  .optionen{display:flex;flex-wrap:wrap;gap:8px 14px;margin:4px 0 6px}
+  .optionen label{display:inline-flex;align-items:center;gap:7px;font-size:15px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:7px 12px;cursor:pointer}
+  .optionen input{width:18px;height:18px;accent-color:var(--accentd)}
+  .zeile{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+  .weiss{background:none;border:1px solid var(--line);border-radius:999px;padding:6px 12px;font:14px inherit;color:var(--muted);cursor:pointer}
+  .weiss.aktiv{background:var(--ink);color:var(--paperw);border-color:var(--ink)}
+  .status{font-size:13px;color:var(--ok);min-height:1em}
+  .leiste{position:fixed;left:0;right:0;bottom:0;background:var(--ink);color:var(--paperw);padding:12px 18px;box-shadow:0 -8px 30px rgba(0,0,0,.25)}
+  .leiste .in{max-width:760px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .fort{font:13px/1.3 ui-monospace,Menlo,monospace;color:#bcc2ba}
+  .fort b{color:var(--accent)}
+  .knoepfe{display:flex;gap:8px;flex-wrap:wrap}
+  .btn{font:600 15px inherit;border:0;border-radius:999px;padding:11px 16px;cursor:pointer;background:var(--accent);color:#06121b}
+  .btn.ghost{background:transparent;color:var(--paperw);border:1px solid #4a524e}
+  .btn:disabled{opacity:.6;cursor:default}
+  .meldung{display:none;margin:18px 0;padding:14px 16px;border-radius:12px;background:#e3f4ea;border:1px solid #9fd3b4;color:#14532d}
+  .meldung.fehler{background:#fdeaea;border-color:#f0b1b1;color:#7a1f1f}
+  .meldung.sichtbar{display:block}
+  footer{margin-top:40px;font-size:13px;color:var(--muted)}
+  footer a{color:var(--accentd)}
+  @media(max-width:520px){.leiste .in{justify-content:center}.knoepfe{width:100%;justify-content:center}.btn{flex:1;text-align:center;padding:11px 10px;font-size:14px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="marke">Artur WebDesign<small>Klarheit vor Code · Chemnitz · artur.ae</small></div>
+  </header>
+
+  <h1>Fragebogen für Ihre <span>neue Website</span></h1>
+  <p class="lead">Schreiben Sie einfach in Ihren Worten – Stichpunkte reichen. Nichts muss perfekt sein, ich formuliere daraus die Texte. Dauer: etwa 15 Minuten.</p>
+  <p class="hinweis">Ihre Eingaben werden automatisch auf Ihrem Gerät zwischengespeichert. Sie können jederzeit zumachen und später weitermachen. Wenn Sie etwas nicht wissen: Knopf „weiß ich noch nicht“ drücken und weiter. Fotos schicken Sie am einfachsten per WhatsApp an +49 176 2265 9649.</p>
+
+  <div class="meldung" id="meldung"></div>
+  <form id="fb" novalidate>
+    <h2>1 · Ihr Betrieb</h2>
+    <div class="frage" data-id="firma"><label class="q" for="f_firma">Firmenname, Inhaber, Adresse (so, wie es im Impressum stehen soll)</label><p class="bsp">Beispiel: Mustermann Nutzfahrzeuge, Inhaber Max Mustermann, Musterstraße 1, 04129 Leipzig</p><textarea id="f_firma"></textarea><div class="zeile"><button type="button" class="weiss">weiß ich noch nicht</button><span class="status"></span></div></div>
+    <div class="frage" data-id="kontakt"><label class="q" for="f_kontakt">Telefon, WhatsApp-Nummer und E-Mail, die auf der Website stehen sollen</label><textarea id="f_kontakt"></textarea><div class="zeile"><button type="button" class="weiss">weiß ich noch nicht</button><span class="status"></span></div></div>
+    <div class="frage" data-id="seit"><label class="q" for="f_seit">Seit wann gibt es Ihren Betrieb? Gibt es eine Umsatzsteuer-Identifikationsnummer fürs Impressum?</label><input type="text" id="f_seit" placeholder="z. B. seit 2015, USt-IdNr. DE…"><div class="zeile"><button type="button" class="weiss">weiß ich noch nicht</button><span class="status"></span></div></div>
+
+    <h2>2 · Ihr Angebot</h2>
+    <div class="frage" data-id="ankauf"><label class="q" id="lq_ankauf">Was kaufen Sie an? (alles anhaken, was passt)</label>
+      <div class="optionen" role="group" aria-labelledby="lq_ankauf">
+        <label><input type="checkbox" value="Bagger"> Bagger</label>
+        <label><input type="checkbox" value="Radlader"> Radlader</label>
+        <label><input type="checkbox" value="LKW"> LKW</label>
+        <label><input type="checkbox" value="Transporter"> Transporter</label>
+        <label><input type="checkbox" value="Stapler"> Stapler</label>
+        <label><input type="checkbox" value="Anhänger / Auflieger"> Anhänger / Auflieger</label>
+        <label><input type="checkbox" value="Landmaschinen"> Landmaschinen</label>
+        <label><input type="checkbox" value="auch nicht fahrbereit"> auch nicht fahrbereit</label>
+      </div>
+      <textarea id="f_ankauf" aria-label="Ergänzungen zum Ankauf" placeholder="Was fehlt? Was kaufen Sie ausdrücklich NICHT an?"></textarea><div class="zeile"><button type="button" class="weiss">weiß ich noch nicht</button><span class="status"></span></div></div>
+    <div class="frage" data-id="gebiet"><label class="q" for="f_gebiet">Wo holen Sie ab? Welche Orte oder Bundesländer sollen auf der Seite stehen?</label><p class="bsp">Beispiel: Leipzig und 150 km Umkreis, Sachsen, Sachsen-Anhalt, Thüringen, Brandenburg</p><textarea id="f_gebiet"></textarea><div class="zeile"><button type="button" class="weiss">weiß ich noch nicht</button><span class="status"></span></div></div>
+    <div class="frage" data-id="zeiten"><label class="q" for="f_zeiten">Wann sind Sie erreichbar? (Öffnungszeiten oder „telefonisch täglich 8–20 Uhr“)</label><input type="text" id="f_zeiten"><div class="zeile"><button type="button" class="weiss">weiß ich noch nicht</button><span class="status"></span></div></div>
+    <div class="frage" data-id="ablauf"><label class="q" for="f_ablauf">Wie läuft ein Ankauf bei Ihnen ab – vom ersten Anruf bis zum Geld? In Ihren Worten.</label><p class="bsp">Beispiel: Kunde schickt Fotos → wir nennen einen Preis → Besichtigung oder direkt Abholung → Bezahlung bar oder Überweisung → Abmeldung übernehmen wir</p><textarea id="f_ablauf"></textarea><div class="zeile"><button type="button" class="weiss">weiß ich noch nicht</button><span class="status"></span></div></div>
+    <div class="frage" data-id="satz"><label class="q" for="f_satz">Der eine Satz, der oben auf Ihrer Seite stehen soll. Warum sollen Kunden an Sie verkaufen und nicht an andere?</label><p class="bsp">Beispiel: Wir kaufen Ihre Baumaschine innerhalb von 24 Stunden – auch defekt, Barzahlung, Abholung inklusive.</p><textarea id="f_satz"></textarea><div class="zeile"><button type="button" class="weiss">weiß ich noch nicht</button><span class="status"></span></div></div>
+    <div class="frage" data-id="fragen"><label class="q" for="f_fragen">Was fragen Ihre Kunden am häufigsten? (Für den Bereich „Häufige Fragen“)</label><textarea id="f_fragen"></textarea><div class="zeile"><button type="button" class="weiss">weiß ich noch nicht</button><span class="status"></span></div></div>
+
+    <h2>3 · Material</h2>
+    <div class="frage" data-id="fotos"><label class="q" for="f_fotos">Fotos: Wie viele haben Sie (Platz, Fahrzeuge, Team)? Gibt es ein Logo?</label><p class="bsp">Die Fotos hängen Sie am Ende einfach an die E-Mail an, die sich nach dem Absenden öffnet – Originale, nicht verkleinert. Alternativ per WhatsApp an +49 176 2265 9649.</p><input type="text" id="f_fotos"><div class="zeile"><button type="button" class="weiss">weiß ich noch nicht</button><span class="status"></span></div></div>
+    <div class="frage" data-id="texte"><label class="q" for="f_texte">Gibt es schon Texte, die bleiben sollen (von der alten Seite, aus Flyern)? Was soll auf keinen Fall mehr drauf?</label><textarea id="f_texte"></textarea><div class="zeile"><button type="button" class="weiss">weiß ich noch nicht</button><span class="status"></span></div></div>
+    <div class="frage" data-id="bewertungen"><label class="q" for="f_bewertungen">Link zu Ihrem Google-Unternehmensprofil (oder Name, unter dem man Sie bei Google findet). Dürfen einzelne Bewertungen zitiert werden?</label><input type="url" id="f_bewertungen" placeholder="https://…"><div class="optionen" role="group" aria-label="Bewertungen zitieren"><label><input type="checkbox" value="Bewertungen zitieren: ja"> zitieren: ja</label><label><input type="checkbox" value="Bewertungen zitieren: nein"> nein</label><label><input type="checkbox" value="Bewertungen zitieren: erst fragen"> erst fragen</label></div><div class="zeile"><button type="button" class="weiss">weiß ich noch nicht</button><span class="status"></span></div></div>
+    <div class="frage" data-id="sprachen"><label class="q" id="lq_sprachen">Sprachen: Deutsch ist drin. Brauchen Sie später weitere?</label>
+      <div class="optionen" role="group" aria-labelledby="lq_sprachen">
+        <label><input type="checkbox" value="nur Deutsch"> nur Deutsch</label>
+        <label><input type="checkbox" value="später Englisch"> später Englisch</label>
+        <label><input type="checkbox" value="später Russisch"> später Russisch</label>
+      </div><div class="zeile"><button type="button" class="weiss">weiß ich noch nicht</button><span class="status"></span></div></div>
+
+    <h2>4 · Technik (kurz)</h2>
+    <div class="frage" data-id="hosting"><label class="q" for="f_hosting">Bei welchem Anbieter liegt Ihre Internetadresse (Domain), und wo soll die neue Seite liegen? Haben Sie Zugangsdaten?</label><p class="bsp">Beispiel: Domain bei Hetzner, Zugangsdaten habe ich. – Oder: weiß ich nicht, mein Neffe hat das gemacht.</p><textarea id="f_hosting"></textarea><div class="zeile"><button type="button" class="weiss">weiß ich noch nicht</button><span class="status"></span></div></div>
+    <div class="frage" data-id="vorbild"><label class="q" for="f_vorbild">Gibt es Websites, die Ihnen gefallen? Adressen und was genau daran.</label><textarea id="f_vorbild"></textarea><div class="zeile"><button type="button" class="weiss">weiß ich noch nicht</button><span class="status"></span></div></div>
+    <div class="frage" data-id="alt"><label class="q" for="f_alt">Ihre jetzige Seite: Was gefällt Ihnen, was stört Sie?</label><textarea id="f_alt"></textarea><div class="zeile"><button type="button" class="weiss">weiß ich noch nicht</button><span class="status"></span></div></div>
+    <div class="frage" data-id="sonst"><label class="q" for="f_sonst">Sonst noch etwas? Wünsche, Termine, Fragen.</label><textarea id="f_sonst"></textarea><div class="zeile"><button type="button" class="weiss">weiß ich noch nicht</button><span class="status"></span></div></div>
+
+    <h2>5 · Rückmeldung</h2>
+    <div class="frage" data-id="antwort"><label class="q" for="f_mail">Ihre E-Mail-Adresse für die Bestätigung (optional)</label><input type="email" id="f_mail" placeholder="name@firma.de"><div class="zeile"><span class="hinweis">Ihre Angaben gehen über den Formular-Dienst Formspree (bzw. Ihr E-Mail-Programm) an Artur WebDesign (Artur Stol, Chemnitz) und werden nur für Ihr Website-Projekt verwendet, nicht weitergegeben. <a href="https://artur.ae/datenschutz.html" target="_blank" rel="noopener" style="color:var(--accentd)">Datenschutzerklärung</a> Fotos laufen nicht über Formspree: Nach dem Absenden öffnet sich Ihr eigenes E-Mail-Programm, dort hängen Sie die Fotos an.</span></div></div>
+  </form>
+
+  <footer>Artur Stol · Artur WebDesign · Chemnitz · <a href="https://artur.ae">artur.ae</a> · <a href="https://artur.ae/impressum.html">Impressum</a></footer>
+</div>
+
+<div class="leiste"><div class="in">
+  <div class="fort"><b id="fortZahl">0</b> von <span id="fortGesamt">0</span> Fragen beantwortet · <span id="speicherStatus">wird automatisch gespeichert</span></div>
+  <div class="knoepfe">
+    <button type="button" class="btn" id="btnSenden">Absenden – Fotos anhängen</button>
+    <button type="button" class="btn" id="btnFotoMail" style="display:none">E-Mail für Fotos öffnen</button>
+    <button type="button" class="btn ghost" id="btnWhatsApp">per WhatsApp</button>
+    <button type="button" class="btn ghost" id="btnKopieren">Kopieren</button>
+  </div>
+</div></div>
+
+<script>
+(function(){
+  "use strict";
+  var EMPFAENGER = "info@artur.ae";
+  var WHATSAPP = "4917622659649";
+  var FORMSPREE = "https://formspree.io/f/xeewbkyw";
+  var KEY = "aw_fragebogen_website_v1";
+  var WEISS = "weiß ich noch nicht";
+  var fragen = Array.prototype.slice.call(document.querySelectorAll(".frage"));
+  var meldung = document.getElementById("meldung");
+
+  function frageText(f){ var q = f.querySelector("label.q"); return q ? q.textContent.trim() : f.getAttribute("data-id"); }
+  function wert(f){
+    var teile = [];
+    f.querySelectorAll("input[type=checkbox]:checked").forEach(function(c){ teile.push(c.value); });
+    f.querySelectorAll("input[type=text],input[type=email],input[type=tel],input[type=url],textarea").forEach(function(i){ if (i.value.trim()) teile.push(i.value.trim()); });
+    if (f.classList.contains("weiss-aktiv")) teile.push(WEISS);
+    return teile.join(" · ");
+  }
+  function speichern(){
+    var d = {};
+    fragen.forEach(function(f){
+      var id = f.getAttribute("data-id"); var o = { w: f.classList.contains("weiss-aktiv"), c: [], t: {} };
+      f.querySelectorAll("input[type=checkbox]").forEach(function(c){ if (c.checked) o.c.push(c.value); });
+      f.querySelectorAll("input[type=text],input[type=email],input[type=tel],input[type=url],textarea").forEach(function(i){ o.t[i.id] = i.value; });
+      d[id] = o;
+    });
+    try{ localStorage.setItem(KEY, JSON.stringify(d)); document.getElementById("speicherStatus").textContent = "gespeichert " + new Date().toLocaleTimeString("de-DE", {hour:"2-digit", minute:"2-digit"}); }catch(e){ document.getElementById("speicherStatus").textContent = "nicht gespeichert – bitte in einem Rutsch ausfüllen"; }
+    fortschritt();
+  }
+  function laden(){
+    var d; try{ d = JSON.parse(localStorage.getItem(KEY) || "null"); }catch(e){}
+    if (!d) return;
+    fragen.forEach(function(f){
+      var o = d[f.getAttribute("data-id")]; if (!o) return;
+      if (o.w) setzeWeiss(f, true);
+      f.querySelectorAll("input[type=checkbox]").forEach(function(c){ c.checked = o.c.indexOf(c.value) !== -1; });
+      Object.keys(o.t || {}).forEach(function(id){ var el = document.getElementById(id); if (el) el.value = o.t[id]; });
+    });
+  }
+  function setzeWeiss(f, an){
+    var b = f.querySelector(".weiss"); f.classList.toggle("weiss-aktiv", an); if (b) b.classList.toggle("aktiv", an);
+    var s = f.querySelector(".status"); if (s) s.textContent = an ? "notiert – klären wir zusammen" : "";
+  }
+  function fortschritt(){
+    var n = 0; fragen.forEach(function(f){ if (wert(f)) n++; });
+    document.getElementById("fortZahl").textContent = n; document.getElementById("fortGesamt").textContent = fragen.length;
+  }
+  function zusammenfassung(){
+    var z = ["Fragebogen Website – Antworten (" + new Date().toLocaleDateString("de-DE") + ")", ""];
+    fragen.forEach(function(f, i){ z.push((i+1) + ". " + frageText(f)); z.push(wert(f) || "(keine Angabe)"); z.push(""); });
+    return z.join("\n");
+  }
+  function firma(){ var el = document.getElementById("f_firma"); return el && el.value.trim() ? el.value.trim().split(/[,\n]/)[0].slice(0, 60) : "ohne Firmenname"; }
+  function zeige(text, fehler){ meldung.textContent = text; meldung.className = "meldung sichtbar" + (fehler ? " fehler" : ""); meldung.scrollIntoView({behavior:"smooth", block:"center"}); }
+
+  fragen.forEach(function(f){
+    f.addEventListener("input", speichern); f.addEventListener("change", speichern);
+    var b = f.querySelector(".weiss"); if (b) b.addEventListener("click", function(){ setzeWeiss(f, !f.classList.contains("weiss-aktiv")); speichern(); });
+  });
+
+  document.getElementById("btnKopieren").addEventListener("click", function(){
+    var t = zusammenfassung();
+    if (navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(t).then(function(){ zeige("Antworten kopiert. Fügen Sie sie in eine E-Mail oder WhatsApp-Nachricht an mich ein."); }, function(){ fallbackKopie(t); }); }
+    else fallbackKopie(t);
+  });
+  function fallbackKopie(t){ var ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select(); try{ document.execCommand("copy"); zeige("Antworten kopiert."); }catch(e){ zeige("Kopieren nicht möglich – bitte den Knopf ‚Antworten senden‘ nutzen.", true); } document.body.removeChild(ta); }
+
+  document.getElementById("btnWhatsApp").addEventListener("click", function(){
+    var t = zusammenfassung(); if (t.length > 3500) t = t.slice(0, 3400) + "\n… (gekürzt – Rest schicke ich per E-Mail)";
+    window.open("https://wa.me/" + WHATSAPP + "?text=" + encodeURIComponent(t), "_blank", "noopener");
+  });
+
+  function fotoMailHref(){
+    var body = "Guten Tag Herr Stol,\n\nanbei meine Fotos (Platz, Fahrzeuge, Team, Logo).\nMeine Antworten habe ich über den Fragebogen gesendet.\n\n" + firma();
+    return "mailto:" + EMPFAENGER + "?subject=" + encodeURIComponent("Fotos zum Fragebogen – " + firma()) + "&body=" + encodeURIComponent(body);
+  }
+  function fotoKnopfZeigen(){
+    var k = document.getElementById("btnFotoMail"); k.style.display = "";
+    k.onclick = function(){ window.location.href = fotoMailHref(); };
+  }
+  document.getElementById("btnSenden").addEventListener("click", function(){
+    var btn = this; var t = zusammenfassung(); var mail = (document.getElementById("f_mail").value || "").trim();
+    var aufArturAe = /(^|\.)artur\.ae$/.test(location.hostname);
+    if (aufArturAe && window.fetch){
+      btn.disabled = true; btn.textContent = "wird gesendet …";
+      var daten = { _subject: "Fragebogen Website – " + firma(), antworten: t };
+      if (mail) daten._replyto = mail;
+      fetch(FORMSPREE, { method: "POST", headers: { "Accept": "application/json", "Content-Type": "application/json" }, body: JSON.stringify(daten) })
+        .then(function(r){
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          btn.textContent = "Antworten gesendet ✓"; fotoKnopfZeigen();
+          zeige("Ihre Antworten sind angekommen ✓ Jetzt öffnet sich Ihr E-Mail-Programm – bitte Fotos anhängen und abschicken. Falls sich nichts öffnet: Knopf ‚E-Mail für Fotos öffnen‘ drücken oder die Fotos per WhatsApp an +49 176 2265 9649 schicken.");
+          setTimeout(function(){ window.location.href = fotoMailHref(); }, 900);
+        })
+        .catch(function(){ btn.disabled = false; btn.textContent = "Absenden – Fotos anhängen"; zeige("Direktversand gerade nicht möglich – Ihr E-Mail-Programm öffnet sich stattdessen mit allen Antworten.", true); setTimeout(function(){ perMail(t); }, 1200); });
+    } else perMail(t);
+  });
+  function perMail(t){
+    var body = "Bitte Fotos (Platz, Fahrzeuge, Team, Logo) an diese E-Mail anhängen.\n\n" + t;
+    var href = "mailto:" + EMPFAENGER + "?subject=" + encodeURIComponent("Fragebogen Website – " + firma()) + "&body=" + encodeURIComponent(body);
+    if (href.length > 7000){ zeige("Die Antworten sind zu lang für den E-Mail-Weg – bitte ‚Kopieren‘ drücken und in eine E-Mail an " + EMPFAENGER + " einfügen (Fotos anhängen).", true); return; }
+    window.location.href = href;
+    zeige("Ihr E-Mail-Programm öffnet sich mit allen Antworten – bitte Fotos anhängen und abschicken. Falls nichts passiert: ‚Kopieren‘ drücken und den Text an " + EMPFAENGER + " schicken.");
+  }
+
+  laden(); fortschritt();
+})();
+</script>
+</body>
+</html>
