@@ -186,18 +186,67 @@ def cmd_live(args: argparse.Namespace) -> int:
         print("Telegram nicht konfiguriert: TELEGRAM_BOT_TOKEN und TELEGRAM_CHAT_ID setzen", file=sys.stderr)
         return 2
 
+    def send_async(text: str) -> None:
+        import threading
+
+        threading.Thread(target=send_telegram, args=(text,), daemon=True).start()
+
     def on_alert(alert):
         print(f"\n{time.strftime('%H:%M:%S')}  {alert.tier}")
         print(alert.text)
         if args.record and alert.report.verdict is not None:
             append_record(args.record, alert.report.verdict, {"tier": alert.tier, "word": alert.report.word, "flags": alert.report.flags, "stufe": args.stufe})
         if args.telegram and alert.tier in notify_words:
-            import threading
+            send_async(alert.text)
 
-            threading.Thread(target=send_telegram, args=(alert.text,), daemon=True).start()
+    paper = None
+    if args.paper:
+        from .narrative import load_keywords
+        from .paper import PaperTrader, strategies_by_name
 
-    live(rpc, config, scoring, on_alert, ws_url=args.ws)
+        strategies = strategies_by_name((args.paper_strategies or "alle").split(","))
+        message_strategies = [s.strip() for s in (args.paper_telegram or "").split(",") if s.strip()]
+        if message_strategies and not args.telegram:
+            print("--paper-telegram braucht --telegram", file=sys.stderr)
+            return 2
+        paper = PaperTrader(
+            strategies,
+            size_sol=args.paper_size,
+            latency_s=args.paper_latency,
+            record_path=args.paper,
+            on_message=send_async if args.telegram else None,
+            message_strategies=message_strategies,
+            keywords=load_keywords(args.narratives),
+        )
+        print(f"Papier-Trading: {len(strategies)} Strategien, {args.paper_size} SOL je Trade, Latenz {args.paper_latency:.0f} s, Aufzeichnung in {args.paper}")
+
+    live(rpc, config, scoring, on_alert, ws_url=args.ws, paper=paper)
+    if paper is not None:
+        print(paper.status_line())
     return 0
+
+
+def cmd_paper(args: argparse.Namespace) -> int:
+    from .paper import STRATEGIES, load_paper, look_back, paper_report, parse_calls_file
+
+    if args.paper_cmd == "strategien":
+        for s in STRATEGIES:
+            print(f"{s.name:<14} {s.description}")
+        return 0
+    if args.paper_cmd == "report":
+        records = load_paper(args.file)
+        print(paper_report(records, cash=args.kasse if args.kasse > 0 else None, size=args.einsatz))
+        return 0
+    if args.paper_cmd == "rueckblick":
+        calls = parse_calls_file(args.file)
+        if not calls:
+            print("keine Calls gefunden: je Zeile <Mint> <Unix-Zeit oder ISO-Zeit>", file=sys.stderr)
+            return 2
+        rpc = make_rpc(args.rpc, args.rps)
+        print(look_back(rpc, calls, size_sol=args.einsatz or 0.08, latency_s=args.latenz, horizon_s=args.horizont))
+        print(_stats_line(rpc))
+        return 0
+    return 2
 
 
 def cmd_selftest(args: argparse.Namespace) -> int:
@@ -302,8 +351,31 @@ def build_parser() -> argparse.ArgumentParser:
     lv.add_argument("--blick-buyers", type=int, help="Außen-Käufer, ab denen BLICK kommt (Stufe: 8 / 5 / 3)")
     lv.add_argument("--blick-inflow", type=float, help="organischer Zufluss in SOL, ab dem BLICK kommt (Stufe: 1,0 / 0,5 / 0,25)")
     lv.add_argument("--budget", type=float, help="RPC-Einheiten pro Stunde für Hintergrundabfragen (Standard 4000, etwa 100.000 Helius-Credits am Tag)")
+    lv.add_argument("--paper", metavar="DATEI", help="Papier-Trading: alle Strategien handeln jeden Call ohne Geld, jede Entscheidung landet in dieser JSONL-Datei")
+    lv.add_argument("--paper-size", type=float, default=0.08, help="SOL je Papier-Trade (Standard 0,08)")
+    lv.add_argument("--paper-latency", type=float, default=2.0, help="Sekunden zwischen Entscheidung und Ausführung (Standard 2)")
+    lv.add_argument("--paper-strategies", help="welche Strategien, kommagetrennt (Standard alle; Liste: paper strategien)")
+    lv.add_argument("--paper-telegram", help="Papier-Käufe und -Verkäufe dieser Strategien per Telegram melden (kommagetrennt)")
+    lv.add_argument("--narratives", metavar="DATEI", help="Trend-Wörter für den Narrativ-Score, eines je Zeile")
     _add_rpc_args(lv)
     lv.set_defaults(func=cmd_live)
+
+    pp = sub.add_parser("paper", help="Papier-Trading auswerten: report, strategien, rueckblick")
+    pps = pp.add_subparsers(dest="paper_cmd", required=True)
+    pr = pps.add_parser("report", help="Ergebnis je Strategie aus der Papier-Datei, mit Was-wäre-wenn auf den Preispfaden")
+    pr.add_argument("file")
+    pr.add_argument("--kasse", type=float, default=0.25, help="Kasse in SOL für die Nachrechnung mit begrenztem Geld (0 = aus)")
+    pr.add_argument("--einsatz", type=float, help="SOL je Trade für die Kassen-Nachrechnung (Standard: wie gehandelt)")
+    pr.set_defaults(func=cmd_paper)
+    ps = pps.add_parser("strategien", help="die eingebauten Strategien auflisten")
+    ps.set_defaults(func=cmd_paper)
+    pb = pps.add_parser("rueckblick", help="frühere Calls (Datei mit <Mint> <Zeit> je Zeile) aus der Kette nachrechnen")
+    pb.add_argument("file")
+    pb.add_argument("--einsatz", type=float, default=0.08, help="SOL je Trade (Standard 0,08)")
+    pb.add_argument("--latenz", type=float, default=2.0, help="Sekunden zwischen Call und Kauf (Standard 2)")
+    pb.add_argument("--horizont", type=float, default=900.0, help="Sekunden nach dem Call, die betrachtet werden (Standard 900)")
+    _add_rpc_args(pb)
+    pb.set_defaults(func=cmd_paper)
 
     t = sub.add_parser("selftest", help="Datensammlung an einem echten Token prüfen")
     t.add_argument("mint")

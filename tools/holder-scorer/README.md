@@ -36,8 +36,8 @@ verkauften Floats, über 35 % des Supplys in den ersten Slots, Serien-Deployer m
 120 s ab 3 Minuten Alter, mehr als 40 % Wash-Trading-Wallets. Dazu drei
 Ausstiegsregeln, die auch einen schon guten Token kippen: ein Bundle ab 5 % des
 Supplys hat die Hälfte verkauft, die Erstkäufer haben 70 % ihrer Position
-verkauft (ab 5 Außen-Käufern), oder der Kurs ist in 60 s um 30 % oder mehr
-gefallen bei mindestens zwei Verkäufen.
+verkauft (ab 5 Außen-Käufern), oder der Kurs liegt 30 % oder mehr unter dem
+Hoch der letzten 60 s bei mindestens zwei Verkäufen.
 
 Und **Mindestmengen für JA**: mindestens 12 Außen-Käufer insgesamt, 8
 Außen-Käufe in den letzten 120 s und 1 SOL organischer Netto-Zufluss in 120 s.
@@ -95,6 +95,10 @@ python -m holder_scorer watch --record beobachtungen.jsonl
 # Früher entscheiden (25 s nach dem Start) und GO-Nachrichten per Telegram schicken:
 python -m holder_scorer watch --early --telegram --notify go,rug
 
+# Live-Modus mit Papier-Trading: alle Strategien handeln jeden Call ohne Geld, alles wird aufgezeichnet:
+python -m holder_scorer live --stufe 2 --paper papier.jsonl --record live.jsonl
+python -m holder_scorer paper report papier.jsonl
+
 # Die Kurzsprache erklären:
 python -m holder_scorer legend
 ```
@@ -127,7 +131,7 @@ und erzeugt höchstens drei Alarme:
 |---|---|---|
 | 👀 BLICK | erste echte Käufer (nicht Dev, nicht Erstellungs-Block, keine Bots), kein Warnsignal, noch kein volles Urteil; nur in den ersten 60 s | Chart öffnen, selbst entscheiden |
 | 🟢 GO | das volle Urteil: Score, Mindestmengen, Zufluss gerade positiv und **keine offene Warnung** (kein Bundle über der Stufengrenze, kein DEV-GROSS, DEV-RAUS, BOTS, FRISCH, FUNDER, SCHNELL, SERIE, UNSICHTBAR); sonst bleibt es bei WARTE | der eigentliche Call |
-| 🔴 RUG / ⚫ TOT | ein Token mit BLICK oder GO ist gekippt: Dev-Dump, Bundle raus, Erstkäufer raus, Kurs −30 % in 60 s, MC −35 % seit dem GO, Stillstand | raus |
+| 🔴 RUG / ⚫ TOT | ein Token mit BLICK oder GO ist gekippt: Dev-Dump, Bundle raus, Erstkäufer raus, Kurs −30 % vom 60-s-Hoch, MC −35 % seit dem GO, Stillstand | raus |
 
 Ist der Erstellungs-Slot eines Tokens nur geschätzt (der erste Trade kam später
 als 1,5 s nach dem Launch an), wartet der Live-Modus bis zu 15 s auf die
@@ -195,6 +199,115 @@ Zwei Dinge sind bewusst nicht drin: Der PumpPortal-Trade-Stream
 grob 0,5 SOL am Tag. Und eine Bewertung im Erstellungs-Block gibt es nicht,
 weil es dort noch nichts zu bewerten gibt; wer dort kauft, kauft blind.
 
+## Papier-Trading: alle Strategien gleichzeitig, ohne Geld
+
+```bash
+# Live-Modus mit Papier-Händler (Aufzeichnung in papier.jsonl):
+python -m holder_scorer live --stufe 2 --paper papier.jsonl --record live.jsonl
+
+# Später: Ergebnis je Strategie, mit Was-wäre-wenn auf den aufgezeichneten Preispfaden
+python -m holder_scorer paper report papier.jsonl
+
+# Die eingebauten Strategien:
+python -m holder_scorer paper strategien
+
+# Frühere Calls nachrechnen (Datei mit "<Mint> <Unix-Zeit oder ISO-Zeit>" je Zeile):
+python -m holder_scorer paper rueckblick calls.txt
+```
+
+Der Papier-Händler hängt sich an den Live-Modus und handelt jeden Call mit
+allen eingebauten Strategien gleichzeitig, mit 0,08 SOL je Trade
+(`--paper-size`), ohne dass ein Lamport bewegt wird:
+
+- Kauf und Verkauf werden auf der Bonding Curve gerechnet wie echte:
+  Konstantprodukt auf den virtuellen Reserven, 1,25 % pump.fun-Gebühr je
+  Seite, eigener Preiseinfluss. Ausgeführt wird 2 s nach der Entscheidung
+  (`--paper-latency`) zum Kurvenstand von dann, weil eine echte Transaktion
+  erst dann landet. Auch Verkäufe brauchen diese Latenz.
+- Jede Sekunde werden die offenen Positionen gegen den aktuellen Kurs
+  geprüft: Take-Profit, Stop-Loss, Trailing-Stop, Teilverkauf, Zeitlimit,
+  RUG/TOT-Urteil, Dev-Verkauf, Graduation.
+- Alles landet in der JSONL-Datei: jeder Kauf mit Auslöser und den Zahlen, auf
+  denen er beruhte (Wort, Warnungen, Score, MC, Alter, Außen-Käufer,
+  Dev-Verkauf, Bundle, Narrativ), jeder Verkauf mit Grund, Vielfachem,
+  Hoch und Tief seit dem Einstieg und Ergebnis, und je Token der Preispfad
+  (alle 5 s mit Hoch und Tief dazwischen) bis 15 Minuten nach dem ersten
+  Einstieg. Damit lässt sich später jede Regel nachrechnen, die nie gelaufen
+  ist.
+- Token mit offenen Papier-Positionen bleiben abonniert (höchstens 30 min),
+  auch wenn der Live-Modus sie sonst nach 240 s vergessen würde.
+- `--paper-telegram GO-3x,DEV-HÄLT` meldet die Papier-Käufe und -Verkäufe
+  dieser Strategien kurz per Telegram (zusammen mit `--telegram`).
+
+| Strategie | Einstieg | Ausstieg |
+|---|---|---|
+| GO-3x | beim GO | Ziel 3x, Stop −40 %, spätestens nach 10 min, bei RUG/TOT |
+| GO-2x | beim GO | Ziel 2x, Stop −35 %, 10 min |
+| GO-schnell | beim GO | Ziel 1,5x, Stop −25 %, 3 min |
+| GO-trail | beim GO | ab 1,5x Trailing-Stop 30 % unter dem Hoch, Stop −40 %, 15 min |
+| GO-halb | beim GO | Hälfte bei 2x, Rest mit Trailing-Stop 35 %, Stop −40 % |
+| GO-bis-RUG | beim GO | nur bei RUG/TOT, Dev-Verkauf oder nach 15 min (reines Signalfolgen) |
+| DEV-HÄLT | beim GO, nur wenn der Dev noch nichts verkauft hat | Ziel 3x, Stop −40 %, sofort raus, wenn der Dev verkauft |
+| NARRATIV-GO | beim GO, nur mit Narrativ-Score 60+ | Ziel 3x, Stop −40 % |
+| BLICK-3x | schon beim BLICK | Ziel 3x, Stop −50 % |
+| BLICK-trail | beim BLICK | ab 1,5x Trailing-Stop 35 %, Stop −50 % |
+| NARRATIV-früh | vor jedem Alarm: Narrativ 60+, Dev hält, Bundle ≤ 5 %, ab 2 echten Käufern | Ziel 3x, Stop −50 % |
+| SAUBER-früh | vor jedem Alarm: keine Warnung, Dev hält, kein Bundle, ab 3 echten Käufern | Ziel 2x, Stop −40 %, 5 min |
+
+Mit `--paper-strategies GO-3x,DEV-HÄLT` läuft nur ein Teil; eigene Varianten
+sind eine Zeile in `STRATEGIES` (`holder_scorer/paper.py`).
+
+**Narrativ.** Ein Narrativ lässt sich nicht messen, nur seine Spuren: echte
+Social-Links (je 15 Punkte, bis drei), eine Beschreibung und ein Bild in den
+Metadaten (10 und 5), ein Treffer in deiner Trend-Liste (`--narratives
+trends.txt`, ein Wort je Zeile, 25 Punkte), abzüglich Wegwerf-Namen (−20) und
+Kopien: derselbe Name oder dasselbe Symbol wie ein Launch der letzten Stunde
+(−30). Grundwert 30, Skala 0 bis 100. Die Trend-Liste musst du pflegen, das
+Modul kennt keine Nachrichten.
+
+**Der Report.** `paper report` zeigt je Strategie die Zahl der Trades, die
+Trefferquote, Mittel und Median des Ergebnisses je Trade, die Summe in SOL,
+ein 95 %-Konfidenzintervall des Mittelwerts (Bootstrap), den größten
+Rückschlag der Summe, die Ausstiegsgründe und den Endstand, wenn du mit
+0,25 SOL Kasse (`--kasse`) nur so viele Positionen offen halten kannst, wie
+das Geld hergibt. Als Kandidat gilt eine Strategie erst, wenn die untere Grenze
+des Intervalls über 0 liegt; vorher steht dort, wie viele Trades bei gleichem
+Mittelwert grob nötig wären. Dazu rechnet er auf den aufgezeichneten Pfaden
+64 Regeln durch (Ziel 1,5x bis 5x, Stop −25 % bis keiner, 2 bis 15 min) und
+nennt die beste, samt der Gegenprobe: die beste Regel der ersten Hälfte der
+Trades und was sie in der zweiten Hälfte gebracht hätte. Wer 64 Regeln auf 30
+Trades probiert, findet immer eine, die gut aussieht; die zweite Hälfte zeigt,
+ob sie hält.
+
+**Rückblick auf frühere Calls.** `paper rueckblick calls.txt` lädt für jeden
+Call die Trades des Tokens aus der Kette (bis 15 min nach dem Call), setzt den
+Einstieg 2 s nach dem Call und zeigt Hoch danach, Anteil der Calls mit 2x und
+3x und die Ergebnisse der Regeln. Das kostet je Token bis zu einigen tausend
+getTransaction-Anfragen, bei Helius also Kontingent; für 20 bis 50 Calls ist
+das noch in Ordnung.
+
+**Was über solche Calls schon bekannt ist** (Stand September 2026, aus
+öffentlichen Auswertungen; Quellen in der Recherche zum Projekt):
+
+- Ein Call-Kanal mit 4.356 Calls: Median-Hoch nach dem Call 1,64x, 36 bis
+  39 % erreichen 2x. Das sind Höchststände, keine realisierten Gewinne; wer
+  ein 3x-Ziel wartet, verpasst die meisten davon.
+- Eine systematische Prüfung von 266 Einstiegsvarianten auf 63.000
+  unselektierten Launches (6,3 Mio. Trades): keine einzige mit einer unteren
+  Konfidenzgrenze über 0; jeder Einstieg, der auf sichtbare Käufer wartet
+  (Tempo, Breite, Kaufdruck, Dip, KOL-Folgen), verliert nach Gebühren. Die
+  Latenz zwischen Signal und Kauf kostet 5 bis 16 Prozentpunkte je Trade.
+  Filter gegen Bundles, Konzentration und Wallet-Ringe machen die Verluste 2
+  bis 11 Punkte kleiner, erzeugen aber keinen Gewinn.
+- Ein Kurventrade kostet 1,25 % je Seite, dazu der eigene Preiseinfluss:
+  ein Hin und Zurück ohne Kursbewegung verliert etwa 2,5 bis 3 %.
+
+Das heißt nicht, dass es keine Strategie geben kann. Es heißt, dass die
+Beweislast bei der Strategie liegt: erst wenn der Papier-Report über einige
+hundert Trades eine untere Konfidenzgrenze über 0 zeigt, ist ein Versuch mit
+echtem Geld mehr als Raten, und selbst dann wird es real schlechter
+(fehlgeschlagene Transaktionen, Priority-Fees, Slippage bei dünnen Kurven).
+
 ## Die Kurznachricht
 
 Jede Bewertung ist zehn kurze Zeilen: ein Wort als Urteil, die Kennzahlen
@@ -246,7 +359,7 @@ Slots), `DEV-DUMP`, `DEV-RAUS 40%`, `SERIE 12/0/11` (frühere Token /
 graduiert / tot), `SCHNELL` (Creator startet im Minutentakt), `FRISCH 5/6`
 (frische frühe Wallets), `FUNDER 4` (vom Creator finanziert), `TOP1 35%`,
 `TOP10 61%`, `BOTS 40%`, `WASH`, `SELF-PUMP`, `EXIT 62%` (Erstkäufer raus),
-`DUMP 35%` (Kurs in 60 s gefallen), `UNSICHTBAR 18%` (Supply, das die Kurve
+`DUMP −35%` (Kurs unter dem Hoch der letzten 60 s), `UNSICHTBAR 18%` (Supply, das die Kurve
 verlassen hat, ohne dass ein gesehener Trade es erklärt: Käufe vor dem
 Zuhören), `FAKE-MC 0.006` (Volumen der letzten Stunde geteilt durch MC),
 `DÜNN 0.006` (Liquidität geteilt durch MC), `STILL 95s`, `NOSOC`, `LÜCKE`
@@ -419,7 +532,10 @@ Die Tests prüfen Base58 und die Adressableitung (bei installiertem `solders`
 gegen die Referenz), die Decoder für Trade-, Create-Events und
 Bonding-Curve-Konten nach der offiziellen IDL, die RPC-Schicht gegen einen
 HTTP-Stub (Batches, Fehlercodes, DAS-Erkennung, Rate-Limit über mehrere
-Threads), die Datensammlung gegen einen RPC-Stub, die Kalibrierdatei und fünf
+Threads), die Datensammlung gegen einen RPC-Stub, die Kalibrierdatei, fünf
 Bewertungsszenarien (organisches Wachstum, gebündelter Dev-Dump, toter Token,
-zu junger Token, koordinierter Wallet-Ring). Die Programm-Layouts stammen aus
-https://github.com/pump-fun/pump-public-docs (Stand September 2026).
+zu junger Token, koordinierter Wallet-Ring), die Live-Engine und den
+Papier-Händler (Kurven-Mathematik, Einstiege je Strategie, alle
+Ausstiegsgründe, Preispfade, Report, Rückblick gegen einen Historien-Stub).
+Die Programm-Layouts stammen aus https://github.com/pump-fun/pump-public-docs
+(Stand September 2026).

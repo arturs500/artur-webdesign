@@ -177,8 +177,8 @@ def hard_fail_reasons(f: Features, cfg: ScoringConfig) -> list[str]:
         reasons.append(f"Bundle ({_pct(f.creation_window_share)} des Supplys) hat {_pct(f.creation_window_sold_share)} verkauft")
     if f.early_sold_share is not None and f.early_sold_share >= cfg.early_exit_sold and f.unique_outside_buyers >= cfg.early_exit_min_buyers:
         reasons.append(f"Erstkäufer haben {_pct(f.early_sold_share)} ihrer Position verkauft (Exit)")
-    if f.price_change_60s is not None and f.price_change_60s <= cfg.crash_60s and f.sells_60s >= cfg.crash_min_sells:
-        reasons.append(f"Kurs {f.price_change_60s * 100:+.0f} % in 60 s bei {f.sells_60s} Verkäufen (Dump)")
+    if f.drawdown_60s is not None and f.drawdown_60s <= cfg.crash_60s and f.sells_60s >= cfg.crash_min_sells:
+        reasons.append(f"Kurs {f.drawdown_60s * 100:+.0f} % vom Hoch der letzten 60 s bei {f.sells_60s} Verkäufen (Dump)")
     return reasons
 
 
@@ -382,8 +382,8 @@ def short_flags(f: Features, cfg: ScoringConfig) -> list[str]:
         flags.append(f"BOTS {pct(f.bot_buy_share)}")
     if f.price_change_60s is not None and f.price_change_60s >= 0.25 and f.new_buyers_60s <= 2:
         flags.append("SELF-PUMP")
-    if f.price_change_60s is not None and f.price_change_60s <= cfg.crash_60s and f.sells_60s >= cfg.crash_min_sells:
-        flags.append(f"DUMP {f.price_change_60s * 100:+.0f}%")
+    if f.drawdown_60s is not None and f.drawdown_60s <= cfg.crash_60s and f.sells_60s >= cfg.crash_min_sells:
+        flags.append(f"DUMP {f.drawdown_60s * 100:+.0f}%")
     if f.early_sold_share is not None and f.early_sold_share >= 0.5:
         flags.append(f"EXIT {pct(f.early_sold_share)}")
     if f.hidden_float_share is not None and f.hidden_float_share >= cfg.max_hidden_float:

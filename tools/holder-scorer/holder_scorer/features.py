@@ -70,6 +70,7 @@ class Features:
     organic_net_flow_120s_sol: float | None
     seconds_since_last_trade: float | None
     price_change_60s: float | None
+    drawdown_60s: float | None  # last price against the highest price of the last 60 s (0 = at the high, -0.5 = halved)
     # curve and market numbers (SOL-quoted curves only)
     complete: bool | None
     progress: float | None
@@ -256,12 +257,17 @@ def compute_features(snap: Snapshot, now: float | None = None) -> Features:
 
     # price move without holders (self-pump) -----------------------------------------
     price_change = None
+    drawdown = None
     if trades:
         last = trades[-1].price_after
         older = [t for t in trades if ts_of(t) <= now - 60]
         prev = older[-1].price_after if older else None
         if last and prev:
             price_change = last / prev - 1.0
+        # a pump and dump inside one minute is invisible to "price against 60 s ago": measure against the 60 s high
+        recent_prices = [t.price_after for t in w60 if t.price_after] + ([prev] if prev else [])
+        if last and recent_prices:
+            drawdown = last / max(recent_prices) - 1.0
 
     # holders ----------------------------------------------------------------------------
     holders_usable = snap.holders is not None and (snap.holders_source in ("das", "largest") or (snap.holders_source == "trades" and complete_history))
@@ -453,6 +459,7 @@ def compute_features(snap: Snapshot, now: float | None = None) -> Features:
         organic_net_flow_120s_sol=organic_net,
         seconds_since_last_trade=last_trade_gap,
         price_change_60s=price_change,
+        drawdown_60s=drawdown,
         complete=snap.curve.complete if snap.curve else None,
         progress=progress,
         curve_sol=curve_sol,

@@ -23,6 +23,8 @@ from .features import Features, compute_features
 from .market import MarketData, fetch_market
 from .notify import format_legend, format_short, send_telegram
 from .live import Alert, LiveConfig, LiveEngine, live
+from .narrative import NameRegistry, narrative_score
+from .paper import STRATEGIES, PaperTrader, Strategy, look_back, paper_report
 from .quick import QuickConfig, QuickReport, quick_check, report_from_features
 from .rpc import RpcError, SolanaRpc
 from .scoring import (
@@ -48,6 +50,13 @@ __all__ = [
     "live",
     "LiveEngine",
     "LiveConfig",
+    "PaperTrader",
+    "Strategy",
+    "STRATEGIES",
+    "paper_report",
+    "look_back",
+    "narrative_score",
+    "NameRegistry",
     "Alert",
     "format_short",
     "format_legend",

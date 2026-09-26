@@ -50,6 +50,7 @@ from .collect import (
 from .encoding import BorshError
 from .features import CREATION_WINDOW_SLOTS, compute_features
 from .market import sol_usd
+from .narrative import NameRegistry
 from .pump import (
     COMPLETE_EVENT_DISC,
     CREATE_EVENT_DISC,
@@ -92,6 +93,7 @@ class LiveConfig:
     track_seconds: float = 240.0
     final_linger_s: float = 30.0
     idle_expire_s: float = 60.0  # drop a token that never saw an outside trade
+    max_keep_alive_s: float = 1800.0  # hard cap for tokens a paper trader or other hook wants to keep watching
     eval_interval_s: float = 1.0
     blick_min_outside_buyers: int = 5
     blick_min_inflow_sol: float = 0.5
@@ -253,6 +255,8 @@ class LiveEngine:
         cache: ProfileCache | None = None,
         run_side_task: Callable[..., None] | None = None,
         price_hint: Callable[[], float | None] | None = None,
+        on_evaluate: Callable[..., None] | None = None,
+        keep_alive: Callable[[str, float], bool] | None = None,
     ):
         self.rpc = rpc
         self.cfg = config
@@ -261,6 +265,9 @@ class LiveEngine:
         self.cache = cache or ProfileCache(ttl_s=7200.0)
         self.run_side_task = run_side_task
         self.price_hint = price_hint
+        self.on_evaluate = on_evaluate  # (state, report, features, now) after every evaluation, e.g. the paper trader
+        self.keep_alive = keep_alive  # (mint, now) -> True keeps a token subscribed beyond track_seconds
+        self.names = NameRegistry()  # recent launch names, to spot copycats
         self.tokens: dict[str, TokenState] = {}
         self.stats = {
             "launches": 0, "tracked": 0, "trades": 0, "missing": 0, "dropped_missing": 0, "alerts": 0,
@@ -345,6 +352,7 @@ class LiveEngine:
             self._update_curve(state, state.trades[-1])
         self.tokens[mint] = state
         self.stats["tracked"] = len(self.tokens)
+        self.names.register(mint, create.name, create.symbol, now)
         self._schedule_metadata(state)
         return state
 
@@ -626,6 +634,11 @@ class LiveEngine:
         if feats.unique_outside_buyers >= self.cfg.profiles_min_buyers:
             self._schedule_profiles(state)
         self._alerts(state, report, feats, now)
+        if self.on_evaluate is not None:
+            try:
+                self.on_evaluate(state, report, feats, now)
+            except Exception as exc:  # noqa: BLE001 - a hook must not stop the scoring loop
+                print(f"[{state.mint[:8]}] Bewertungs-Hook fehlgeschlagen: {exc!r}")
         return report
 
     def _emit(self, state: TokenState, tier: str, report: QuickReport, suffix: str | None, now: float) -> None:
@@ -711,12 +724,21 @@ class LiveEngine:
         for mint, state in list(self.tokens.items()):
             age = now - state.created_at
             idle = state.outside_trades() == 0 and age > self.cfg.idle_expire_s and not state.tiers_sent
-            if (
+            keep = False
+            if self.keep_alive is not None and age <= self.cfg.max_keep_alive_s and not state.complete:
+                try:
+                    keep = bool(self.keep_alive(mint, now))
+                except Exception:  # noqa: BLE001
+                    keep = False
+            if not keep and (
                 age > self.cfg.track_seconds
                 or (state.final and state.final_at is not None and now - state.final_at > self.cfg.final_linger_s)
                 or state.complete
                 or idle
             ):
+                expired.append(mint)
+                continue
+            if state.complete and not keep:
                 expired.append(mint)
                 continue
             if state.final:
@@ -860,11 +882,22 @@ async def run_live(
     ws_url: str | None = None,
     cache: ProfileCache | None = None,
     status_every_s: float = 60.0,
+    paper: Any = None,
 ) -> None:
     try:
         import websockets
     except ImportError as exc:
         raise SystemExit("Für den Live-Modus fehlt das Paket 'websockets': pip install websockets") from exc
+
+    user_on_alert = on_alert
+    if paper is not None:
+
+        def on_alert(alert: Alert) -> None:  # noqa: F811 - the paper trader sees every alert first
+            try:
+                paper.on_alert(alert)
+            except Exception as exc:  # noqa: BLE001
+                print(f"Papier-Händler (Alarm) fehlgeschlagen: {exc!r}")
+            user_on_alert(alert)
 
     loop = asyncio.get_running_loop()
     stop = asyncio.Event()
@@ -895,7 +928,19 @@ async def run_live(
     def price_hint() -> float | None:
         return price_state["value"]
 
-    engine = LiveEngine(rpc, config, scoring, on_alert, cache=cache, run_side_task=run_side_task, price_hint=price_hint)
+    engine = LiveEngine(
+        rpc,
+        config,
+        scoring,
+        on_alert,
+        cache=cache,
+        run_side_task=run_side_task,
+        price_hint=price_hint,
+        on_evaluate=paper.on_evaluate if paper is not None else None,
+        keep_alive=paper.keep_alive if paper is not None else None,
+    )
+    if paper is not None:
+        paper.attach(engine)
     stream = SolanaLogStream(ws_url or ws_url_from_rpc(rpc.url), config.commitment, lambda *a: engine.on_logs(*a))
 
     async def pumpportal() -> None:
@@ -930,6 +975,11 @@ async def run_live(
         while not stop.is_set():
             await asyncio.sleep(config.eval_interval_s)
             now = time.time()
+            if paper is not None:
+                try:
+                    paper.on_tick(now)  # before the engine expires tokens, so closes see the last curve state
+                except Exception as exc:  # noqa: BLE001
+                    print(f"Papier-Händler (Tick) fehlgeschlagen: {exc!r}")
             for mint in engine.tick(now):
                 await stream.unsubscribe(mint)
             missing = engine.take_missing()
@@ -965,6 +1015,8 @@ async def run_live(
                     f"Log-Benachrichtigungen {stream.stats['notifications']} ({stream.stats['bytes'] / 1e6:.1f} MB, "
                     f"bei Helius etwa {stream.stats['bytes'] / 1e6 * 20:.0f} Credits), RPC-Einheiten {rpc.stats['requests']}"
                 )
+                if paper is not None:
+                    print(paper.status_line())
 
     tasks = [loop.create_task(pumpportal()), loop.create_task(stream.run(stop)), loop.create_task(ticker())]
     try:

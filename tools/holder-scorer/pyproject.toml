@@ -1,6 +1,6 @@
 [project]
 name = "holder-scorer"
-version = "0.2.0"
+version = "0.3.0"
 description = "Bewertet, ob ein pump.fun-Token wahrscheinlich mehr Holder bekommt (Filter für Sniper-Bots)"
 requires-python = ">=3.10"
 dependencies = ["requests>=2.28"]

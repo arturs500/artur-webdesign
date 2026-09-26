@@ -37,6 +37,7 @@ NUMERIC_FACTORS = [
     "buy_sell_ratio_120s",
     "organic_net_flow_120s_sol",
     "price_change_60s",
+    "drawdown_60s",
     "creation_window_share",
     "creation_window_held_share",
     "creation_window_sold_share",
