@@ -60,6 +60,7 @@ def base_snapshot(mint: str, dev: str, launch_ts: float, trades: list[TradeEvent
     )
     snap.trades = trades
     snap.total_signatures = len(trades) + 1
+    snap.history_ok = True
     snap.holders = [HolderInfo(o, a) for o, a in derive_balances(trades).items() if a > 0]
     snap.holders_source = "trades"
     return snap
@@ -74,7 +75,7 @@ def organic_snapshot() -> Snapshot:
     slot = 1008
     # 12 buyers in the first 60 s, 34 in the last 90 s (accelerating)
     for i in range(46):
-        gap = 5.0 if i < 12 else 2.6
+        gap = 5.0 if i < 12 else 2.5
         t += gap
         slot += int(gap / 0.4)
         size = rnd.choice([0.02, 0.03, 0.05, 0.08, 0.15, 0.3])
@@ -137,11 +138,14 @@ def young_snapshot() -> Snapshot:
 def test_organic_token_scores_yes():
     feats = compute_features(organic_snapshot(), NOW)
     v = score_features(feats)
-    assert feats.holders_now == 47  # dev + 46 buyers, three sellers sold only a little
+    assert feats.holders_now == 47  # dev + 46 buyers, three sellers sold only half
+    assert feats.holders_now_trades == 47
     assert feats.holder_growth_60s is not None and feats.holder_growth_60s > 0.4
     assert feats.creation_window_share == 0.0
     assert feats.dev_buy_share == 0.02 and feats.dev_sold_share == 0.0
     assert feats.socials_count == 2
+    assert feats.unique_outside_buyers == 46 and feats.bot_buy_share == 0.0
+    assert feats.organic_net_flow_120s_sol is not None and feats.organic_net_flow_120s_sol > 1.0
     assert v.hard_fails == []
     assert v.label == LABEL_YES, format_verdict(v)
     assert v.score >= 80
@@ -152,12 +156,44 @@ def test_bundled_dev_dump_is_hard_no():
     v = score_features(feats)
     assert feats.creation_slot_buyers == 8
     assert 0.29 < feats.creation_window_share < 0.31
+    assert feats.creation_window_sold_share is not None and 0.6 < feats.creation_window_sold_share < 0.65
+    assert feats.early_sold_share is not None and feats.early_sold_share > 0.5
     assert feats.dev_sold_share == 1.0
     assert feats.early_fresh_wallets == 6 and feats.early_funded_by_creator == 6
     assert v.label == LABEL_NO
     assert any("Dev-Dump" in r for r in v.hard_fails)
     assert any("Serien-Deployer" in r for r in v.hard_fails)
     assert v.score < 45
+
+
+def coordinated_snapshot() -> Snapshot:
+    """Dev plus four coordinated wallets and not a single outside buyer: must never be JA."""
+    mint, dev = addr(), addr()
+    launch = NOW - 100
+    ring = [addr() for _ in range(4)]
+    trades = [trade(mint, dev, 0.3, 0.01, True, launch, 1000)]
+    slot = 1010
+    t = launch + 5
+    for i in range(24):  # the four wallets take turns buying every ~4 s with the same size
+        w = ring[i % 4]
+        t += 3.8
+        slot += 15
+        trades.append(trade(mint, w, 0.05, 0.0005, True, t, slot))
+    snap = base_snapshot(mint, dev, launch, trades, curve_sol=2.0)
+    snap.creator_history = CreatorHistory(address=dev, prior_tokens=0, source="rpc")
+    snap.creator_profile = WalletProfile(address=dev, tx_count=300, first_seen=int(launch - 40 * 86400))
+    snap.early_wallets = [WalletProfile(address=w, tx_count=150, first_seen=int(launch - 20 * 86400)) for w in ring]
+    snap.metadata_ok = True
+    snap.metadata = {"twitter": "https://x.com/ring/status/1", "telegram": "https://t.me/ring", "website": "https://ring.example/x", "image": "https://ipfs.io/ipfs/a"}
+    return snap
+
+
+def test_coordinated_wallets_cannot_reach_yes():
+    feats = compute_features(coordinated_snapshot(), NOW)
+    v = score_features(feats)
+    assert feats.unique_outside_buyers == 0  # all four wallets are repeat buyers, i.e. bots
+    assert feats.bot_buy_share == 1.0
+    assert v.label != LABEL_YES, format_verdict(v)
 
 
 def test_dead_token_is_no():

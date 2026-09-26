@@ -87,14 +87,11 @@ class BondingCurveState:
 
     @property
     def progress(self) -> float:
-        """Share of the sellable supply already bought (0..1), assuming the standard curve."""
-        return self.progress_from(INITIAL_REAL_TOKEN_RESERVES)
-
-    def progress_from(self, initial_real_token_reserves: int) -> float:
-        """Progress against the coin's own initial real reserves (from its CreateEvent)."""
-        if initial_real_token_reserves <= 0:
+        """Share of the sellable supply already bought (0..1)."""
+        initial_real = INITIAL_REAL_TOKEN_RESERVES
+        if initial_real <= 0:
             return 0.0
-        return max(0.0, min(1.0, 1.0 - self.real_token_reserves / initial_real_token_reserves))
+        return max(0.0, min(1.0, 1.0 - self.real_token_reserves / initial_real))
 
     @property
     def price_quote_per_token(self) -> float:
@@ -156,24 +153,11 @@ class TradeEvent:
     block_time: int | None = None
 
     @property
-    def quote_is_sol(self) -> bool:
-        return self.quote_mint in (None, WSOL_MINT, ZERO_PUBKEY)
-
-    @property
     def quote_lamports(self) -> int:
         """Amount paid or received in the quote asset's smallest unit."""
-        if not self.quote_is_sol and self.quote_amount is not None:
-            return self.quote_amount
         if self.sol_amount:
             return self.sol_amount
         return self.quote_amount or 0
-
-    @property
-    def price_after(self) -> float | None:
-        """Curve price (quote per token, smallest units) after this trade."""
-        if self.virtual_token_reserves <= 0:
-            return None
-        return self.virtual_sol_reserves / self.virtual_token_reserves
 
     @property
     def price_per_token(self) -> float:
@@ -286,7 +270,6 @@ class ParsedTx:
     creates: list[CreateEvent] = field(default_factory=list)
     completed_mints: list[str] = field(default_factory=list)
     created_mints: list[str] = field(default_factory=list)
-    mayhem_token_vault: str | None = None  # create_v2 coins park part of the supply here
 
 
 def _all_account_keys(tx: dict[str, Any]) -> list[str]:
@@ -308,10 +291,9 @@ def _iter_instructions(tx: dict[str, Any]) -> Iterable[dict[str, Any]]:
             yield ix
 
 
-def _event_payloads(tx: dict[str, Any], keys: list[str]) -> tuple[list[bytes], list[tuple[bytes, dict[str, Any]]]]:
-    """Return raw event bytes (discriminator + body) from CPI and log paths, plus decoded pump instructions."""
+def _event_payloads(tx: dict[str, Any], keys: list[str]) -> list[bytes]:
+    """Return raw event bytes (discriminator + body) from CPI and log paths."""
     payloads: list[bytes] = []
-    pump_ixs: list[tuple[bytes, dict[str, Any]]] = []
     seen: set[bytes] = set()
     for ix in _iter_instructions(tx):
         idx = ix.get("programIdIndex")
@@ -329,8 +311,6 @@ def _event_payloads(tx: dict[str, Any], keys: list[str]) -> tuple[list[bytes], l
             if body not in seen:
                 seen.add(body)
                 payloads.append(body)
-        else:
-            pump_ixs.append((raw, ix))
     for line in (tx.get("meta") or {}).get("logMessages") or []:
         if not line.startswith("Program data: "):
             continue
@@ -341,7 +321,7 @@ def _event_payloads(tx: dict[str, Any], keys: list[str]) -> tuple[list[bytes], l
         if len(raw) > 8 and raw[:8] in (TRADE_EVENT_DISC, CREATE_EVENT_DISC, COMPLETE_EVENT_DISC) and raw not in seen:
             seen.add(raw)
             payloads.append(raw)
-    return payloads, pump_ixs
+    return payloads
 
 
 def parse_transaction(signature: str, tx: dict[str, Any] | None) -> ParsedTx | None:
@@ -360,8 +340,7 @@ def parse_transaction(signature: str, tx: dict[str, Any] | None) -> ParsedTx | N
     )
     if parsed.failed:
         return parsed
-    payloads, pump_ixs = _event_payloads(tx, keys)
-    for payload in payloads:
+    for payload in _event_payloads(tx, keys):
         disc, body = payload[:8], payload[8:]
         try:
             if disc == TRADE_EVENT_DISC:
@@ -379,13 +358,18 @@ def parse_transaction(signature: str, tx: dict[str, Any] | None) -> ParsedTx | N
                 parsed.completed_mints.append(r.pubkey())
         except BorshError:
             continue
-    # Create instructions: fallback mint detection and the mayhem vault of create_v2 coins.
-    for raw, ix in pump_ixs:
-        if raw[:8] not in CREATE_DISCRIMINATORS:
-            continue
-        accs = ix.get("accounts") or []
-        if not parsed.created_mints and accs and accs[0] < len(keys):
-            parsed.created_mints.append(keys[accs[0]])
-        if raw[:8] == IX_CREATE_V2 and len(accs) > 13 and accs[13] < len(keys):
-            parsed.mayhem_token_vault = keys[accs[13]]
+    # Fallback for creates whose event could not be decoded: look at the instruction itself.
+    if not parsed.created_mints:
+        for ix in _iter_instructions(tx):
+            idx = ix.get("programIdIndex")
+            if idx is None or idx >= len(keys) or keys[idx] != PUMP_PROGRAM_ID:
+                continue
+            try:
+                raw = b58decode(ix.get("data", ""))
+            except ValueError:
+                continue
+            if raw[:8] in CREATE_DISCRIMINATORS:
+                accs = ix.get("accounts") or []
+                if accs and accs[0] < len(keys):
+                    parsed.created_mints.append(keys[accs[0]])
     return parsed

@@ -3,6 +3,7 @@ import pytest
 from holder_scorer.encoding import BorshError, b58encode
 from holder_scorer.pump import (
     IX_CREATE,
+    IX_CREATE_V2,
     decode_bonding_curve,
     decode_create_event,
     decode_trade_event,
@@ -87,3 +88,17 @@ def test_parse_transaction_create_fallback_from_instruction():
     tx["transaction"]["message"]["accountKeys"][2] = b58encode(mint)
     parsed = parse_transaction("sig", tx)
     assert parsed.created_mints == [b58encode(mint)]
+    assert parsed.mayhem_token_vault is None
+
+
+def test_parse_transaction_records_mayhem_vault_of_create_v2():
+    mint, payer, vault = key(), key(), key()
+    keys_extra = [b58encode(key()) for _ in range(14)]
+    ix = {"programIdIndex": 1, "accounts": [2] + list(range(3, 16)), "data": b58encode(IX_CREATE_V2 + b"\x00" * 4)}
+    tx = fake_tx("sig", 1, 1, payer, [], extra_instructions=[ix])
+    tx["transaction"]["message"]["accountKeys"] += keys_extra
+    tx["transaction"]["message"]["accountKeys"][2] = b58encode(mint)
+    tx["transaction"]["message"]["accountKeys"][3 + 13 - 1] = b58encode(vault)  # accounts[13] -> key index 15
+    parsed = parse_transaction("sig", tx)
+    assert parsed.created_mints == [b58encode(mint)]
+    assert parsed.mayhem_token_vault == b58encode(vault)

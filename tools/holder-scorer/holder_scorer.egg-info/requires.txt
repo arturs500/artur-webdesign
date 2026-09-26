@@ -1,0 +1,7 @@
+requests>=2.28
+
+[test]
+pytest>=7
+
+[watch]
+websockets>=12

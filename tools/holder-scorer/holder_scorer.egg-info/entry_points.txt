@@ -1,0 +1,2 @@
+[console_scripts]
+holder-scorer = holder_scorer.cli:main

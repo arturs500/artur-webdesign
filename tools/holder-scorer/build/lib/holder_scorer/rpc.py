@@ -1,33 +1,22 @@
 """Small JSON-RPC client for Solana with batching, retries and rate limiting.
 
-Works with any RPC endpoint. The Helius DAS method ``getTokenAccounts`` is
-used when the endpoint supports it and skipped otherwise, so every feature
-that depends on it degrades gracefully.
-
-The client is thread-safe: the rate limiter reserves send slots under a lock,
-so several collectors (the watch mode runs two) share one request budget.
-Helius meters DAS calls separately from standard RPC calls, hence two
-buckets. By default every item of a JSON-RPC batch counts as one request
-unit, which is how Helius bills; set ``units_per_batch_item=False`` for an
-endpoint that limits per HTTP request.
+Works with any RPC endpoint. The Helius DAS methods (``getTokenAccounts``,
+``getAssetsByCreator``) are used when the endpoint supports them and skipped
+otherwise, so every feature that depends on them degrades gracefully.
 """
 from __future__ import annotations
 
 import base64
-import threading
 import time
 from typing import Any
 
 import requests
 
-DAS_METHODS = {"getTokenAccounts", "getAssetsByCreator", "getAsset", "getAssetsByOwner", "searchAssets", "getAssetBatch"}
-
 
 class RpcError(RuntimeError):
-    def __init__(self, message: str, code: int | None = None, http_status: int | None = None):
+    def __init__(self, message: str, code: int | None = None):
         super().__init__(message)
         self.code = code
-        self.http_status = http_status
 
 
 class SolanaRpc:
@@ -35,63 +24,40 @@ class SolanaRpc:
         self,
         url: str,
         rps: float = 10.0,
-        das_rps: float = 2.0,
         timeout: float = 25.0,
         max_batch: int = 20,
         max_retries: int = 4,
-        units_per_batch_item: bool = True,
         session: requests.Session | None = None,
     ):
         self.url = url
         self.rps = max(0.1, rps)
-        self.das_rps = max(0.1, das_rps)
         self.timeout = timeout
         self.max_batch = max(1, max_batch)
         self.max_retries = max_retries
-        self.units_per_batch_item = units_per_batch_item
         self.session = session or requests.Session()
-        self.stop = threading.Event()
-        self._lock = threading.Lock()
-        self._next_allowed = {"rpc": 0.0, "das": 0.0}
+        self._next_allowed = 0.0
         self._id = 0
         self._das_supported: bool | None = None
-        self.stats: dict[str, Any] = {"requests": 0, "posts": 0, "retries": 0, "by_method": {}}
+        self.stats = {"requests": 0, "retries": 0}
 
     # --- transport -------------------------------------------------------------
-    def _sleep(self, seconds: float) -> None:
-        deadline = time.monotonic() + seconds
-        while True:
-            if self.stop.is_set():
-                raise RpcError("abgebrochen")
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                return
-            time.sleep(min(0.2, remaining))
+    def _throttle(self, units: int) -> None:
+        now = time.monotonic()
+        if self._next_allowed > now:
+            time.sleep(self._next_allowed - now)
+            now = self._next_allowed
+        self._next_allowed = now + units / self.rps
 
-    def _throttle(self, units: int, group: str) -> None:
-        rate = self.das_rps if group == "das" else self.rps
-        with self._lock:
-            now = time.monotonic()
-            start = max(now, self._next_allowed[group])
-            self._next_allowed[group] = start + units / rate
-        if start > now:
-            self._sleep(start - now)
-
-    def _post(self, body: Any, units: int, group: str) -> Any:
+    def _post(self, body: Any, units: int) -> Any:
         last_exc: Exception | None = None
         for attempt in range(self.max_retries + 1):
-            if self.stop.is_set():
-                raise RpcError("abgebrochen")
-            self._throttle(units, group)
-            with self._lock:
-                self.stats["requests"] += units
-                self.stats["posts"] += 1
+            self._throttle(units)
             try:
+                self.stats["requests"] += units
                 resp = self.session.post(self.url, json=body, timeout=self.timeout)
             except requests.RequestException as exc:
                 last_exc = exc
                 resp = None
-            wait = 0.5 * (2**attempt)
             if resp is not None:
                 if resp.status_code == 200:
                     try:
@@ -99,39 +65,24 @@ class SolanaRpc:
                     except ValueError as exc:
                         last_exc = exc
                 elif resp.status_code in (429, 500, 502, 503, 504):
-                    last_exc = RpcError(f"HTTP {resp.status_code}: {resp.text[:200]}", http_status=resp.status_code)
-                    retry_after = resp.headers.get("Retry-After")
-                    if retry_after:
-                        try:
-                            wait = max(wait, min(30.0, float(retry_after)))
-                        except ValueError:
-                            pass
+                    last_exc = RpcError(f"HTTP {resp.status_code}: {resp.text[:200]}")
                 else:
-                    raise RpcError(f"HTTP {resp.status_code}: {resp.text[:300]}", http_status=resp.status_code)
+                    raise RpcError(f"HTTP {resp.status_code}: {resp.text[:300]}")
             if attempt < self.max_retries:
-                with self._lock:
-                    self.stats["retries"] += 1
-                self._sleep(wait)
+                self.stats["retries"] += 1
+                time.sleep(0.5 * (2**attempt))
         raise RpcError(f"RPC request failed after retries: {last_exc}")
 
     def _next_id(self) -> int:
-        with self._lock:
-            self._id += 1
-            return self._id
-
-    def _count(self, method: str, n: int = 1) -> None:
-        with self._lock:
-            self.stats["by_method"][method] = self.stats["by_method"].get(method, 0) + n
+        self._id += 1
+        return self._id
 
     def call(self, method: str, params: Any) -> Any:
         payload = {"jsonrpc": "2.0", "id": self._next_id(), "method": method, "params": params}
-        self._count(method)
-        data = self._post(payload, 1, "das" if method in DAS_METHODS else "rpc")
+        data = self._post(payload, 1)
         if isinstance(data, dict) and "error" in data:
             err = data["error"] or {}
-            code = err.get("code") if isinstance(err, dict) else None
-            msg = err.get("message", err) if isinstance(err, dict) else err
-            raise RpcError(f"{method}: {msg}", code)
+            raise RpcError(f"{method}: {err.get('message', err)}", err.get("code"))
         if not isinstance(data, dict):
             raise RpcError(f"{method}: unexpected response {str(data)[:200]}")
         return data.get("result")
@@ -147,13 +98,9 @@ class SolanaRpc:
                 rid = self._next_id()
                 ids[rid] = start + offset
                 payload.append({"jsonrpc": "2.0", "id": rid, "method": method, "params": params})
-                self._count(method)
-            units = len(payload) if self.units_per_batch_item else 1
             try:
-                data = self._post(payload, units, "rpc")
-            except RpcError as exc:
-                if exc.http_status in (401, 403) or "abgebrochen" in str(exc):
-                    raise
+                data = self._post(payload, len(payload))
+            except RpcError:
                 data = None
             if isinstance(data, list):
                 for item in data:
@@ -164,9 +111,7 @@ class SolanaRpc:
             for offset, (method, params) in enumerate(chunk):
                 try:
                     results[start + offset] = self.call(method, params)
-                except RpcError as exc:
-                    if exc.http_status in (401, 403) or "abgebrochen" in str(exc):
-                        raise
+                except RpcError:
                     results[start + offset] = None
         return results
 
@@ -199,30 +144,13 @@ class SolanaRpc:
                 out.append(base64.b64decode(value["data"][0]) if value else None)
         return out
 
-    def get_token_account_owners(self, addresses: list[str]) -> dict[str, str]:
-        """Map token-account addresses to their owner wallets (jsonParsed)."""
-        owners: dict[str, str] = {}
-        for start in range(0, len(addresses), 100):
-            chunk = addresses[start : start + 100]
-            res = self.call("getMultipleAccounts", [chunk, {"encoding": "jsonParsed", "commitment": "confirmed"}])
-            for addr, value in zip(chunk, (res or {}).get("value") or []):
-                try:
-                    owners[addr] = value["data"]["parsed"]["info"]["owner"]
-                except (TypeError, KeyError):
-                    continue
-        return owners
-
     def get_token_largest_accounts(self, mint: str) -> list[dict[str, Any]]:
         res = self.call("getTokenLargestAccounts", [mint, {"commitment": "confirmed"}])
         return (res or {}).get("value") or []
 
     # --- Helius DAS -----------------------------------------------------------
-    @property
-    def das_supported(self) -> bool | None:
-        return self._das_supported
-
     def das_get_token_accounts(self, mint: str, max_pages: int = 5) -> list[dict[str, Any]] | None:
-        """All token accounts of a mint as ``{address, owner, amount}``, or None if the endpoint has no DAS."""
+        """All token accounts of a mint as ``{owner, amount}`` or None if unsupported."""
         if self._das_supported is False:
             return None
         accounts: list[dict[str, Any]] = []
@@ -232,8 +160,7 @@ class SolanaRpc:
             try:
                 res = self.call("getTokenAccounts", params)
             except RpcError as exc:
-                # Only "method not found" (or a 404) proves the endpoint has no DAS; anything else is per-request.
-                if exc.code == -32601 or exc.http_status == 404:
+                if exc.code in (-32601, -32602) or "not found" in str(exc).lower() or "unknown" in str(exc).lower():
                     self._das_supported = False
                     return None
                 raise
@@ -241,10 +168,32 @@ class SolanaRpc:
             items = (res or {}).get("token_accounts") or []
             for item in items:
                 try:
-                    accounts.append({"address": item.get("address"), "owner": item["owner"], "amount": int(item.get("amount", 0))})
+                    accounts.append({"owner": item["owner"], "amount": int(item.get("amount", 0))})
                 except (KeyError, TypeError, ValueError):
                     continue
             if len(items) < 1000:
                 break
             page += 1
         return accounts
+
+    def das_get_assets_by_creator(self, creator: str, max_pages: int = 3) -> list[str] | None:
+        if self._das_supported is False:
+            return None
+        mints: list[str] = []
+        page = 1
+        while page <= max_pages:
+            params = {"creatorAddress": creator, "onlyVerified": False, "page": page, "limit": 1000}
+            try:
+                res = self.call("getAssetsByCreator", params)
+            except RpcError as exc:
+                if exc.code in (-32601, -32602) or "not found" in str(exc).lower() or "unknown" in str(exc).lower():
+                    self._das_supported = False
+                    return None
+                raise
+            self._das_supported = True
+            items = (res or {}).get("items") or []
+            mints.extend(str(item.get("id")) for item in items if item.get("id"))
+            if len(items) < 1000:
+                break
+            page += 1
+        return mints

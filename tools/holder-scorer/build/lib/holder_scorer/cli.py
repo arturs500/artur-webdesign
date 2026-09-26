@@ -1,4 +1,4 @@
-"""Command line interface: score, outcome, evaluate, watch, selftest."""
+"""Command line interface: score, record, outcome, evaluate, watch, selftest."""
 from __future__ import annotations
 
 import argparse
@@ -32,22 +32,15 @@ def _add_rpc_args(p: argparse.ArgumentParser) -> None:
 
 def _add_score_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--json", action="store_true", help="Ergebnis als JSON ausgeben (für andere Programme)")
-    p.add_argument("--no-deep", action="store_true", help="frühe Wallets nicht prüfen (spart etwa 15 Anfragen)")
-    p.add_argument("--min-age", type=float, help="Mindestalter in Sekunden, darunter Urteil ZU_FRUEH (Standard 90)")
+    p.add_argument("--no-deep", action="store_true", help="frühe Wallets nicht prüfen (schneller, weniger RPC-Aufrufe)")
+    p.add_argument("--min-age", type=float, help="Mindestalter in Sekunden, darunter Urteil ZU_FRUEH (Standard 45)")
     p.add_argument("--yes-threshold", type=float, help="Score ab dem das Urteil JA lautet (Standard 65)")
     p.add_argument("--no-threshold", type=float, help="Score unter dem das Urteil NEIN lautet (Standard 45)")
-
-
-def _stats_line(rpc) -> str:
-    by = rpc.stats.get("by_method", {})
-    top = ", ".join(f"{k} {v}" for k, v in sorted(by.items(), key=lambda kv: -kv[1])[:4])
-    return f"{rpc.stats['requests']} Request-Einheiten in {rpc.stats['posts']} HTTP-Aufrufen, {rpc.stats['retries']} Wiederholungen ({top})"
 
 
 def cmd_score(args: argparse.Namespace) -> int:
     rpc = make_rpc(args.rpc, args.rps)
     cfg = _config_from_args(args)
-    t0 = time.monotonic()
     try:
         verdict = evaluate_token(args.mint, rpc=rpc, config=cfg, deep=not args.no_deep)
     except RpcError as exc:
@@ -59,14 +52,14 @@ def cmd_score(args: argparse.Namespace) -> int:
         print(json.dumps(verdict.to_dict(), ensure_ascii=False, indent=2))
     else:
         print(format_verdict(verdict))
-        print(f"\n({time.monotonic() - t0:.1f} s, {_stats_line(rpc)})")
+        print(f"\n({rpc.stats['requests']} RPC-Aufrufe, {rpc.stats['retries']} Wiederholungen)")
     return 0 if verdict.buy_signal else 1
 
 
 def cmd_outcome(args: argparse.Namespace) -> int:
     rpc = make_rpc(args.rpc, args.rps)
     n = update_outcomes(args.file, rpc, horizon_s=args.horizon, growth_target=args.target)
-    print(f"{n} Aufzeichnungen nachgeprüft ({_stats_line(rpc)})")
+    print(f"{n} Aufzeichnungen mit Ergebnis ergänzt")
     return 0
 
 
@@ -89,15 +82,7 @@ def cmd_watch(args: argparse.Namespace) -> int:
         if args.record:
             append_record(args.record, v)
 
-    watch(
-        rpc,
-        args.delay,
-        on_verdict,
-        config=cfg,
-        deep=not args.no_deep,
-        max_lateness=args.max_lag,
-        min_trades=args.min_trades,
-    )
+    watch(rpc, args.delay, on_verdict, config=cfg, deep=not args.no_deep)
     return 0
 
 
@@ -113,7 +98,7 @@ def cmd_selftest(args: argparse.Namespace) -> int:
         c = snap.curve
         print(
             f"  complete={c.complete} progress={c.progress * 100:.1f}% real_quote={c.real_quote_reserves / 1e9:.3f} "
-            f"creator={c.creator} quote_mint={c.quote_mint} mayhem={c.is_mayhem_mode}"
+            f"creator={c.creator} quote_mint={c.quote_mint}"
         )
     else:
         print("  Curve-Konto nicht gefunden oder nicht dekodierbar")
@@ -123,27 +108,20 @@ def cmd_selftest(args: argparse.Namespace) -> int:
         print(f"  uri={ce.uri}")
     else:
         print("Create-Event nicht gefunden (Historie unvollständig oder alter Token)")
-    print(
-        f"Signaturen: {snap.total_signatures} (fehlgeschlagen {snap.failed_tx}, nicht ladbar {snap.missing_tx}), "
-        f"Trades dekodiert: {len(snap.trades)}, Historie vollständig: {snap.history_complete}"
-    )
+    print(f"Signaturen: {snap.total_signatures} (davon fehlgeschlagen {snap.failed_tx}), Trades dekodiert: {len(snap.trades)}")
     for t in snap.trades[:3] + snap.trades[-3:]:
         print(
             f"  {'BUY ' if t.is_buy else 'SELL'} slot={t.slot} ts={t.timestamp} user={t.user[:8]}… "
             f"{t.quote_lamports / 1e9:.4f} SOL für {t.token_amount / 1e6:,.0f} Token ix={t.ix_name}"
         )
-    print(f"Holder: {len(snap.holders) if snap.holders is not None else '?'} ({snap.holders_source})")
+    print(f"Holder: {len(snap.holders or [])} ({snap.holders_source})")
     print(f"Metadaten: {'ok' if snap.metadata_ok else 'fehlt'} {list(snap.metadata)[:8]}")
     if snap.creator_history:
         ch = snap.creator_history
-        print(
-            f"Creator: {ch.prior_tokens} frühere Token, {ch.graduated} graduiert, {ch.dead} tot, {ch.young} jung, "
-            f"Quelle {ch.source}, {ch.coverage_note}"
-        )
+        print(f"Creator: {ch.prior_tokens} frühere Token, {ch.graduated} graduiert, {ch.dead} tot, Quelle {ch.source} {ch.coverage_note}")
     print(f"Frühe Wallets geprüft: {len(snap.early_wallets)}, frisch: {sum(1 for w in snap.early_wallets if w.is_fresh)}")
     print("Hinweise: " + ("; ".join(snap.notes) if snap.notes else "keine"))
     print("Zeiten: " + ", ".join(f"{k} {v:.1f}s" for k, v in snap.timings.items()))
-    print(_stats_line(rpc))
     feats = compute_features(snap)
     print(f"\nMerkmale: age={feats.age_s and round(feats.age_s)} holders={feats.holders_now} growth60={feats.holder_growth_60s}")
     return 0
@@ -172,9 +150,7 @@ def build_parser() -> argparse.ArgumentParser:
     e.set_defaults(func=cmd_evaluate)
 
     w = sub.add_parser("watch", help="neue Token live bewerten (braucht das Paket websockets)")
-    w.add_argument("--delay", type=float, default=90.0, help="Sekunden nach dem Start bis zur Bewertung (Standard 90)")
-    w.add_argument("--max-lag", type=float, default=30.0, help="Token überspringen, die mehr als N s nach der Fälligkeit dran wären (Standard 30)")
-    w.add_argument("--min-trades", type=int, default=6, help="Vorfilter: mindestens N Transaktionen, sonst keine Bewertung (Standard 6)")
+    w.add_argument("--delay", type=float, default=60.0, help="Sekunden nach dem Start bis zur Bewertung (Standard 60)")
     w.add_argument("--min-score", type=float, default=0.0, help="nur Urteile ab diesem Score anzeigen")
     w.add_argument("--record", help="alle Urteile an diese JSONL-Datei anhängen")
     w.add_argument("--verbose", action="store_true", help="vollständige Faktor-Tabelle je Token")
@@ -198,6 +174,3 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     except KeyboardInterrupt:
         return 130
-    except Exception as exc:  # noqa: BLE001 - never end with a traceback for the user
-        print(f"Fehler: {exc!r}", file=sys.stderr)
-        return 2
