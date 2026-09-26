@@ -97,7 +97,7 @@ def load_records(path: str) -> list[dict[str, Any]]:
     if not os.path.exists(path):
         return []
     base: list[dict[str, Any]] = []
-    index: dict[tuple[str, float], dict[str, Any]] = {}
+    index: dict[tuple[Any, ...], dict[str, Any]] = {}
     outcomes: list[dict[str, Any]] = []
     with open(path, encoding="utf-8") as fh:
         for line in fh:
@@ -114,13 +114,21 @@ def load_records(path: str) -> list[dict[str, Any]]:
                 outcomes.append(obj)
             elif "mint" in obj and "recorded_at" in obj:
                 base.append(obj)
-                index[(obj["mint"], obj["recorded_at"])] = obj
+                index[(obj["mint"], obj["recorded_at"], obj.get("label"))] = obj
+                index.setdefault((obj["mint"], obj["recorded_at"]), obj)
     for o in outcomes:
         ref = o.get("outcome_for") or {}
-        rec = index.get((ref.get("mint"), ref.get("recorded_at")))
+        key: tuple[Any, ...] = (ref.get("mint"), ref.get("recorded_at"))
+        if "label" in ref:
+            key = key + (ref.get("label"),)
+        rec = index.get(key)
         if rec is not None:
             rec["outcome"] = o.get("outcome")
     return base
+
+
+def _outcome_ref(rec: dict[str, Any]) -> dict[str, Any]:
+    return {"mint": rec.get("mint"), "recorded_at": rec.get("recorded_at"), "label": rec.get("label")}
 
 
 def _probe_holders(rpc: SolanaRpc, mint: str, now: float) -> tuple[int | None, float | None, bool | None]:
@@ -181,7 +189,7 @@ def update_outcomes(path: str, rpc: SolanaRpc, horizon_s: float = 900.0, growth_
         except Exception as exc:  # noqa: BLE001 - one bad record must not abort the run
             if "abgebrochen" in str(exc):
                 raise
-            _append_line(path, {"outcome_for": {"mint": mint, "recorded_at": recorded_at}, "outcome": {"error": str(exc), "checked_at": now, "attempts": attempts}})
+            _append_line(path, {"outcome_for": _outcome_ref(rec), "outcome": {"error": str(exc), "checked_at": now, "attempts": attempts}})
             checked += 1
             continue
         grew = None
@@ -199,7 +207,7 @@ def update_outcomes(path: str, rpc: SolanaRpc, horizon_s: float = 900.0, growth_
         }
         if grew is None and base is not None:
             outcome["error"] = "holder count unknown at check"
-        _append_line(path, {"outcome_for": {"mint": mint, "recorded_at": recorded_at}, "outcome": outcome})
+        _append_line(path, {"outcome_for": _outcome_ref(rec), "outcome": outcome})
         checked += 1
     return checked
 
