@@ -128,7 +128,7 @@ def test_collect_raises_on_rpc_failure_and_cli_exits_2(monkeypatch):
     def boom(*args, **kwargs):
         raise RpcError("HTTP 401: bad key", http_status=401)
 
-    monkeypatch.setattr(cli, "evaluate_token", boom)
+    monkeypatch.setattr(cli, "quick_check", boom)
     monkeypatch.setattr(cli, "make_rpc", lambda *a, **k: rpc)
     assert cli.main(["score", mint, "--json"]) == 2
 

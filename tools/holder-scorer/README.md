@@ -75,17 +75,101 @@ export SOLANA_RPC_URL="https://mainnet.helius-rpc.com/?api-key=DEIN_KEY"
 # Ersten Test mit einem echten Token machen (nimm einen 2 bis 5 Minuten alten Token von pump.fun):
 python -m holder_scorer selftest <MINT>
 
-# Einen Token bewerten:
+# Einen Token bewerten (Kurznachricht mit Kennzahlen und einem Wort als Urteil):
 python -m holder_scorer score <MINT>
 
-# Als JSON, z. B. für einen Bot in einer anderen Sprache (Exit-Code 0 = JA, 1 = sonst, 2 = RPC-Fehler):
+# Dazu die vollständige Faktor-Tabelle:
+python -m holder_scorer score <MINT> --long
+
+# Als JSON, z. B. für einen Bot in einer anderen Sprache (Exit-Code 0 = GO, 1 = sonst, 2 = RPC-Fehler):
 python -m holder_scorer score <MINT> --json
 
 # Neue Token live bewerten, jeweils 90 s nach dem Start, und alles aufzeichnen:
-python -m holder_scorer watch --delay 90 --record beobachtungen.jsonl
+python -m holder_scorer watch --record beobachtungen.jsonl
+
+# Früher entscheiden (25 s nach dem Start) und GO-Nachrichten per Telegram schicken:
+python -m holder_scorer watch --early --telegram --notify go,rug
+
+# Die Kurzsprache erklären:
+python -m holder_scorer legend
 ```
 
-Beispielausgabe von `score`:
+## Die Kurznachricht
+
+Jede Bewertung ist zehn kurze Zeilen: ein Wort als Urteil, die Kennzahlen
+untereinander, die Warnungen als letzte Zeile. Beispiel für einen guten Token:
+
+```
+🟢 GO 82 · PEPE2 · 1m32s
+MC   38k$ · 12.1 SOL
+Vol  9.4k$ · V/MC 0.25 · 60s 2.1 SOL
+Liq  8.7 SOL · L/MC 0.72 · Kurve 32%
+Hold 48 · +27 in 60s
+Buys 41 / 4 · Netto +3.2 SOL
+Dev  1.8% hält · Bundle 2%
+Crea 3 Tok · 1 grad · 2 tot
+Soc  2 Links · Bots 0%
+⚠️   –
+```
+
+Und für einen offensichtlichen Rug, wie ihn ein Sniper trotzdem kauft:
+
+```
+🔴 RUG · SCAM · 3m20s
+MC   900k$ · 6000.0 SOL
+Vol  5.0k$ · V/MC 0.006
+Liq  33.3 SOL · L/MC 0.006
+Hold 61
+Buys 40 / 22
+Dev  ?
+Crea ?
+Soc  keine
+⚠️   FAKE-MC 0.006 · DÜNN 0.006
+```
+
+Die Wörter:
+
+| Wort | Bedeutung |
+|---|---|
+| 🟢 GO | kein Warnsignal, genug echte Käufer, gerade Zulauf |
+| 🟡 WARTE | unklar, oder der Score reicht, aber die Mindestmengen fehlen |
+| ⏳ FRÜH | zu jung für ein Urteil |
+| ⚪ NEIN | schwach, aber kein Rug-Muster |
+| 🔴 RUG | Rug-Muster: Bundle, Dev-Dump, Serien-Deployer, Konzentration, Fake-MC oder dünne Liquidität |
+| ⚫ TOT | Handel eingeschlafen |
+| 🎓 GRAD | graduiert, handelt auf PumpSwap: nur Marktzahlen |
+| ❔ ? | keine Daten oder RPC-Fehler |
+
+Die wichtigsten Warnungen: `BUNDLE 30%/12%` (gekauft/gehalten in den ersten
+Slots), `DEV-DUMP`, `DEV-RAUS 40%`, `SERIE 12/0/11` (frühere Token /
+graduiert / tot), `SCHNELL` (Creator startet im Minutentakt), `FRISCH 5/6`
+(frische frühe Wallets), `FUNDER 4` (vom Creator finanziert), `TOP1 35%`,
+`TOP10 61%`, `BOTS 40%`, `WASH`, `SELF-PUMP`, `EXIT 62%` (Erstkäufer raus),
+`FAKE-MC 0.006` (Volumen der letzten Stunde geteilt durch MC), `DÜNN 0.006`
+(Liquidität geteilt durch MC), `STILL 95s`, `NOSOC`, `LÜCKE` (Daten
+unvollständig), `MINDEST` (Score reicht, Mindestmengen fehlen). Die ganze
+Liste zeigt `python -m holder_scorer legend`.
+
+Die Marktzahlen (MC in USD, Volumen der letzten Stunde, Liquidität,
+Käufe/Verkäufe) kommen von DexScreener, kostenlos und ohne Schlüssel, und
+funktionieren auch für graduierte Token, die das On-Chain-Modul nicht mehr
+lesen kann. Auf der Kurve werden MC, Volumen und Liquidität direkt aus der
+Chain berechnet; der SOL-Kurs kommt aus dem DexScreener-Paar, sonst von
+CoinGecko, sonst aus der Umgebungsvariable `SOL_USD`.
+
+**Telegram:** Einen Bot bei @BotFather anlegen, den Token in
+`TELEGRAM_BOT_TOKEN` und deine Chat-ID in `TELEGRAM_CHAT_ID` setzen. `score
+--telegram` schickt die Kurznachricht, `watch --telegram` schickt sie für die
+Urteile aus `--notify` (Standard: nur GO).
+
+**Früh-Modus (`--early`):** Urteil ab 20 s Alter statt 90 s, mit kleineren
+Mindestmengen (6 Außen-Käufer, 5 Außen-Käufe, 0,5 SOL Zufluss) und strengeren
+Stillstandsregeln, dazu weniger Abfragen (150 Transaktionen, 4 Wallet-Profile,
+40 Creator-Transaktionen). Im Watch-Modus wird dann 25 s nach dem Start
+bewertet. Früher heißt weniger Beweise: mehr WARTE und mehr falsche GO als
+bei 90 s. Wie viel mehr, sagt dir `evaluate` nach ein paar Stunden Aufzeichnung.
+
+Beispielausgabe von `score --long` (die Faktor-Tabelle unter der Kurznachricht):
 
 ```
 Token 7xKX...pump
@@ -130,29 +214,34 @@ etwas Gutes wegwirft.
 ## In einen Bot einbauen
 
 **Python-Bot** (z. B. der Chainstack pump.fun-Bot oder ein eigener): einen
-RPC-Client einmal anlegen, vor dem Kauf aufrufen und nur bei `verdict.buy_signal`
+RPC-Client einmal anlegen, vor dem Kauf aufrufen und nur bei `report.buy_signal`
 kaufen.
 
 ```python
-from holder_scorer import evaluate_token, make_rpc, ScoringConfig
+from holder_scorer import quick_check, format_short, send_telegram, make_rpc, ScoringConfig
 
 rpc = make_rpc(RPC_URL)                       # einmal anlegen: Rate-Limit und Cache bleiben erhalten
-cfg = ScoringConfig(min_age_s=90, yes_threshold=65)
+cfg = ScoringConfig.early()                   # oder ScoringConfig() für die 90-Sekunden-Variante
 
 def darf_kaufen(mint: str) -> bool:
-    verdict = evaluate_token(mint, rpc=rpc, config=cfg)
-    print(verdict.label, round(verdict.score), verdict.hard_fails, verdict.notes)
-    return verdict.buy_signal
+    report = quick_check(mint, rpc, config=cfg)
+    text = format_short(report)               # zehn Zeilen, ein Wort als Urteil
+    print(text)
+    if report.word in ("GO", "RUG"):
+        send_telegram(text)                   # nutzt TELEGRAM_BOT_TOKEN und TELEGRAM_CHAT_ID
+    return report.buy_signal                  # True nur bei GO
 ```
 
-`evaluate_token` wirft `RpcError`, wenn der Endpunkt die Pflichtabfragen (Kurve,
+`quick_check` wirft `RpcError`, wenn der Endpunkt die Pflichtabfragen (Kurve,
 Signaturliste) nicht beantwortet; alles andere wird als "unbekannt" gewertet und
-in `verdict.notes` erklärt.
+in `report.notes` erklärt. `evaluate_token` liefert weiterhin nur das
+On-Chain-Urteil mit der Faktor-Tabelle.
 
 **Bot in einer anderen Sprache** (TypeScript, Rust, …): das Kommando
 `python -m holder_scorer score <MINT> --json` als Unterprozess starten und das
-JSON lesen. Feld `label` ist das Urteil, `score` die Punktzahl, `hard_fails` die
-K.-o.-Gründe, `notes` die Einschränkungen, `features` alle Rohwerte.
+JSON lesen. Feld `word` ist das Urteil, `flags` die Warnungen, `mc_usd`,
+`volume_usd`, `turnover`, `liquidity_sol`, `holders`, `buys`, `sells`,
+`dev_share`, `bundle_share` die Kennzahlen, `verdict.features` alle Rohwerte.
 
 **Fertiger Bot oder Terminal ohne Quellcode** (Telegram-Bots, GMGN, Axiom, …):
 den Watch-Modus daneben laufen lassen und nur Token kaufen, die mit JA

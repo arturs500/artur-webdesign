@@ -69,10 +69,16 @@ class Features:
     organic_net_flow_120s_sol: float | None
     seconds_since_last_trade: float | None
     price_change_60s: float | None
-    # curve
+    # curve and market numbers (SOL-quoted curves only)
     complete: bool | None
     progress: float | None
     curve_sol: float | None
+    mc_sol: float | None
+    volume_sol: float | None
+    volume_60s_sol: float | None
+    volume_120s_sol: float | None
+    turnover: float | None
+    liq_to_mc: float | None
     quote_is_sol: bool
     is_mayhem: bool | None
     is_holder_reward: bool | None
@@ -379,6 +385,27 @@ def compute_features(snap: Snapshot, now: float | None = None) -> Features:
     if snap.curve:
         progress = snap.curve.progress_from(snap.create.real_token_reserves) if (snap.create and snap.create.real_token_reserves) else snap.curve.progress
 
+    # market numbers from the chain: MC = price x supply, volume = traded quote, liquidity = SOL in the curve
+    mc_sol = volume_sol = volume_60 = volume_120 = turnover = liq_to_mc = curve_sol = None
+    if quote_is_sol:
+        price = None
+        if snap.curve and snap.curve.virtual_token_reserves > 0:
+            price = snap.curve.virtual_quote_reserves / snap.curve.virtual_token_reserves
+        elif trades:
+            price = trades[-1].price_after
+        if price:
+            mc_sol = price * supply / LAMPORTS_PER_SOL
+        if trades:
+            volume_sol = sum(t.quote_lamports for t in trades) / LAMPORTS_PER_SOL
+            volume_60 = sum(t.quote_lamports for t in w60) / LAMPORTS_PER_SOL
+            volume_120 = sum(t.quote_lamports for t in w120) / LAMPORTS_PER_SOL
+        if snap.curve:
+            curve_sol = snap.curve.real_quote_reserves / LAMPORTS_PER_SOL
+        if mc_sol and volume_sol is not None:
+            turnover = volume_sol / mc_sol
+        if mc_sol and curve_sol is not None:
+            liq_to_mc = curve_sol / mc_sol
+
     return Features(
         mint=snap.mint,
         collected_at=snap.collected_at,
@@ -419,7 +446,13 @@ def compute_features(snap: Snapshot, now: float | None = None) -> Features:
         price_change_60s=price_change,
         complete=snap.curve.complete if snap.curve else None,
         progress=progress,
-        curve_sol=(snap.curve.real_quote_reserves / LAMPORTS_PER_SOL) if (snap.curve and quote_is_sol) else None,
+        curve_sol=curve_sol,
+        mc_sol=mc_sol,
+        volume_sol=volume_sol,
+        volume_60s_sol=volume_60,
+        volume_120s_sol=volume_120,
+        turnover=turnover,
+        liq_to_mc=liq_to_mc,
         quote_is_sol=quote_is_sol,
         is_mayhem=(snap.curve.is_mayhem_mode if snap.curve and snap.curve.is_mayhem_mode is not None else (snap.create.is_mayhem_mode if snap.create else None)),
         is_holder_reward=snap.curve.is_holder_reward if snap.curve else None,

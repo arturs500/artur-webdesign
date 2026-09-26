@@ -2,13 +2,15 @@
 
 Minimal use from a Python bot::
 
-    from holder_scorer import evaluate_token, make_rpc
+    from holder_scorer import quick_check, format_short, make_rpc
 
     rpc = make_rpc("https://mainnet.helius-rpc.com/?api-key=...")   # create once, reuse
-    verdict = evaluate_token(mint, rpc=rpc)
-    if verdict.buy_signal:      # label == "JA"
+    report = quick_check(mint, rpc)
+    print(format_short(report))          # ten short lines: word, numbers, flags
+    if report.buy_signal:                # word == "GO"
         ...place the buy...
-    print(verdict.score, verdict.label, verdict.hard_fails)
+
+``evaluate_token`` returns the full on-chain verdict (factor table) without market data.
 """
 from __future__ import annotations
 
@@ -18,6 +20,9 @@ import time
 
 from .collect import ProfileCache, Snapshot, collect
 from .features import Features, compute_features
+from .market import MarketData, fetch_market
+from .notify import format_legend, format_short, send_telegram
+from .quick import QuickConfig, QuickReport, quick_check
 from .rpc import RpcError, SolanaRpc
 from .scoring import (
     LABEL_GRADUATED,
@@ -35,6 +40,14 @@ from .scoring import (
 
 __all__ = [
     "evaluate_token",
+    "quick_check",
+    "QuickReport",
+    "QuickConfig",
+    "format_short",
+    "format_legend",
+    "send_telegram",
+    "MarketData",
+    "fetch_market",
     "collect",
     "compute_features",
     "score_features",

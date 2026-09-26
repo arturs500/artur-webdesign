@@ -3,7 +3,7 @@
 Uses the free PumpPortal data stream (wss://pumpportal.fun/api/data). This
 module needs the optional ``websockets`` package. It is meant for people who
 trade through a bot or terminal they cannot modify: run it next to the bot
-and only buy tokens that come back with the label JA.
+and only buy tokens that come back with the word GO.
 
 pump.fun launches far more tokens per hour than a 10-requests-per-second
 endpoint can score in depth, so the watcher (1) only accepts pump.fun pool
@@ -20,8 +20,9 @@ import time
 from typing import Callable
 
 from .collect import ProfileCache
+from .quick import QuickConfig, QuickReport, quick_check
 from .rpc import RpcError, SolanaRpc
-from .scoring import ScoringConfig, Verdict
+from .scoring import ScoringConfig
 
 PUMPPORTAL_WS = "wss://pumpportal.fun/api/data"
 
@@ -41,8 +42,8 @@ def accept_launch(msg: dict) -> tuple[bool, str]:
 
 async def _worker(
     queue: "asyncio.Queue[tuple[float, float, str]]",
-    scorer: Callable[[str, float], "Verdict | int"],
-    on_verdict: Callable[[Verdict], None],
+    scorer: Callable[[str, float], "QuickReport | int"],
+    on_report: Callable[[QuickReport], None],
     on_skip: Callable[[str, int], None] | None,
     max_lateness: float,
     stats: dict[str, int],
@@ -58,9 +59,9 @@ async def _worker(
                 print(f"[{mint[:8]}] übersprungen, {-wait:.0f} s zu spät (Rückstand {queue.qsize()})")
                 continue
             result = await asyncio.to_thread(scorer, mint, launched_at)
-            if isinstance(result, Verdict):
+            if isinstance(result, QuickReport):
                 stats["scored"] += 1
-                on_verdict(result)
+                on_report(result)
             else:
                 stats["skipped_prefilter"] += 1
                 if on_skip:
@@ -78,9 +79,9 @@ async def _worker(
 async def watch_async(
     rpc: SolanaRpc,
     delay_s: float,
-    on_verdict: Callable[[Verdict], None],
+    on_report: Callable[[QuickReport], None],
     config: ScoringConfig | None = None,
-    deep: bool = True,
+    quick: QuickConfig | None = None,
     workers: int = 2,
     max_lateness: float = 30.0,
     min_trades: int = 6,
@@ -93,8 +94,6 @@ async def watch_async(
     except ImportError as exc:
         raise SystemExit("Für den Watch-Modus fehlt das Paket 'websockets': pip install websockets") from exc
 
-    from . import evaluate_token
-
     cache = cache or ProfileCache()
     rpc.stop.clear()  # a previous session may have left the shared client stopped
     queue: "asyncio.Queue[tuple[float, float, str]]" = asyncio.Queue(maxsize=max(4, 3 * workers))
@@ -102,16 +101,16 @@ async def watch_async(
     seen: set[str] = set()
     next_slot = 0.0
 
-    def scorer(mint: str, launched_at: float) -> "Verdict | int":
+    def scorer(mint: str, launched_at: float) -> "QuickReport | int":
         sigs = None
         if min_trades > 0:
             sigs = rpc.get_signatures(mint, limit=1000)
             ok = sum(1 for s in sigs if s.get("err") is None)
             if ok < min_trades:
                 return ok
-        return evaluate_token(mint, rpc=rpc, config=config, deep=deep, cache=cache, launch_hint=launched_at, signatures=sigs)
+        return quick_check(mint, rpc, config=config, quick=quick, cache=cache, launch_hint=launched_at, signatures=sigs)
 
-    tasks = [asyncio.create_task(_worker(queue, scorer, on_verdict, on_skip, max_lateness, stats)) for _ in range(workers)]
+    tasks = [asyncio.create_task(_worker(queue, scorer, on_report, on_skip, max_lateness, stats)) for _ in range(workers)]
     backoff = 5.0
     try:
         while True:
@@ -173,9 +172,9 @@ async def watch_async(
         )
 
 
-def watch(rpc: SolanaRpc, delay_s: float, on_verdict: Callable[[Verdict], None], **kwargs) -> None:
+def watch(rpc: SolanaRpc, delay_s: float, on_report: Callable[[QuickReport], None], **kwargs) -> None:
     try:
-        asyncio.run(watch_async(rpc, delay_s, on_verdict, **kwargs))
+        asyncio.run(watch_async(rpc, delay_s, on_report, **kwargs))
     except KeyboardInterrupt:
         pass
     finally:

@@ -61,6 +61,10 @@ NUMERIC_FACTORS = [
     "failed_after_30s_share",
     "progress",
     "holders_now",
+    "mc_sol",
+    "volume_sol",
+    "turnover",
+    "liq_to_mc",
 ]
 
 
@@ -68,7 +72,7 @@ LABEL_PREFILTER = "VORFILTER"
 MAX_OUTCOME_ATTEMPTS = 3
 
 
-def append_record(path: str, verdict: Verdict) -> None:
+def append_record(path: str, verdict: Verdict, extra: dict[str, Any] | None = None) -> None:
     rec = {
         "recorded_at": time.time(),
         "mint": verdict.mint,
@@ -79,6 +83,8 @@ def append_record(path: str, verdict: Verdict) -> None:
         "features": verdict.features.to_dict(),
         "outcome": None,
     }
+    if extra:
+        rec.update(extra)
     _append_line(path, rec)
 
 

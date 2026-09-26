@@ -1,4 +1,4 @@
-"""Command line interface: score, outcome, evaluate, watch, selftest."""
+"""Command line interface: score, watch, outcome, evaluate, selftest, legend."""
 from __future__ import annotations
 
 import argparse
@@ -6,16 +6,20 @@ import json
 import sys
 import time
 
-from . import evaluate_token, make_rpc
+from . import make_rpc
 from .calibrate import append_prefilter_record, append_record, evaluate, update_outcomes
 from .collect import collect
 from .features import compute_features
+from .notify import format_legend, format_short, send_telegram, telegram_configured
+from .quick import QuickConfig, QuickReport, quick_check
 from .rpc import RpcError
 from .scoring import ScoringConfig, format_verdict
 
+NOTIFY_DEFAULT = "go"
+
 
 def _config_from_args(args: argparse.Namespace) -> ScoringConfig:
-    cfg = ScoringConfig()
+    cfg = ScoringConfig.early() if getattr(args, "early", False) else ScoringConfig()
     if getattr(args, "min_age", None) is not None:
         cfg.min_age_s = args.min_age
     if getattr(args, "yes_threshold", None) is not None:
@@ -25,17 +29,23 @@ def _config_from_args(args: argparse.Namespace) -> ScoringConfig:
     return cfg
 
 
+def _quick_from_args(args: argparse.Namespace) -> QuickConfig:
+    return QuickConfig(fast=bool(getattr(args, "fast", False) or getattr(args, "early", False)), use_market=not getattr(args, "no_market", False))
+
+
 def _add_rpc_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--rpc", help="Solana-RPC-URL (oder Umgebungsvariable SOLANA_RPC_URL)")
     p.add_argument("--rps", type=float, help="Anfragen pro Sekunde (Standard 10, Helius-Gratis-Tarif)")
 
 
 def _add_score_args(p: argparse.ArgumentParser) -> None:
-    p.add_argument("--json", action="store_true", help="Ergebnis als JSON ausgeben (für andere Programme)")
-    p.add_argument("--no-deep", action="store_true", help="frühe Wallets nicht prüfen (spart etwa 15 Anfragen)")
-    p.add_argument("--min-age", type=float, help="Mindestalter in Sekunden, darunter Urteil ZU_FRUEH (Standard 90)")
-    p.add_argument("--yes-threshold", type=float, help="Score ab dem das Urteil JA lautet (Standard 65)")
+    p.add_argument("--early", action="store_true", help="Früh-Modus: Urteil ab 20 s Alter mit kleineren Mindestmengen, weniger Abfragen")
+    p.add_argument("--fast", action="store_true", help="weniger Transaktionen und Wallet-Profile laden (schneller, etwas weniger genau)")
+    p.add_argument("--no-market", action="store_true", help="keine Marktzahlen von DexScreener abrufen")
+    p.add_argument("--min-age", type=float, help="Mindestalter in Sekunden, darunter Urteil FRÜH (Standard 90, mit --early 20)")
+    p.add_argument("--yes-threshold", type=float, help="Score ab dem das Urteil GO lautet (Standard 65)")
     p.add_argument("--no-threshold", type=float, help="Score unter dem das Urteil NEIN lautet (Standard 45)")
+    p.add_argument("--telegram", action="store_true", help="Kurznachricht per Telegram senden (TELEGRAM_BOT_TOKEN und TELEGRAM_CHAT_ID)")
 
 
 def _stats_line(rpc) -> str:
@@ -44,23 +54,48 @@ def _stats_line(rpc) -> str:
     return f"{rpc.stats['requests']} Request-Einheiten in {rpc.stats['posts']} HTTP-Aufrufen, {rpc.stats['retries']} Wiederholungen ({top})"
 
 
+def _record_report(path: str, report: QuickReport) -> None:
+    if report.verdict is None:
+        return
+    extra = {"word": report.word, "flags": report.flags, "market": report.market.to_dict() if report.market else None, "sol_usd": report.sol_usd}
+    append_record(path, report.verdict, extra)
+
+
+def _notify(report: QuickReport, words: set[str]) -> None:
+    if report.word in words:
+        ok = send_telegram(format_short(report))
+        if not ok:
+            print("(Telegram-Versand fehlgeschlagen)", file=sys.stderr)
+
+
 def cmd_score(args: argparse.Namespace) -> int:
     rpc = make_rpc(args.rpc, args.rps)
     cfg = _config_from_args(args)
     t0 = time.monotonic()
     try:
-        verdict = evaluate_token(args.mint, rpc=rpc, config=cfg, deep=not args.no_deep)
+        report = quick_check(args.mint, rpc, config=cfg, quick=_quick_from_args(args))
     except RpcError as exc:
         print(f"RPC-Fehler: {exc}", file=sys.stderr)
         return 2
     if args.record:
-        append_record(args.record, verdict)
+        _record_report(args.record, report)
+    if args.telegram:
+        if not telegram_configured():
+            print("Telegram nicht konfiguriert: TELEGRAM_BOT_TOKEN und TELEGRAM_CHAT_ID setzen", file=sys.stderr)
+        else:
+            _notify(report, {report.word})
     if args.json:
-        print(json.dumps(verdict.to_dict(), ensure_ascii=False, indent=2))
-    else:
-        print(format_verdict(verdict))
+        print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2))
+    elif args.long and report.verdict is not None:
+        print(format_short(report))
+        print()
+        print(format_verdict(report.verdict))
         print(f"\n({time.monotonic() - t0:.1f} s, {_stats_line(rpc)})")
-    return 0 if verdict.buy_signal else 1
+    else:
+        print(format_short(report))
+        if args.long:
+            print("\n(keine Curve-Analyse für diesen Token, nur Marktzahlen)")
+    return 0 if report.buy_signal else 1
 
 
 def cmd_outcome(args: argparse.Namespace) -> int:
@@ -75,19 +110,32 @@ def cmd_evaluate(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_legend(args: argparse.Namespace) -> int:
+    print(format_legend())
+    return 0
+
+
 def cmd_watch(args: argparse.Namespace) -> int:
     from .watch import watch
 
     rpc = make_rpc(args.rpc, args.rps)
     cfg = _config_from_args(args)
+    notify_words = {w.strip().upper() for w in (args.notify or NOTIFY_DEFAULT).split(",") if w.strip()}
+    if args.telegram and not telegram_configured():
+        print("Telegram nicht konfiguriert: TELEGRAM_BOT_TOKEN und TELEGRAM_CHAT_ID setzen", file=sys.stderr)
+        return 2
+    delay = args.delay if args.delay is not None else (25.0 if args.early else 90.0)
 
-    def on_verdict(v):
-        if v.score >= args.min_score or v.hard_fails:
-            print(f"\n{time.strftime('%H:%M:%S')}  {v.label:<9} {v.score:5.1f}  {v.mint}")
-            if args.verbose:
-                print(format_verdict(v))
+    def on_report(r: QuickReport):
+        if r.score is None or r.score >= args.min_score or r.flags:
+            print(f"\n{time.strftime('%H:%M:%S')}  {r.mint}")
+            print(format_short(r))
+            if args.verbose and r.verdict is not None:
+                print(format_verdict(r.verdict))
         if args.record:
-            append_record(args.record, v)
+            _record_report(args.record, r)
+        if args.telegram:
+            _notify(r, notify_words)
 
     def on_skip(mint: str, signatures: int):
         if args.record:
@@ -95,10 +143,10 @@ def cmd_watch(args: argparse.Namespace) -> int:
 
     watch(
         rpc,
-        args.delay,
-        on_verdict,
+        delay,
+        on_report,
         config=cfg,
-        deep=not args.no_deep,
+        quick=_quick_from_args(args),
         max_lateness=args.max_lag,
         min_trades=args.min_trades,
         max_per_hour=args.max_per_hour,
@@ -151,7 +199,7 @@ def cmd_selftest(args: argparse.Namespace) -> int:
     print("Zeiten: " + ", ".join(f"{k} {v:.1f}s" for k, v in snap.timings.items()))
     print(_stats_line(rpc))
     feats = compute_features(snap)
-    print(f"\nMerkmale: age={feats.age_s and round(feats.age_s)} holders={feats.holders_now} growth60={feats.holder_growth_60s}")
+    print(f"\nMerkmale: age={feats.age_s and round(feats.age_s)} holders={feats.holders_now} growth60={feats.holder_growth_60s} mc_sol={feats.mc_sol}")
     return 0
 
 
@@ -159,8 +207,10 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="holder_scorer", description="Bewertet, ob ein pump.fun-Token wahrscheinlich mehr Holder bekommt.")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    s = sub.add_parser("score", help="einen Token jetzt bewerten")
+    s = sub.add_parser("score", help="einen Token jetzt bewerten (Kurznachricht)")
     s.add_argument("mint")
+    s.add_argument("--long", action="store_true", help="zusätzlich die vollständige Faktor-Tabelle ausgeben")
+    s.add_argument("--json", action="store_true", help="Ergebnis als JSON ausgeben (für andere Programme)")
     s.add_argument("--record", help="Urteil samt Merkmalen an diese JSONL-Datei anhängen")
     _add_rpc_args(s)
     _add_score_args(s)
@@ -178,13 +228,14 @@ def build_parser() -> argparse.ArgumentParser:
     e.set_defaults(func=cmd_evaluate)
 
     w = sub.add_parser("watch", help="neue Token live bewerten (braucht das Paket websockets)")
-    w.add_argument("--delay", type=float, default=90.0, help="Sekunden nach dem Start bis zur Bewertung (Standard 90)")
+    w.add_argument("--delay", type=float, help="Sekunden nach dem Start bis zur Bewertung (Standard 90, mit --early 25)")
     w.add_argument("--max-lag", type=float, default=30.0, help="Token überspringen, die mehr als N s nach der Fälligkeit dran wären (Standard 30)")
     w.add_argument("--min-trades", type=int, default=6, help="Vorfilter: mindestens N Transaktionen, sonst keine Bewertung (Standard 6)")
     w.add_argument("--max-per-hour", type=float, help="höchstens N Launches pro Stunde bewerten (schont das Kontingent)")
-    w.add_argument("--min-score", type=float, default=0.0, help="nur Urteile ab diesem Score anzeigen")
+    w.add_argument("--min-score", type=float, default=0.0, help="nur Urteile ab diesem Score anzeigen (Warnungen immer)")
+    w.add_argument("--notify", help="welche Urteile per Telegram gehen, kommagetrennt (Standard: go; z. B. go,rug)")
     w.add_argument("--record", help="alle Urteile an diese JSONL-Datei anhängen")
-    w.add_argument("--verbose", action="store_true", help="vollständige Faktor-Tabelle je Token")
+    w.add_argument("--verbose", action="store_true", help="zusätzlich die vollständige Faktor-Tabelle je Token")
     _add_rpc_args(w)
     _add_score_args(w)
     w.set_defaults(func=cmd_watch)
@@ -193,6 +244,9 @@ def build_parser() -> argparse.ArgumentParser:
     t.add_argument("mint")
     _add_rpc_args(t)
     t.set_defaults(func=cmd_selftest)
+
+    lg = sub.add_parser("legend", help="die Kurzsprache der Nachrichten erklären")
+    lg.set_defaults(func=cmd_legend)
     return p
 
 

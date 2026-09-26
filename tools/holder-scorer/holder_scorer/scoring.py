@@ -59,6 +59,25 @@ class ScoringConfig:
     w_organic: float = 5.0
     w_socials: float = 10.0
 
+    @classmethod
+    def early(cls) -> "ScoringConfig":
+        """Settings for a decision about 20 to 40 seconds after launch.
+
+        The windows (60 s / 120 s) then cover the whole life of the token, so the
+        minimum quantities are scaled down and the stall rules tightened. Earlier
+        means less evidence: expect more WARTE and more wrong GO than at 90 s.
+        """
+        return cls(
+            min_age_s=20.0,
+            yes_min_outside_buyers=6,
+            yes_min_outside_buys_120s=5,
+            yes_min_net_inflow_120s_sol=0.5,
+            early_stall_age_s=40.0,
+            early_stall_gap_s=25.0,
+            stall_age_s=120.0,
+            stall_gap_s=60.0,
+        )
+
 
 @dataclass
 class FactorResult:
@@ -299,6 +318,67 @@ def _socials(f: Features, cfg: ScoringConfig) -> FactorResult:
     pts = {0: 0.0, 1: mx * 0.6}.get(f.socials_count, mx)
     value = f"{f.socials_count} Social-Links" + ("" if f.has_image else ", kein Bild")
     return FactorResult("Socials", pts, mx, value, "")
+
+
+def short_flags(f: Features, cfg: ScoringConfig) -> list[str]:
+    """The warning vocabulary for short messages: hard fails first, then softer signals."""
+    flags: list[str] = []
+
+    def pct(x: float | None) -> str:
+        return "?" if x is None else f"{x * 100:.0f}%"
+
+    if f.creation_window_share is not None and f.creation_window_share >= 0.02:
+        held = f.creation_window_held_share
+        flags.append(f"BUNDLE {pct(f.creation_window_share)}" + (f"/{pct(held)}" if held is not None else ""))
+    if f.dev_buy_share is not None and f.dev_sold_share is not None and f.dev_buy_share >= cfg.dev_dump_min_buy:
+        if f.dev_sold_share >= cfg.dev_dump_share:
+            flags.append("DEV-DUMP")
+        elif f.dev_sold_share >= 0.2:
+            flags.append(f"DEV-RAUS {pct(f.dev_sold_share)}")
+    if f.creator_prior_tokens:
+        dead_rate = (f.creator_dead or 0) / f.creator_prior_tokens
+        if f.creator_prior_tokens >= 3 and (f.creator_graduated or 0) == 0 and dead_rate >= 0.6:
+            flags.append(f"SERIE {f.creator_prior_tokens}/{f.creator_graduated or 0}/{f.creator_dead or 0}")
+    if (f.creator_seconds_since_prev_launch is not None and f.creator_seconds_since_prev_launch < 600) or (
+        f.creator_launch_rate_per_h is not None and f.creator_launch_rate_per_h >= 3
+    ):
+        flags.append("SCHNELL")
+    if f.early_fresh_wallets >= 2:
+        flags.append(f"FRISCH {f.early_fresh_wallets}/{f.early_wallets_checked}")
+    if f.early_funded_by_creator or f.early_shared_funder_max >= 3:
+        flags.append(f"FUNDER {max(f.early_funded_by_creator, f.early_shared_funder_max)}")
+    if f.largest_holder_share is not None and f.largest_holder_share >= cfg.max_largest_holder:
+        flags.append(f"TOP1 {pct(f.largest_holder_share)}")
+    elif f.largest_float_share is not None and f.largest_float_share >= cfg.max_largest_float and f.unique_outside_buyers >= 8:
+        flags.append(f"TOP1 {pct(f.largest_float_share)} Float")
+    if f.top10_share is not None and f.top10_share >= cfg.max_top10_share:
+        flags.append(f"TOP10 {pct(f.top10_share)}")
+    if f.wash_share is not None and f.wash_share >= cfg.max_wash_share and f.unique_traders >= 8:
+        flags.append("WASH")
+    elif f.bot_buy_share is not None and f.bot_buy_share >= 0.3:
+        flags.append(f"BOTS {pct(f.bot_buy_share)}")
+    if f.price_change_60s is not None and f.price_change_60s >= 0.25 and f.new_buyers_60s <= 2:
+        flags.append("SELF-PUMP")
+    if f.early_sold_share is not None and f.early_sold_share >= 0.5:
+        flags.append(f"EXIT {pct(f.early_sold_share)}")
+    if f.age_s is not None and f.seconds_since_last_trade is not None:
+        if (f.age_s >= cfg.stall_age_s and f.seconds_since_last_trade >= cfg.stall_gap_s) or (
+            f.age_s >= cfg.early_stall_age_s and f.seconds_since_last_trade >= cfg.early_stall_gap_s
+        ):
+            flags.append(f"STILL {f.seconds_since_last_trade:.0f}s")
+    if f.socials_count == 0:
+        flags.append("NOSOC")
+    if f.is_mayhem:
+        flags.append("MAYHEM")
+    if not f.quote_is_sol:
+        flags.append("USDC")
+    if f.partial_history:
+        flags.append("LÜCKE")
+    if f.n_trades and f.age_s is not None and f.age_s >= cfg.min_age_s and yes_gate_failures(f, cfg) and not any(
+        x.split(" ")[0] in ("BUNDLE", "DEV-DUMP", "SERIE", "TOP1", "TOP10", "WASH", "STILL") for x in flags
+    ):
+        flags.append("MINDEST")
+    return flags
 
 
 def yes_gate_failures(f: Features, cfg: ScoringConfig) -> list[str]:
