@@ -38,11 +38,13 @@ NUMERIC_FACTORS = [
     "organic_net_flow_120s_sol",
     "price_change_60s",
     "creation_window_share",
+    "creation_window_held_share",
     "creation_window_sold_share",
     "early_sold_share",
     "early_overhang",
     "top10_share",
     "largest_float_share",
+    "top3_float_share",
     "dev_buy_share",
     "dev_sold_share",
     "early_fresh_wallets",
@@ -62,6 +64,10 @@ NUMERIC_FACTORS = [
 ]
 
 
+LABEL_PREFILTER = "VORFILTER"
+MAX_OUTCOME_ATTEMPTS = 3
+
+
 def append_record(path: str, verdict: Verdict) -> None:
     rec = {
         "recorded_at": time.time(),
@@ -74,6 +80,11 @@ def append_record(path: str, verdict: Verdict) -> None:
         "outcome": None,
     }
     _append_line(path, rec)
+
+
+def append_prefilter_record(path: str, mint: str, signatures: int) -> None:
+    """Record a launch the watch prefilter skipped, so ``outcome`` can show whether it grew anyway."""
+    _append_line(path, {"recorded_at": time.time(), "mint": mint, "label": LABEL_PREFILTER, "signatures": signatures, "features": None, "outcome": None})
 
 
 def _append_line(path: str, obj: dict[str, Any]) -> None:
@@ -131,27 +142,46 @@ def _probe_holders(rpc: SolanaRpc, mint: str, now: float) -> tuple[int | None, f
                 continue
             merged[item["owner"]] = merged.get(item["owner"], 0) + item["amount"]
         return sum(1 for a in merged.values() if a > DUST_TOKENS), progress, complete
-    snap = collect(mint, rpc, deep=False, fetch_metadata=False, max_tx=400, use_das=False, now=now)
+    snap = collect(mint, rpc, deep=False, fetch_metadata=False, max_tx=400, use_das=False, creator_scan_tx=0, now=now)
     feats = compute_features(snap, now)
     return feats.holders_now, progress if progress is not None else feats.progress, complete if complete is not None else feats.complete
 
 
+def _outcome_final(outcome: Any, base_known: bool) -> bool:
+    """An outcome is final when it carries a result, or the base count can never be known, or attempts are used up."""
+    if not isinstance(outcome, dict):
+        return outcome is not None
+    if outcome.get("grew") is not None:
+        return True
+    if not base_known and "holders_later" in outcome:
+        return True  # nothing to compare against; the later count is kept for the VORFILTER statistics
+    return int(outcome.get("attempts") or 1) >= MAX_OUTCOME_ATTEMPTS
+
+
 def update_outcomes(path: str, rpc: SolanaRpc, horizon_s: float = 900.0, growth_target: float = 1.5) -> int:
-    """Append outcomes for records older than ``horizon_s``. Returns the count checked."""
+    """Append outcomes for records older than ``horizon_s``. Returns the count checked.
+
+    Transient failures and unknown holder counts are retried on later runs (up to
+    ``MAX_OUTCOME_ATTEMPTS`` times); a later outcome line supersedes an earlier one.
+    """
     records = load_records(path)
     checked = 0
     for rec in records:
         now = time.time()
         mint, recorded_at = rec.get("mint"), rec.get("recorded_at")
-        if not mint or recorded_at is None or rec.get("outcome") is not None or recorded_at + horizon_s > now:
+        if not mint or recorded_at is None or recorded_at + horizon_s > now:
             continue
         base = (rec.get("features") or {}).get("holders_now")
+        prev = rec.get("outcome")
+        if _outcome_final(prev, base is not None):
+            continue
+        attempts = (int(prev.get("attempts") or 1) if isinstance(prev, dict) else 0) + 1
         try:
             later, progress, complete = _probe_holders(rpc, mint, now)
         except Exception as exc:  # noqa: BLE001 - one bad record must not abort the run
             if "abgebrochen" in str(exc):
                 raise
-            _append_line(path, {"outcome_for": {"mint": mint, "recorded_at": recorded_at}, "outcome": {"error": str(exc), "checked_at": now}})
+            _append_line(path, {"outcome_for": {"mint": mint, "recorded_at": recorded_at}, "outcome": {"error": str(exc), "checked_at": now, "attempts": attempts}})
             checked += 1
             continue
         grew = None
@@ -165,9 +195,10 @@ def update_outcomes(path: str, rpc: SolanaRpc, horizon_s: float = 900.0, growth_
             "progress_later": progress,
             "complete_later": complete,
             "grew": grew,
+            "attempts": attempts,
         }
-        if grew is None:
-            outcome["error"] = "holder count unknown at record or at check"
+        if grew is None and base is not None:
+            outcome["error"] = "holder count unknown at check"
         _append_line(path, {"outcome_for": {"mint": mint, "recorded_at": recorded_at}, "outcome": outcome})
         checked += 1
     return checked
@@ -247,6 +278,10 @@ def evaluate(path: str) -> EvalReport:
         subset = [l for r, l in zip(records, labels) if (r.get("features") or {}).get(flag) is True]
         if subset:
             lines.append(f"  {flag}=True  n={len(subset):<4} Trefferquote {sum(subset) / len(subset) * 100:.1f} %")
+    pre = [r for r in all_records if r.get("label") == LABEL_PREFILTER and isinstance(r.get("outcome"), dict) and r["outcome"].get("holders_later") is not None]
+    if pre:
+        grown = sum(1 for r in pre if (r["outcome"].get("holders_later") or 0) >= 20)
+        lines.append(f"  Vorfilter-Abweisungen mit Ergebnis: n={len(pre)}, davon später mindestens 20 Holder: {grown / len(pre) * 100:.1f} %")
     terciles: dict[str, list[tuple[str, int, float | None]]] = {}
     lines.append("\nFaktoren nach Dritteln (Anteil gewachsen je Drittel, niedrig → hoch):")
     for name in NUMERIC_FACTORS:
@@ -279,4 +314,14 @@ def evaluate(path: str) -> EvalReport:
     return EvalReport(len(all_records), len(records), base_rate, per_label, terciles, coefficients, "\n".join(lines))
 
 
-__all__ = ["append_record", "load_records", "update_outcomes", "evaluate", "EvalReport", "NUMERIC_FACTORS", "ProfileCache"]
+__all__ = [
+    "append_record",
+    "append_prefilter_record",
+    "load_records",
+    "update_outcomes",
+    "evaluate",
+    "EvalReport",
+    "NUMERIC_FACTORS",
+    "LABEL_PREFILTER",
+    "ProfileCache",
+]

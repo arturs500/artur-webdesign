@@ -46,6 +46,7 @@ class Features:
     # holders and momentum
     holders_now: int | None
     holders_source: str
+    holders_listed: int | None
     holders_now_trades: int | None
     holders_60s_ago: int | None
     holders_120s_ago: int | None
@@ -204,8 +205,11 @@ def compute_features(snap: Snapshot, now: float | None = None) -> Features:
     outside = lambda u: u not in devs and u not in bots  # noqa: E731
 
     slot0 = snap.create.slot if snap.create else None
+    # the creation window and the dev buy only need the head of the history, not the whole of it
+    head_usable = snap.head_usable and (snap.head_last_slot is None or slot0 is None or snap.head_last_slot > slot0 + CREATION_WINDOW_SLOTS)
+    das_balances = {h.owner: h.amount for h in snap.holders} if (snap.holders is not None and snap.holders_source == "das") else None
     window_wallets: set[str] = set()
-    if slot0 is not None and complete_history:
+    if slot0 is not None and head_usable:
         window_wallets = {t.user for t in buys if t.slot <= slot0 + CREATION_WINDOW_SLOTS and t.user not in devs}
     first_nondev = [u for u in buyers_order if u not in devs][:EARLY_COHORT_BUYERS]
     cohort = set(window_wallets) | set(first_nondev)
@@ -286,30 +290,40 @@ def compute_features(snap: Snapshot, now: float | None = None) -> Features:
             top3_float = min(1.0, sum(nondev[:3]) / float_tokens)
     creation_slot_buyers = creation_window_share = window_held = window_sold = None
     early_sold_share = early_overhang = None
-    if slot0 is not None and complete_history:
+    if slot0 is not None and head_usable:
         early_buys = [t for t in buys if t.user in window_wallets]
         creation_slot_buyers = len(window_wallets)
         bought = sum(t.token_amount for t in early_buys)
         creation_window_share = bought / supply
-        held_map = {h.owner: h.amount for h in snap.holders} if (snap.holders and snap.holders_source == "das") else balances
-        held = sum(max(0, held_map.get(u, 0)) for u in window_wallets)
-        window_held = held / supply
-        window_sold = (1.0 - held / bought) if bought else None
+        # what the window wallets still hold: DAS is authoritative, a complete trade replay is second best
+        held_map = das_balances if das_balances is not None else (balances if complete_history else None)
+        if held_map is not None:
+            held = sum(max(0, held_map.get(u, 0)) for u in window_wallets)
+            window_held = held / supply
+            window_sold = (1.0 - held / bought) if bought else None
         cohort_bought = sum(t.token_amount for t in buys if t.user in cohort)
-        cohort_sold = sum(t.token_amount for t in sells if t.user in cohort)
-        early_sold_share = (cohort_sold / cohort_bought) if cohort_bought else None
-        if circulating > 0:
-            early_overhang = max(0, cohort_bought - cohort_sold) / circulating
-    dev_buy_share = dev_sold_share = dev_holds_share = None
-    if trades and devs and complete_history:
-        dev_bought = sum(t.token_amount for t in buys if t.user in devs)
-        dev_sold = sum(t.token_amount for t in sells if t.user in devs)
-        dev_buy_share = dev_bought / supply
-        dev_sold_share = (dev_sold / dev_bought) if dev_bought else 0.0
-        if snap.holders and snap.holders_source == "das":
-            dev_holds_share = sum(h.amount for h in snap.holders if h.owner in devs) / supply
+        if complete_history:
+            cohort_sold = sum(t.token_amount for t in sells if t.user in cohort)
+        elif das_balances is not None:
+            cohort_sold = max(0, cohort_bought - sum(max(0, das_balances.get(u, 0)) for u in cohort))
         else:
-            dev_holds_share = max(0, dev_bought - dev_sold) / supply
+            cohort_sold = None
+        if cohort_sold is not None:
+            early_sold_share = (cohort_sold / cohort_bought) if cohort_bought else None
+            if circulating > 0 and complete_history:
+                early_overhang = max(0, cohort_bought - cohort_sold) / circulating
+    dev_buy_share = dev_sold_share = dev_holds_share = None
+    if trades and devs and head_usable:
+        dev_bought = sum(t.token_amount for t in buys if t.user in devs)
+        dev_buy_share = dev_bought / supply
+        if complete_history:
+            dev_sold = sum(t.token_amount for t in sells if t.user in devs)
+            dev_sold_share = (dev_sold / dev_bought) if dev_bought else 0.0
+            dev_holds_share = (sum(a for o, a in das_balances.items() if o in devs) / supply) if das_balances is not None else max(0, dev_bought - dev_sold) / supply
+        elif das_balances is not None:
+            dev_holds = sum(a for o, a in das_balances.items() if o in devs)
+            dev_holds_share = dev_holds / supply
+            dev_sold_share = max(0.0, 1.0 - dev_holds / dev_bought) if dev_bought else 0.0
 
     # early wallets ----------------------------------------------------------------------
     fresh = sum(1 for w in snap.early_wallets if w.is_fresh)
@@ -380,6 +394,7 @@ def compute_features(snap: Snapshot, now: float | None = None) -> Features:
         failed_after_30s_share=failed_after_30,
         holders_now=holders_now,
         holders_source=snap.holders_source,
+        holders_listed=len(snap.holders) if snap.holders is not None else None,
         holders_now_trades=holders_now_trades,
         holders_60s_ago=holders_60,
         holders_120s_ago=holders_120,

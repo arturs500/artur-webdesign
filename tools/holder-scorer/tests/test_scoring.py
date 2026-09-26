@@ -109,7 +109,7 @@ def bundle_snapshot() -> Snapshot:
     snap = base_snapshot(mint, dev, launch, trades, curve_sol=4.0)
     snap.creator_history = CreatorHistory(address=dev, prior_tokens=12, graduated=0, dead=11, active=1, source="rpc")
     snap.creator_profile = WalletProfile(address=dev, tx_count=15, first_seen=int(launch - 3600), is_fresh=True)
-    snap.early_wallets = [WalletProfile(address=w, tx_count=3, first_seen=int(launch - 600), funder=dev, is_fresh=True) for w in bundle[:6]]
+    snap.early_wallets = [WalletProfile(address=w, tx_count=3, first_seen=int(launch - 600), funder=dev, is_fresh=True).with_launch(int(launch)) for w in bundle[:6]]
     snap.metadata_ok = True
     snap.metadata = {"twitter": "https://x.com"}
     return snap

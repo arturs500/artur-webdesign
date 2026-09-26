@@ -156,7 +156,8 @@ def _momentum(f: Features, cfg: ScoringConfig) -> FactorResult:
         shown = f.holders_now if f.holders_now is not None else "?"
         value = f"{f.new_buyers_60s} neue Käufer in 60 s bei {shown} Holdern"
         comments.append("Holder-Verlauf unbekannt, Näherung über neue Käufer")
-    if (f.holders_now or 0) < 10 and (f.age_s or 0) > 120:
+    known = [c for c in (f.holders_now, f.holders_now_trades) if c is not None]
+    if known and max(known) < 10 and (f.age_s or 0) > 120:
         pts = min(pts, mx * 0.2)
         comments.append("zu wenige Holder für das Alter des Tokens")
     if f.price_change_60s is not None and f.price_change_60s >= 0.25 and f.new_buyers_60s <= 2:
@@ -225,9 +226,13 @@ def _distribution(f: Features, cfg: ScoringConfig) -> FactorResult:
         return FactorResult("Verteilung", mx * 0.3, mx, "unbekannt", "weder Bundle- noch Holder-Daten")
     pts = mx
     parts: list[str] = []
+    comments: list[str] = []
     if f.creation_window_share is not None:
-        pts -= min(mx, 60.0 * f.creation_window_share)
-        parts.append(f"Bundle-Anteil {_pct(f.creation_window_share)} ({f.creation_slot_buyers} Wallets)")
+        held = f.creation_window_held_share if f.creation_window_held_share is not None else f.creation_window_share
+        pts -= min(mx, 60.0 * held)
+        parts.append(f"Bundle-Anteil {_pct(f.creation_window_share)} gekauft, {_pct(held)} gehalten ({f.creation_slot_buyers} Wallets)")
+        if f.creation_window_sold_share is not None and f.creation_window_sold_share >= 0.5 and f.creation_window_share >= 0.02:
+            comments.append(f"Bundle hat {_pct(f.creation_window_sold_share)} bereits verkauft")
     if f.top10_share is not None:
         if f.top10_share > 0.15:
             pts -= (f.top10_share - 0.15) * 40.0
@@ -236,7 +241,6 @@ def _distribution(f: Features, cfg: ScoringConfig) -> FactorResult:
         if f.largest_float_share > 0.25:
             pts -= (f.largest_float_share - 0.25) * 40.0
         parts.append(f"größter Nicht-Dev-Holder {_pct(f.largest_float_share)} des Floats")
-    comments: list[str] = []
     if f.early_fresh_wallets > 1:
         pts -= 3.0 * (f.early_fresh_wallets - 1)
         comments.append(f"{f.early_fresh_wallets} von {f.early_wallets_checked} frühen Wallets sind frisch")
@@ -359,10 +363,10 @@ def format_verdict(v: Verdict) -> str:
     f = v.features
     lines = [f"Token {v.mint}"]
     age = f"{f.age_s:.0f} s" if f.age_s is not None else "?"
-    if f.holders_now is None:
+    if f.holders_source == "largest" and f.holders_listed is not None:
+        holders = f"≥{f.holders_listed} (nur Top-20-Konten)"
+    elif f.holders_now is None:
         holders = "?"
-    elif f.holders_source == "largest":
-        holders = f"≥{f.holders_now} (nur Top-20-Konten)"
     else:
         holders = f"{f.holders_now} ({f.holders_source})"
     lines.append(

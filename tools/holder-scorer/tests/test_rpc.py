@@ -91,6 +91,24 @@ def test_batch_and_sequential_fallback():
         rpc3.batch([("getTransaction", ["a"])])
 
 
+def test_batch_never_resends_item_by_item_after_transport_failure():
+    posts = {"n": 0}
+
+    def always_503(body):
+        posts["n"] += 1
+        return Resp(503, "down")
+
+    rpc = make(always_503, max_retries=1)
+    out = rpc.batch([("getTransaction", ["a"]), ("getTransaction", ["b"])])
+    assert out == [None, None]
+    assert posts["n"] == 2  # one batch post plus one retry, no per-item fallback
+
+    rpc429 = make(lambda body: Resp(429, "slow"), max_retries=0)
+    with pytest.raises(RpcError) as exc:
+        rpc429.batch([("getTransaction", ["a"])])
+    assert exc.value.http_status == 429
+
+
 def test_das_latch_only_on_method_not_found():
     def per_request_error(body):
         return Resp(200, {"jsonrpc": "2.0", "id": body["id"], "error": {"code": -32602, "message": "Invalid params"}})

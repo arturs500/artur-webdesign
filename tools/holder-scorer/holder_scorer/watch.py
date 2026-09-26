@@ -7,9 +7,10 @@ and only buy tokens that come back with the label JA.
 
 pump.fun launches far more tokens per hour than a 10-requests-per-second
 endpoint can score in depth, so the watcher (1) only accepts pump.fun pool
-launches, (2) drops launches it cannot score within ``max_lateness`` seconds
-of their due time, and (3) triages each token with one cheap signature
-lookup before spending the full request budget on it.
+launches, (2) optionally samples them down to ``max_per_hour``, (3) drops
+launches it cannot score within ``max_lateness`` seconds of their due time,
+and (4) triages each token with one signature lookup before spending the full
+request budget on it; that page is reused by the scorer.
 """
 from __future__ import annotations
 
@@ -40,8 +41,9 @@ def accept_launch(msg: dict) -> tuple[bool, str]:
 
 async def _worker(
     queue: "asyncio.Queue[tuple[float, float, str]]",
-    scorer: Callable[[str, float], Verdict | None],
+    scorer: Callable[[str, float], "Verdict | int"],
     on_verdict: Callable[[Verdict], None],
+    on_skip: Callable[[str, int], None] | None,
     max_lateness: float,
     stats: dict[str, int],
 ) -> None:
@@ -55,12 +57,14 @@ async def _worker(
                 stats["skipped_late"] += 1
                 print(f"[{mint[:8]}] übersprungen, {-wait:.0f} s zu spät (Rückstand {queue.qsize()})")
                 continue
-            verdict = await asyncio.to_thread(scorer, mint, launched_at)
-            if verdict is None:
-                stats["skipped_prefilter"] += 1
-            else:
+            result = await asyncio.to_thread(scorer, mint, launched_at)
+            if isinstance(result, Verdict):
                 stats["scored"] += 1
-                on_verdict(verdict)
+                on_verdict(result)
+            else:
+                stats["skipped_prefilter"] += 1
+                if on_skip:
+                    on_skip(mint, int(result))
         except RpcError as exc:
             if "abgebrochen" in str(exc):
                 return
@@ -80,6 +84,8 @@ async def watch_async(
     workers: int = 2,
     max_lateness: float = 30.0,
     min_trades: int = 6,
+    max_per_hour: float | None = None,
+    on_skip: Callable[[str, int], None] | None = None,
     cache: ProfileCache | None = None,
 ) -> None:
     try:
@@ -90,18 +96,22 @@ async def watch_async(
     from . import evaluate_token
 
     cache = cache or ProfileCache()
+    rpc.stop.clear()  # a previous session may have left the shared client stopped
     queue: "asyncio.Queue[tuple[float, float, str]]" = asyncio.Queue(maxsize=max(4, 3 * workers))
-    stats = {"seen": 0, "queued": 0, "dropped_full": 0, "skipped_late": 0, "skipped_prefilter": 0, "scored": 0}
+    stats = {"seen": 0, "queued": 0, "dropped_full": 0, "sampled_out": 0, "skipped_late": 0, "skipped_prefilter": 0, "scored": 0}
     seen: set[str] = set()
+    next_slot = 0.0
 
-    def scorer(mint: str, launched_at: float) -> Verdict | None:
+    def scorer(mint: str, launched_at: float) -> "Verdict | int":
+        sigs = None
         if min_trades > 0:
-            sigs = rpc.get_signatures(mint, limit=200)
-            if sum(1 for s in sigs if s.get("err") is None) < min_trades:
-                return None
-        return evaluate_token(mint, rpc=rpc, config=config, deep=deep, cache=cache, launch_hint=launched_at)
+            sigs = rpc.get_signatures(mint, limit=1000)
+            ok = sum(1 for s in sigs if s.get("err") is None)
+            if ok < min_trades:
+                return ok
+        return evaluate_token(mint, rpc=rpc, config=config, deep=deep, cache=cache, launch_hint=launched_at, signatures=sigs)
 
-    tasks = [asyncio.create_task(_worker(queue, scorer, on_verdict, max_lateness, stats)) for _ in range(workers)]
+    tasks = [asyncio.create_task(_worker(queue, scorer, on_verdict, on_skip, max_lateness, stats)) for _ in range(workers)]
     backoff = 5.0
     try:
         while True:
@@ -117,32 +127,36 @@ async def watch_async(
                             continue
                         if not isinstance(msg, dict):
                             continue
-                        ok, why = accept_launch(msg)
+                        ok, _why = accept_launch(msg)
+                        if msg.get("mint"):
+                            stats["seen"] += 1
                         if not ok:
-                            if msg.get("mint"):
-                                stats["seen"] += 1
                             continue
                         mint = msg["mint"]
-                        stats["seen"] += 1
                         if mint in seen:
                             continue
                         seen.add(mint)
                         if len(seen) > 20_000:
                             seen.clear()
                         now = time.time()
+                        if max_per_hour:
+                            if now < next_slot:
+                                stats["sampled_out"] += 1
+                                continue
+                            next_slot = now + 3600.0 / max_per_hour
                         try:
                             queue.put_nowait((now + delay_s, now, mint))
                             stats["queued"] += 1
+                            if stats["queued"] % 50 == 0:
+                                print(
+                                    f"Statistik: gesehen {stats['seen']}, geplant {stats['queued']}, verworfen {stats['dropped_full']}, "
+                                    f"ausgelassen {stats['sampled_out']}, zu spät {stats['skipped_late']}, Vorfilter {stats['skipped_prefilter']}, "
+                                    f"bewertet {stats['scored']}, Cache-Treffer {cache.hits}"
+                                )
                         except asyncio.QueueFull:
                             stats["dropped_full"] += 1
                             if stats["dropped_full"] % 25 == 1:
                                 print(f"Warteschlange voll, Launches werden verworfen (bisher {stats['dropped_full']})")
-                        if stats["queued"] % 50 == 0:
-                            print(
-                                f"Statistik: gesehen {stats['seen']}, geplant {stats['queued']}, verworfen {stats['dropped_full']}, "
-                                f"zu spät {stats['skipped_late']}, Vorfilter {stats['skipped_prefilter']}, bewertet {stats['scored']}, "
-                                f"Cache-Treffer {cache.hits}"
-                            )
             except asyncio.CancelledError:
                 raise
             except Exception as exc:  # noqa: BLE001 - reconnect with backoff
@@ -155,7 +169,7 @@ async def watch_async(
             t.cancel()
         print(
             f"Beendet: gesehen {stats['seen']}, bewertet {stats['scored']}, zu spät {stats['skipped_late']}, "
-            f"Vorfilter {stats['skipped_prefilter']}, verworfen {stats['dropped_full']}"
+            f"Vorfilter {stats['skipped_prefilter']}, verworfen {stats['dropped_full']}, ausgelassen {stats['sampled_out']}"
         )
 
 
@@ -163,4 +177,6 @@ def watch(rpc: SolanaRpc, delay_s: float, on_verdict: Callable[[Verdict], None],
     try:
         asyncio.run(watch_async(rpc, delay_s, on_verdict, **kwargs))
     except KeyboardInterrupt:
-        rpc.stop.set()
+        pass
+    finally:
+        rpc.stop.clear()  # asyncio.run has joined the scorer threads; hand the shared client back usable

@@ -112,7 +112,7 @@ class SolanaRpc:
                 with self._lock:
                     self.stats["retries"] += 1
                 self._sleep(wait)
-        raise RpcError(f"RPC request failed after retries: {last_exc}")
+        raise RpcError(f"RPC request failed after retries: {last_exc}", http_status=getattr(last_exc, "http_status", None))
 
     def _next_id(self) -> int:
         with self._lock:
@@ -152,9 +152,10 @@ class SolanaRpc:
             try:
                 data = self._post(payload, units, "rpc")
             except RpcError as exc:
-                if exc.http_status in (401, 403) or "abgebrochen" in str(exc):
+                # Auth errors and a rate limit that survived the retries apply to every further request.
+                if exc.http_status in (401, 403, 429) or "abgebrochen" in str(exc):
                     raise
-                data = None
+                continue  # transport or 5xx failure after retries: leave this chunk None, never re-send item by item
             if isinstance(data, list):
                 for item in data:
                     if isinstance(item, dict) and item.get("id") in ids and "error" not in item:

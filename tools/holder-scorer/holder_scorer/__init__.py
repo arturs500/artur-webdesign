@@ -87,17 +87,21 @@ def evaluate_token(
     max_tx: int = 400,
     cache: ProfileCache | None = None,
     launch_hint: float | None = None,
+    signatures: list[dict] | None = None,
 ) -> Verdict:
     """Collect, featurize and score one token.
 
     Raises ``RpcError`` when the endpoint cannot serve the mandatory calls
     (curve account, signature list); optional data degrades to "unknown".
     ``launch_hint`` is the time the launch was observed (used for the token's
-    age when its create transaction is not in the fetched history).
+    age when its create transaction is not in the fetched history), and
+    ``signatures`` may pass an already fetched signature page for the mint.
     """
     client = rpc or make_rpc(rpc_url)
     when = now if now is not None else time.time()
-    snap = collect(mint, client, deep=deep, max_tx=max_tx, cache=cache or _default_cache, launch_hint=launch_hint, now=when)
+    snap = collect(
+        mint, client, deep=deep, max_tx=max_tx, cache=cache or _default_cache, launch_hint=launch_hint, now=when, signatures=signatures
+    )
     feats = compute_features(snap, when)
     verdict = score_features(feats, config)
     verdict.notes.extend(n for n in snap.notes if n not in verdict.notes)

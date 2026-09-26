@@ -7,7 +7,7 @@ import sys
 import time
 
 from . import evaluate_token, make_rpc
-from .calibrate import append_record, evaluate, update_outcomes
+from .calibrate import append_prefilter_record, append_record, evaluate, update_outcomes
 from .collect import collect
 from .features import compute_features
 from .rpc import RpcError
@@ -89,6 +89,10 @@ def cmd_watch(args: argparse.Namespace) -> int:
         if args.record:
             append_record(args.record, v)
 
+    def on_skip(mint: str, signatures: int):
+        if args.record:
+            append_prefilter_record(args.record, mint, signatures)
+
     watch(
         rpc,
         args.delay,
@@ -97,6 +101,8 @@ def cmd_watch(args: argparse.Namespace) -> int:
         deep=not args.no_deep,
         max_lateness=args.max_lag,
         min_trades=args.min_trades,
+        max_per_hour=args.max_per_hour,
+        on_skip=on_skip,
     )
     return 0
 
@@ -175,6 +181,7 @@ def build_parser() -> argparse.ArgumentParser:
     w.add_argument("--delay", type=float, default=90.0, help="Sekunden nach dem Start bis zur Bewertung (Standard 90)")
     w.add_argument("--max-lag", type=float, default=30.0, help="Token überspringen, die mehr als N s nach der Fälligkeit dran wären (Standard 30)")
     w.add_argument("--min-trades", type=int, default=6, help="Vorfilter: mindestens N Transaktionen, sonst keine Bewertung (Standard 6)")
+    w.add_argument("--max-per-hour", type=float, help="höchstens N Launches pro Stunde bewerten (schont das Kontingent)")
     w.add_argument("--min-score", type=float, default=0.0, help="nur Urteile ab diesem Score anzeigen")
     w.add_argument("--record", help="alle Urteile an diese JSONL-Datei anhängen")
     w.add_argument("--verbose", action="store_true", help="vollständige Faktor-Tabelle je Token")

@@ -119,9 +119,13 @@ also nichts mehr.
 Ein rund um die Uhr laufender Watch-Modus würde das kostenlose Helius-Kontingent
 von einer Million Credits im Monat innerhalb weniger Tage aufbrauchen. Deshalb
 bewertet er nur pump.fun-Launches, überspringt Token, die er nicht innerhalb von
-`--max-lag` Sekunden nach der Fälligkeit bewerten kann, und prüft vorab mit einer
-einzigen Anfrage, ob ein Token überhaupt `--min-trades` Transaktionen hat. Was
-übersprungen wurde, steht in der Statistikzeile.
+`--max-lag` Sekunden nach der Fälligkeit bewerten kann, prüft vorab mit einer
+einzigen Anfrage, ob ein Token überhaupt `--min-trades` Transaktionen hat, und
+lässt sich mit `--max-per-hour` auf eine feste Zahl Launches pro Stunde
+begrenzen. Was übersprungen wurde, steht in der Statistikzeile; mit `--record`
+landen auch die vom Vorfilter abgewiesenen Token als Zeile mit dem Urteil
+VORFILTER in der Datei, damit `outcome` und `evaluate` zeigen, ob der Vorfilter
+etwas Gutes wegwirft.
 
 ## In einen Bot einbauen
 
