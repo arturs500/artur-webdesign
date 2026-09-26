@@ -74,6 +74,17 @@ Trade-Historie und bei sehr aktiven Token nur aus den 20 größten Konten.
 export SOLANA_RPC_URL="https://mainnet.helius-rpc.com/?api-key=DEIN_KEY"
 ```
 
+Der schnellste Start ist das Startskript: es legt eine virtuelle Umgebung
+an, installiert das Modul samt `websockets` und startet den Live-Modus mit
+Papier-Trading (Stufe 2, Aufzeichnung in `papier.jsonl` und `live.jsonl`,
+Telegram für GO und RUG, sobald `TELEGRAM_BOT_TOKEN` und `TELEGRAM_CHAT_ID`
+gesetzt sind):
+
+```bash
+./start.sh                 # Mac/Linux; Windows: start.bat
+STUFE=3 ./start.sh --paper-telegram GO-3x,DEV-HÄLT --narratives trends.txt
+```
+
 ## Benutzung
 
 ```bash
