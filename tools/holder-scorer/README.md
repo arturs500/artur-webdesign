@@ -108,9 +108,12 @@ hört zwei Ströme gleichzeitig:
 - **Trades** vom Standard-Websocket deines RPC-Anbieters (`logsSubscribe` je
   beobachtetem Token). pump.fun schreibt jeden Trade als `Program data`-Zeile
   in die Logs, die Zeile wird sofort dekodiert. Kein `getTransaction`, keine
-  Wartezeit, und Log-Abos kosten bei Helius keine Anfrage-Einheiten. Nur wenn
-  eine Log-Zeile ausnahmsweise kein Event enthält, wird die Transaktion einmal
-  nachgeladen.
+  Wartezeit. Helius berechnet Websocket-Daten seit April 2026 mit etwa 20
+  Credits je Megabyte, das sind rund 350 Trade-Benachrichtigungen je MB; ein
+  Tag Dauerbetrieb kostet damit grob 5.000 bis 10.000 der 1 Mio. Gratis-Credits
+  im Monat, die Statuszeile zeigt den Verbrauch. Nur wenn eine Log-Zeile
+  ausnahmsweise kein Event enthält oder abgeschnitten wurde, wird die
+  Transaktion einmal nachgeladen.
 
 Jeder Token wird nach jedem Trade neu bewertet (höchstens einmal pro Sekunde)
 und erzeugt höchstens drei Alarme:

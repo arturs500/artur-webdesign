@@ -150,6 +150,8 @@ class TradeEvent:
     mayhem_mode: bool | None = None
     quote_mint: str | None = None
     quote_amount: int | None = None
+    virtual_quote_reserves: int | None = None
+    real_quote_reserves: int | None = None
     # Filled in by the transaction parser, not part of the event payload.
     signature: str = ""
     slot: int = 0
@@ -220,6 +222,8 @@ def decode_trade_event(payload: bytes) -> TradeEvent:
             r.u16()
         ev.quote_mint = r.pubkey()
         ev.quote_amount = r.u64()
+        ev.virtual_quote_reserves = r.u64()
+        ev.real_quote_reserves = r.u64()
     except BorshError:
         pass
     return ev

@@ -367,7 +367,8 @@ def _creator_history(
         scan = [s for s in sigs if s.get("err") is None][:scan_tx]
         raw = _CreatorRaw(sigs=sigs, created=_scan_creates(rpc, scan), first_sig=first_sig, sample_capped=len(sigs) >= 1000, scanned_tx=len(scan))
     else:
-        # refresh: only transactions newer than the cached page are fetched
+        # refresh: only transactions newer than the cached page are fetched; copy on write, because
+        # two threads may refresh the same creator at once (serial deployers launch in parallel)
         known = {s["signature"] for s in raw.sigs}
         fresh = rpc.get_signatures(creator, limit=max(1, min(1000, scan_tx)))
         new = []
@@ -376,9 +377,9 @@ def _creator_history(
                 break
             new.append(s)
         if new:
-            raw.sigs = new + raw.sigs
-            raw.created.update(_scan_creates(rpc, [s for s in new if s.get("err") is None]))
-            raw.scanned_tx += len(new)
+            created = dict(raw.created)
+            created.update(_scan_creates(rpc, [s for s in new if s.get("err") is None]))
+            raw = _CreatorRaw(sigs=new + raw.sigs, created=created, first_sig=raw.first_sig, sample_capped=raw.sample_capped, scanned_tx=raw.scanned_tx + len(new))
     if cache:
         cache.put("creator", creator, raw)
 

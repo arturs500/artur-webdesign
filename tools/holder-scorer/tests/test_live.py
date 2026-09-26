@@ -16,7 +16,7 @@ from holder_scorer.live import (
     ws_url_from_rpc,
 )
 from holder_scorer.pump import CREATE_EVENT_DISC, TRADE_EVENT_DISC
-from holder_scorer.scoring import ScoringConfig
+from holder_scorer.scoring import ScoringConfig  # noqa: F401 - re-exported for probes
 from tests.helpers import create_event_bytes, key, trade_event_bytes
 
 T0 = 1_800_000_000.0
@@ -77,6 +77,13 @@ def test_log_prefixes_and_parser():
     trades, creates, completed = parse_log_events([PUMP_LOG, t_line, c_line, "Program data: !!!notbase64", "Program log: x"])
     assert len(trades) == 1 and trades[0].user == b58encode(user)
     assert len(creates) == 1 and creates[0].name == "n" and not completed
+    # an event emitted by another program inside the same transaction is ignored
+    other = ["Program JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4 invoke [1]", t_line, "Program JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4 success", PUMP_LOG, c_line, "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success"]
+    trades2, creates2, _ = parse_log_events(other)
+    assert trades2 == [] and len(creates2) == 1
+    # pump.fun's own self-CPI frame still counts as pump.fun
+    nested = [PUMP_LOG, "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [2]", "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success", t_line, "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success"]
+    assert len(parse_log_events(nested)[0]) == 1
     assert ws_url_from_rpc("https://mainnet.helius-rpc.com/?api-key=k") == "wss://mainnet.helius-rpc.com/?api-key=k"
 
 
@@ -177,7 +184,7 @@ def test_stufe_presets_change_thresholds():
 def test_missing_event_fallback_and_side_tasks():
     calls = []
 
-    def side(name, fn, done):
+    def side(name, fn, done, delay=0.0):
         calls.append(name)
         if name == "creator":
             done((CreatorHistory(address="c", prior_tokens=1, graduated=1, source="rpc"), None, None))
@@ -188,10 +195,13 @@ def test_missing_event_fallback_and_side_tasks():
     engine.rpc = object()  # side tasks are only scheduled when an rpc exists
     mint, creator = key(), key()
     engine.on_launch(launch_msg(mint, creator), now=T0)
-    assert "create_tx" in calls  # scheduled at launch (metadata not: uri is empty)
+    assert calls == []  # nothing at launch: metadata needs a uri, the create tx waits for the first outside buyer
     # a log without a decodable event is queued for a getTransaction fallback
     engine.on_logs(b58encode(mint), 6000, "cpi-only", None, [PUMP_LOG, "Program log: Instruction: Buy"], now=T0 + 2)
     assert engine.take_missing() == ["cpi-only"] and engine.take_missing() == []
+    # a truncated log is fetched even though it carried a decodable event
+    engine.on_logs(b58encode(mint), 6001, "cut", None, trade_logs(mint, key(), 0.05, 400_000.0, True, int(T0 + 2), creator) + ["Log truncated"], now=T0 + 2.5)
+    assert engine.take_missing() == ["cut"]
     from tests.helpers import fake_tx
 
     payer = key()
@@ -200,9 +210,85 @@ def test_missing_event_fallback_and_side_tasks():
     assert engine.apply_fetched_transactions({"cpi-only": tx}, now=T0 + 3) == 0  # deduplicated
     feed_buyers(engine, mint, creator, 5, T0 + 4, 1.0)
     engine.tick(T0 + 10)
-    assert "creator" in calls and "profiles" in calls
+    assert "create_tx" in calls and "creator" in calls and "profiles" in calls
     state = engine.tokens[b58encode(mint)]
     assert state.creator_history is not None and state.creator_history.prior_tokens == 1
+
+
+def test_create_slot_uses_earliest_window_trade_and_own_create_log():
+    engine, alerts = make_engine(stufe=2)
+    mint, creator = key(), key()
+    engine.on_launch(launch_msg(mint, creator), now=T0)
+    state = engine.tokens[b58encode(mint)]
+    # three trades inside the creation window at slots 5000, 5003, 5005: slot 0 must be 5000, not 5005
+    engine.on_logs(b58encode(mint), 5003, "w1", None, trade_logs(mint, key(), 0.3, 3_000_000.0, True, int(T0), creator), now=T0 + 0.3)
+    engine.on_logs(b58encode(mint), 5000, "w0", None, trade_logs(mint, key(), 0.3, 3_000_000.0, True, int(T0), creator), now=T0 + 0.9)
+    engine.on_logs(b58encode(mint), 5005, "w2", None, trade_logs(mint, key(), 0.3, 3_000_000.0, True, int(T0), creator), now=T0 + 1.4)
+    assert state.create.slot == 5000 and state.trades[0].slot == 5000 and state.trades[0].user == b58encode(creator)
+    # the create transaction's own log notification is not discarded: it carries the exact slot and dev buy
+    dev_logs = trade_logs(mint, creator, 0.5, 20_000_000.0, True, int(T0), creator)
+    dev_logs.insert(2, "Program data: " + base64.b64encode(CREATE_EVENT_DISC + create_event_bytes("Live Coin", "LIVE", "ipfs://meta", mint, key(), creator, creator, int(T0))).decode())
+    assert engine.on_logs(b58encode(mint), 4999, "createsig", None, dev_logs, now=T0 + 1.6) == 1
+    assert state.create_slot_known and state.create.slot == 4999 and state.create.uri == "ipfs://meta"
+    dev_trades = [t for t in state.trades if t.user == b58encode(creator)]
+    assert len(dev_trades) == 1 and dev_trades[0].slot == 4999 and dev_trades[0].ix_name == "buy"
+    feats = engine.evaluate(state, T0 + 20).verdict.features
+    # with the real create slot 4999 the window ends at 5003: the slot-5005 buyer is organic, not bundle
+    assert feats.creation_slot_buyers == 2 and feats.dev_buy_share == 0.02
+
+
+def test_blick_respects_stufe_bundle_limit_and_not_with_go():
+    engine, alerts = make_engine(stufe=3)
+    mint, creator = key(), key()
+    engine.on_launch(launch_msg(mint, creator), now=T0)
+    # a 3 % creation-window share: vetoed at stufe 1 (5 %)? no, allowed there too; vetoed only above the stufe limit
+    engine.on_logs(b58encode(mint), 8000, "b0", None, trade_logs(mint, key(), 1.0, 30_000_000.0, True, int(T0), creator), now=T0 + 0.5)
+    feed_buyers(engine, mint, creator, 6, T0 + 3, 1.0, sol=0.1, slot0=8000)
+    engine.tick(T0 + 10)
+    assert [a.tier for a in alerts] == ["BLICK"]
+    limits = [LiveConfig.for_stufe(s)[0].blick_max_bundle_share for s in (1, 2, 3)]
+    assert limits[0] < limits[1] < limits[2] and 0.03 < limits[2]
+    # a delayed first evaluation that already satisfies GO must not also send BLICK
+    engine2, alerts2 = make_engine(stufe=2)
+    mint2, creator2 = key(), key()
+    engine2.on_launch(launch_msg(mint2, creator2), now=T0)
+    feed_buyers(engine2, mint2, creator2, 16, T0 + 3, 1.2, sol=0.12)
+    engine2.tick(T0 + 30)
+    assert [a.tier for a in alerts2] == ["GO"]
+
+
+def test_alert_callback_failure_is_retried_then_given_up():
+    attempts = {"n": 0}
+
+    def flaky(alert):
+        attempts["n"] += 1
+        raise RuntimeError("telegram down")
+
+    cfg, scoring = LiveConfig.for_stufe(1)  # no GO before 90 s, so only BLICK is attempted here
+    cfg.tiers = ("BLICK",)
+    engine = LiveEngine(None, cfg, scoring, flaky)
+    mint, creator = key(), key()
+    engine.on_launch(launch_msg(mint, creator), now=T0)
+    feed_buyers(engine, mint, creator, 9, T0 + 3, 1.0, sol=0.15)
+    state = engine.tokens[b58encode(mint)]
+    for i in range(5):
+        engine.tick(T0 + 13 + i * 6)
+    assert attempts["n"] == cfg.max_alert_retries and "BLICK" in state.tiers_sent
+
+
+def test_late_transaction_does_not_roll_curve_back():
+    engine, alerts = make_engine(stufe=2)
+    mint, creator = key(), key()
+    engine.on_launch(launch_msg(mint, creator), now=T0)
+    state = engine.tokens[b58encode(mint)]
+    feed_buyers(engine, mint, creator, 3, T0 + 3, 1.0, sol=0.5, slot0=6000)
+    v_sol_after = state.curve.virtual_quote_reserves
+    from tests.helpers import fake_tx
+
+    old = fake_tx("old", 5990, int(T0 + 1), key(), [TRADE_EVENT_DISC + trade_event_bytes(mint, key(), 10**8, 10**12, True, int(T0 + 1), creator)])
+    engine.apply_fetched_transactions({"old": old}, now=T0 + 8)
+    assert state.curve.virtual_quote_reserves == v_sol_after
+    assert engine.requeue_missing(["nope"]) == 0
 
 
 def test_log_stream_maps_subscriptions():
