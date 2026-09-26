@@ -173,6 +173,12 @@ def cmd_live(args: argparse.Namespace) -> int:
         scoring.min_age_s = args.min_age
     if args.yes_threshold is not None:
         scoring.yes_threshold = args.yes_threshold
+    if args.blick_buyers is not None:
+        config.blick_min_outside_buyers = args.blick_buyers
+    if args.blick_inflow is not None:
+        config.blick_min_inflow_sol = args.blick_inflow
+    if args.budget is not None:
+        config.rpc_units_per_hour = args.budget
     tiers = tuple(t.strip().upper() for t in (args.tiers or "blick,go,rug").split(",") if t.strip())
     config.tiers = tiers
     notify_words = {w.strip().upper() for w in (args.notify or "blick,go,rug").split(",") if w.strip()}
@@ -292,7 +298,10 @@ def build_parser() -> argparse.ArgumentParser:
     lv.add_argument("--no-fetch", action="store_true", help="Logs ohne Event nicht per getTransaction nachladen")
     lv.add_argument("--no-link", action="store_true", help="keine pump.fun-Link-Zeile in den Nachrichten")
     lv.add_argument("--min-age", type=float, help="Mindestalter für GO in Sekunden")
-    lv.add_argument("--yes-threshold", type=float, help="Score ab dem GO gilt")
+    lv.add_argument("--yes-threshold", type=float, help="Score ab dem GO gilt (Notlösung gegen Fehlalarme: 75)")
+    lv.add_argument("--blick-buyers", type=int, help="Außen-Käufer, ab denen BLICK kommt (Stufe: 8 / 5 / 3)")
+    lv.add_argument("--blick-inflow", type=float, help="organischer Zufluss in SOL, ab dem BLICK kommt (Stufe: 1,0 / 0,5 / 0,25)")
+    lv.add_argument("--budget", type=float, help="RPC-Einheiten pro Stunde für Hintergrundabfragen (Standard 4000, etwa 100.000 Helius-Credits am Tag)")
     _add_rpc_args(lv)
     lv.set_defaults(func=cmd_live)
 

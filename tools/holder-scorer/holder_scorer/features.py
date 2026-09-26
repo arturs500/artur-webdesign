@@ -27,6 +27,7 @@ CREATION_WINDOW_SLOTS = 4  # about 1.25 s at 250 ms slots (since September 2026)
 EARLY_COHORT_BUYERS = 10
 REPEAT_BUYS = 3
 QUOTE_ROUND = 10**6  # 0.001 SOL buckets for "same size" detection
+BUMP_BURST_S = 30  # three or more buys without a sell inside this many seconds = bump bot
 
 
 @dataclass
@@ -87,6 +88,7 @@ class Features:
     largest_holder_share: float | None
     largest_float_share: float | None
     top3_float_share: float | None
+    hidden_float_share: float | None  # tokens out of the curve that no observed trade explains
     creation_slot_buyers: int | None
     creation_window_share: float | None
     creation_window_held_share: float | None
@@ -175,7 +177,9 @@ def _bot_wallets(trades: list[TradeEvent], devs: set[str]) -> tuple[set[str], se
                 q = t.quote_lamports // QUOTE_ROUND
                 sizes[q] = sizes.get(q, 0) + 1
                 tokens[t.token_amount] = tokens.get(t.token_amount, 0) + 1
-            if max(sizes.values()) >= REPEAT_BUYS or max(tokens.values()) >= REPEAT_BUYS:
+            times = [t.timestamp or t.block_time or 0 for t in buys]
+            burst = sells == 0 and (max(times) - min(times)) <= BUMP_BURST_S
+            if max(sizes.values()) >= REPEAT_BUYS or max(tokens.values()) >= REPEAT_BUYS or burst:
                 repeat.add(user)
     return repeat | wash, wash, len(per_wallet)
 
@@ -208,7 +212,6 @@ def compute_features(snap: Snapshot, now: float | None = None) -> Features:
             buyers_order.append(t.user)
     traders = {t.user for t in trades}
     bots, washers, nondev_wallets = _bot_wallets(trades, devs)
-    outside = lambda u: u not in devs and u not in bots  # noqa: E731
 
     slot0 = snap.create.slot if snap.create else None
     # the creation window and the dev buy only need the head of the history, not the whole of it
@@ -217,6 +220,8 @@ def compute_features(snap: Snapshot, now: float | None = None) -> Features:
     window_wallets: set[str] = set()
     if slot0 is not None and head_usable:
         window_wallets = {t.user for t in buys if t.slot <= slot0 + CREATION_WINDOW_SLOTS and t.user not in devs}
+    # "outside" buyers are the closest thing to organic demand: not the dev, not a bot, not in the creation block
+    outside = lambda u: u not in devs and u not in bots and u not in window_wallets  # noqa: E731
     first_nondev = [u for u in buyers_order if u not in devs][:EARLY_COHORT_BUYERS]
     cohort = set(window_wallets) | set(first_nondev)
 
@@ -284,6 +289,10 @@ def compute_features(snap: Snapshot, now: float | None = None) -> Features:
         float_tokens = snap.create.real_token_reserves - snap.curve.real_token_reserves
     elif snap.curve:
         float_tokens = INITIAL_REAL_TOKEN_RESERVES - snap.curve.real_token_reserves
+    hidden_float = None
+    if float_tokens and float_tokens > 0 and complete_history and trades:
+        net_from_trades = sum(balances.values())
+        hidden_float = max(0, float_tokens - net_from_trades) / supply
     if not float_tokens or float_tokens <= 0:
         float_tokens = circulating or None
     if holders_usable and snap.holders:
@@ -460,6 +469,7 @@ def compute_features(snap: Snapshot, now: float | None = None) -> Features:
         largest_holder_share=largest,
         largest_float_share=largest_float,
         top3_float_share=top3_float,
+        hidden_float_share=hidden_float,
         creation_slot_buyers=creation_slot_buyers,
         creation_window_share=creation_window_share,
         creation_window_held_share=window_held,

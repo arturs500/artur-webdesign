@@ -172,19 +172,27 @@ def test_stufe_presets_change_thresholds():
     c1, s1 = LiveConfig.for_stufe(1)
     c3, s3 = LiveConfig.for_stufe(3)
     assert c1.blick_min_outside_buyers > LiveConfig.for_stufe(2)[0].blick_min_outside_buyers > c3.blick_min_outside_buyers
-    assert s1.min_age_s == 90 and s3.min_age_s == 12 and s3.yes_min_outside_buyers == 4 and s3.yes_threshold == 55
+    assert s1.min_age_s == 90 and s3.min_age_s == 15 and s3.yes_min_outside_buyers == 4 and s3.yes_threshold == 55
     engine, alerts = make_engine(stufe=3)
     mint, creator = key(), key()
     engine.on_launch(launch_msg(mint, creator), now=T0)
-    feed_buyers(engine, mint, creator, 4, T0 + 2, 1.0, sol=0.1)
+    # first buyer inside the 1.5 s window: exact creation slot, so nothing is held back by the guessed-window grace
+    feed_buyers(engine, mint, creator, 5, T0 + 1, 1.0, sol=0.1)
     engine.tick(T0 + 7)
     assert [a.tier for a in alerts] == ["BLICK"]
+    # the same start would still be too little for stufe 1 (8 buyers, 1 SOL)
+    engine1, alerts1 = make_engine(stufe=1)
+    mint1, creator1 = key(), key()
+    engine1.on_launch(launch_msg(mint1, creator1), now=T0)
+    feed_buyers(engine1, mint1, creator1, 5, T0 + 1, 1.0, sol=0.1)
+    engine1.tick(T0 + 7)
+    assert alerts1 == []
 
 
 def test_missing_event_fallback_and_side_tasks():
     calls = []
 
-    def side(name, fn, done, delay=0.0):
+    def side(name, fn, done, delay=0.0, group="rpc"):
         calls.append(name)
         if name == "creator":
             done((CreatorHistory(address="c", prior_tokens=1, graduated=1, source="rpc"), None, None))
@@ -192,7 +200,7 @@ def test_missing_event_fallback_and_side_tasks():
             done(None)
 
     engine, alerts = make_engine(stufe=2, side=side)
-    engine.rpc = object()  # side tasks are only scheduled when an rpc exists
+    engine.rpc = object()  # side tasks are only scheduled when an rpc exists (no stats attribute: budget always ok)
     mint, creator = key(), key()
     engine.on_launch(launch_msg(mint, creator), now=T0)
     assert calls == []  # nothing at launch: metadata needs a uri, the create tx waits for the first outside buyer
@@ -208,7 +216,8 @@ def test_missing_event_fallback_and_side_tasks():
     tx = fake_tx("cpi-only", 6000, int(T0 + 2), payer, [TRADE_EVENT_DISC + trade_event_bytes(mint, payer, 10**8, 10**12, True, int(T0 + 2), creator)])
     assert engine.apply_fetched_transactions({"cpi-only": tx}, now=T0 + 3) == 1
     assert engine.apply_fetched_transactions({"cpi-only": tx}, now=T0 + 3) == 0  # deduplicated
-    feed_buyers(engine, mint, creator, 5, T0 + 4, 1.0)
+    # the late "cut" trade at slot 6001 put the guessed creation slot at 5996: these buyers must land after that window
+    feed_buyers(engine, mint, creator, 5, T0 + 4, 1.0, slot0=6002)
     engine.tick(T0 + 10)
     assert "create_tx" in calls and "creator" in calls and "profiles" in calls
     state = engine.tokens[b58encode(mint)]
@@ -246,7 +255,7 @@ def test_blick_respects_stufe_bundle_limit_and_not_with_go():
     feed_buyers(engine, mint, creator, 6, T0 + 3, 1.0, sol=0.1, slot0=8000)
     engine.tick(T0 + 10)
     assert [a.tier for a in alerts] == ["BLICK"]
-    limits = [LiveConfig.for_stufe(s)[0].blick_max_bundle_share for s in (1, 2, 3)]
+    limits = [LiveConfig.for_stufe(s)[0].max_bundle_share for s in (1, 2, 3)]
     assert limits[0] < limits[1] < limits[2] and 0.03 < limits[2]
     # a delayed first evaluation that already satisfies GO must not also send BLICK
     engine2, alerts2 = make_engine(stufe=2)
@@ -276,6 +285,131 @@ def test_alert_callback_failure_is_retried_then_given_up():
     assert attempts["n"] == cfg.max_alert_retries and "BLICK" in state.tiers_sent
 
 
+def test_go_is_gated_and_bundle_exit_triggers_rug_after_go():
+    # a 17 % creation-block bundle plus real followers: no GO at any stufe (limit 15 % on stufe 3)
+    for stufe in (1, 2, 3):
+        engine, alerts = make_engine(stufe=stufe)
+        mint, creator = key(), key()
+        engine.on_launch(launch_msg(mint, creator), now=T0)
+        for i in range(4):
+            engine.on_logs(b58encode(mint), 9000, f"bundle{i}", None, trade_logs(mint, key(), 1.3, 42_500_000.0, True, int(T0), creator), now=T0 + 0.3)
+        feed_buyers(engine, mint, creator, 14, T0 + 3, 1.2, sol=0.12, slot0=9000)
+        engine.tick(T0 + 25)
+        engine.tick(T0 + 95)
+        assert "GO" not in [a.tier for a in alerts], (stufe, [a.tier for a in alerts])
+    # a small (4 %) bundle is tolerated for GO on stufe 2, but when it dumps after GO the user gets a RUG
+    engine, alerts = make_engine(stufe=2)
+    mint, creator = key(), key()
+    engine.on_launch(launch_msg(mint, creator), now=T0)
+    ring = [key() for _ in range(2)]
+    for i, w in enumerate(ring):
+        engine.on_logs(b58encode(mint), 9100, f"b{i}", None, trade_logs(mint, w, 0.6, 20_000_000.0, True, int(T0), creator), now=T0 + 0.3)
+    feed_buyers(engine, mint, creator, 14, T0 + 3, 1.2, sol=0.12, slot0=9100)
+    engine.tick(T0 + 25)
+    assert [a.tier for a in alerts] == ["GO"]
+    for i, w in enumerate(ring):
+        engine.on_logs(b58encode(mint), 9300 + i, f"s{i}", None, trade_logs(mint, w, 0.5, 20_000_000.0, False, int(T0 + 30), creator), now=T0 + 30)
+    engine.tick(T0 + 31)
+    assert [a.tier for a in alerts] == ["GO", "RUG"]
+    # the ring is both the bundle and the first buyers: either exit rule may fire first
+    fails = " ".join(alerts[1].report.verdict.hard_fails)
+    assert "Bundle" in fails or "Erstkäufer" in fails, fails
+    assert "nach GO" in alerts[1].text
+
+
+def test_mc_drop_after_go_and_first_buyer_exit():
+    engine, alerts = make_engine(stufe=2)
+    mint, creator = key(), key()
+    engine.on_launch(launch_msg(mint, creator), now=T0)
+    buyers = feed_buyers(engine, mint, creator, 14, T0 + 3, 1.2, sol=0.5)
+    engine.tick(T0 + 25)
+    assert [a.tier for a in alerts] == ["GO"]
+    state = engine.tokens[b58encode(mint)]
+    assert state.go_mc_sol is not None
+    # the first ten buyers sell everything: price falls, first-buyer exit rule -> RUG after GO
+    for i, w in enumerate(buyers[:10]):
+        engine.on_logs(b58encode(mint), 9500 + i, f"x{i}", None, trade_logs(mint, w, 0.45, 800_000.0, False, int(T0 + 32), creator), now=T0 + 32)
+    engine.tick(T0 + 33)
+    assert [a.tier for a in alerts] == ["GO", "RUG"]
+    text = alerts[1].text
+    assert "nach GO" in text and ("EXIT" in text or "DUMP" in text or "seit GO" in text)
+
+
+def test_creation_block_wallets_are_not_outside_buyers_and_hidden_float_is_flagged():
+    engine, alerts = make_engine(stufe=3)
+    mint, creator = key(), key()
+    engine.on_launch(launch_msg(mint, creator), now=T0)
+    for i in range(6):
+        engine.on_logs(b58encode(mint), 9700, f"w{i}", None, trade_logs(mint, key(), 0.5, 15_000_000.0, True, int(T0), creator), now=T0 + 0.3)
+    engine.on_logs(b58encode(mint), 9720, "lone", None, trade_logs(mint, key(), 0.55, 15_000_000.0, True, int(T0 + 3), creator), now=T0 + 3)
+    state = engine.tokens[b58encode(mint)]
+    feats = engine.evaluate(state, T0 + 16).verdict.features
+    assert feats.unique_outside_buyers == 1  # the six creation-block wallets are not organic demand
+    assert [a.tier for a in alerts] == []
+    # trades the engine never saw (bought before the subscription) leave a hole between curve and balances
+    engine2, alerts2 = make_engine(stufe=3)
+    mint2, creator2 = key(), key()
+    engine2.on_launch(launch_msg(mint2, creator2), now=T0)
+    curve2 = CURVES.setdefault(mint2, [30_500_000_000, 1_073_000_000_000_000 - 20_000_000_000_000])
+    curve2[0] += 6_000_000_000  # 6 SOL entered the curve unseen ...
+    curve2[1] -= 180_000_000_000_000  # ... buying 18 % of the supply
+    feed_buyers(engine2, mint2, creator2, 8, T0 + 3, 1.0, sol=0.2)
+    state2 = engine2.tokens[b58encode(mint2)]
+    feats2 = engine2.evaluate(state2, T0 + 16).verdict.features
+    assert feats2.hidden_float_share is not None and 0.17 < feats2.hidden_float_share < 0.19
+    assert any(f.startswith("UNSICHTBAR") for f in engine2.evaluate(state2, T0 + 16).flags)
+    assert [a.tier for a in alerts2] == []
+
+
+def test_guessed_window_blocks_alerts_until_grace_and_idle_tokens_expire():
+    engine, alerts = make_engine(stufe=3)
+    mint, creator = key(), key()
+    engine.on_launch(launch_msg(mint, creator), now=T0)
+    # a bundle whose logs arrive late (after the 1.5 s window): the creation slot is only a guess
+    for i in range(3):
+        engine.on_logs(b58encode(mint), 9800, f"late{i}", None, trade_logs(mint, key(), 0.5, 15_000_000.0, True, int(T0), creator), now=T0 + 2.0)
+    feed_buyers(engine, mint, creator, 5, T0 + 3, 1.0, sol=0.2, slot0=9800)
+    state = engine.tokens[b58encode(mint)]
+    assert state.window_guessed and not state.create_slot_known
+    engine.tick(T0 + 8)
+    assert alerts == []  # within the grace period nothing is sent
+    engine.tick(T0 + 20)
+    assert [a.tier for a in alerts] != [] or state.last_word in ("WARTE", "RUG")  # after the grace the engine decides with what it has
+    # a token nobody but the dev ever traded is dropped after idle_expire_s
+    engine3, _ = make_engine(stufe=2)
+    m3, c3 = key(), key()
+    engine3.on_launch(launch_msg(m3, c3), now=T0)
+    assert engine3.tick(T0 + 30) == []
+    assert engine3.tick(T0 + 61) == [b58encode(m3)]
+
+
+def test_rpc_budget_skips_side_tasks():
+    calls = []
+
+    def side(name, fn, done, delay=0.0, group="rpc"):
+        calls.append((name, group))
+        done(None)
+
+    class Rpc:
+        stats = {"requests": 0}
+
+    engine, alerts = make_engine(stufe=2, side=side)
+    engine.rpc = Rpc()
+    engine.cfg.rpc_units_per_hour = 10
+    mint, creator = key(), key()
+    engine.on_launch(launch_msg(mint, creator), now=T0)
+    feed_buyers(engine, mint, creator, 6, T0 + 3, 1.0, sol=0.2)
+    engine.tick(T0 + 10)
+    assert ("create_tx", "rpc") in calls and ("creator", "rpc") in calls
+    Rpc.stats["requests"] = 50  # budget for this hour exhausted
+    mint2, creator2 = key(), key()
+    engine.on_launch(launch_msg(mint2, creator2), now=T0 + 20)
+    feed_buyers(engine, mint2, creator2, 6, T0 + 23, 1.0, sol=0.2)
+    before = len(calls)
+    engine.tick(T0 + 30)
+    assert len(calls) == before and engine.stats["side_skipped_budget"] > 0
+
+
 def test_late_transaction_does_not_roll_curve_back():
     engine, alerts = make_engine(stufe=2)
     mint, creator = key(), key()
@@ -302,3 +436,23 @@ def test_log_stream_maps_subscriptions():
     stream.handle("not json")
     stream.handle('{"jsonrpc":"2.0","method":"logsNotification","params":{"subscription":99,"result":{}}}')
     assert len(got) == 1
+
+
+def test_big_dev_position_blocks_blick_and_go():
+    # the dev keeps 12 % of the supply: real followers alone do not make a GO (dump risk), the control without it does
+    engine, alerts = make_engine(stufe=2)
+    mint, creator = key(), key()
+    engine.on_launch(launch_msg(mint, creator, initial_buy_tokens=120_000_000.0, sol=3.7), now=T0)
+    CURVES[mint] = [33_700_000_000, 1_073_000_000_000_000 - 120_000_000_000_000]
+    feed_buyers(engine, mint, creator, 14, T0 + 3, 1.2, sol=0.12)
+    engine.tick(T0 + 25)
+    state = engine.tokens[b58encode(mint)]
+    report = engine.evaluate(state, T0 + 26)
+    assert any(f.startswith("DEV-GROSS 12%") for f in report.flags), report.flags
+    assert report.word == "WARTE" and alerts == []
+    control, alerts_c = make_engine(stufe=2)
+    mint_c, creator_c = key(), key()
+    control.on_launch(launch_msg(mint_c, creator_c), now=T0)
+    feed_buyers(control, mint_c, creator_c, 14, T0 + 3, 1.2, sol=0.12)
+    control.tick(T0 + 25)
+    assert [a.tier for a in alerts_c] == ["GO"]

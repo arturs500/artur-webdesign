@@ -11,9 +11,10 @@ bekannten Muster, mit denen Token scheitern (Bundles, Dev-Dumps, Serien-Deployer
 Bump-Bots, eingeschlafener Handel), und misst, ob gerade organisch neue Käufer
 dazukommen. Die Gewichte sind Anfangswerte aus der öffentlichen Forschung, keine
 kalibrierten Wahrheiten. Deshalb ist eine Kalibrierung auf deinen eigenen
-Beobachtungen eingebaut (siehe unten). Und: Das Modul braucht mindestens 90
-Sekunden Handelsdaten. Ein Kauf im Erstellungs-Block ist damit prinzipiell nicht
-vereinbar, das Modul ist ein Filter für den Einstieg in der zweiten Welle.
+Beobachtungen eingebaut (siehe unten). Und: Das Modul braucht Handelsdaten, im
+Standard 90 Sekunden, im Früh- und Live-Modus 15 bis 20 Sekunden. Ein Kauf im
+Erstellungs-Block ist damit prinzipiell nicht vereinbar, das Modul ist ein
+Filter für den Einstieg in der zweiten Welle.
 
 ## Die Faktoren
 
@@ -32,7 +33,11 @@ Dev hat 90 % oder mehr verkauft, Top-10-Wallets über 60 % des Supplys, größte
 Holder über 30 % des Supplys, größter Nicht-Dev-Holder über 60 % des bisher
 verkauften Floats, über 35 % des Supplys in den ersten Slots, Serien-Deployer mit
 5+ toten Token ohne Graduation, kein Trade seit 60 s ab 90 s Alter oder seit
-120 s ab 3 Minuten Alter, mehr als 40 % Wash-Trading-Wallets.
+120 s ab 3 Minuten Alter, mehr als 40 % Wash-Trading-Wallets. Dazu drei
+Ausstiegsregeln, die auch einen schon guten Token kippen: ein Bundle ab 5 % des
+Supplys hat die Hälfte verkauft, die Erstkäufer haben 70 % ihrer Position
+verkauft (ab 5 Außen-Käufern), oder der Kurs ist in 60 s um 30 % oder mehr
+gefallen bei mindestens zwei Verkäufen.
 
 Und **Mindestmengen für JA**: mindestens 12 Außen-Käufer insgesamt, 8
 Außen-Käufe in den letzten 120 s und 1 SOL organischer Netto-Zufluss in 120 s.
@@ -120,29 +125,69 @@ und erzeugt höchstens drei Alarme:
 
 | Alarm | Wann | Was du damit machst |
 |---|---|---|
-| 👀 BLICK | erste echte Käufer, kein Warnsignal, noch kein volles Urteil; typisch 5 bis 15 s nach dem Start | Chart öffnen, selbst entscheiden |
-| 🟢 GO | das volle Urteil inklusive Mindestmengen; typisch 15 bis 40 s (Stufe 2) | der eigentliche Call |
-| 🔴 RUG / ⚫ TOT | ein Token mit BLICK oder GO ist gekippt (Dev-Dump, Bundle raus, Stillstand) | raus |
+| 👀 BLICK | erste echte Käufer (nicht Dev, nicht Erstellungs-Block, keine Bots), kein Warnsignal, noch kein volles Urteil; nur in den ersten 60 s | Chart öffnen, selbst entscheiden |
+| 🟢 GO | das volle Urteil: Score, Mindestmengen, Zufluss gerade positiv und **keine offene Warnung** (kein Bundle über der Stufengrenze, kein DEV-GROSS, DEV-RAUS, BOTS, FRISCH, FUNDER, SCHNELL, SERIE, UNSICHTBAR); sonst bleibt es bei WARTE | der eigentliche Call |
+| 🔴 RUG / ⚫ TOT | ein Token mit BLICK oder GO ist gekippt: Dev-Dump, Bundle raus, Erstkäufer raus, Kurs −30 % in 60 s, MC −35 % seit dem GO, Stillstand | raus |
+
+Ist der Erstellungs-Slot eines Tokens nur geschätzt (der erste Trade kam später
+als 1,5 s nach dem Launch an), wartet der Live-Modus bis zu 15 s auf die
+nachgeladene Create-Transaktion, bevor er BLICK oder GO schickt, weil sonst
+Bundles als echte Käufer durchgehen könnten. Token ohne einen einzigen
+Außen-Käufer in 60 s werden verworfen, alle anderen höchstens 240 s beobachtet.
 
 Die Stufe bestimmt, wie viele Calls du bekommst und wie viele davon falsch
 sind. Mehr Calls heißt immer auch mehr Fehlalarme, das ist keine
 Einstellungsfrage, sondern Mathematik:
 
-| Stufe | BLICK ab | GO ab | Mindestmengen für GO | Wofür |
-|---|---|---|---|---|
-| 1 vorsichtig | 8 Außen-Käufer, 1,0 SOL Zufluss | 90 s Alter, Score 65 | 12 Käufer, 8 Käufe/120 s, 1,0 SOL | wenige, gute Calls |
-| 2 Standard | 5 Außen-Käufer, 0,5 SOL | 20 s, Score 65 | 6 Käufer, 5 Käufe, 0,5 SOL | ausgewogen |
-| 3 aggressiv | 3 Außen-Käufer, 0,25 SOL | 12 s, Score 55 | 4 Käufer, 3 Käufe, 0,3 SOL | viele Calls, viele Fehlalarme |
+| Stufe | BLICK ab | GO ab | Mindestmengen für GO | Bundle-Grenze | Wofür |
+|---|---|---|---|---|---|
+| 1 vorsichtig | 8 Außen-Käufer, 1,0 SOL Zufluss | 90 s Alter, Score 65 | 12 Käufer, 8 Käufe/120 s, 1,0 SOL | 5 % | wenige, gute Calls |
+| 2 Standard | 5 Außen-Käufer, 0,5 SOL | 20 s, Score 65 | 6 Käufer, 5 Käufe, 0,5 SOL | 10 % | ausgewogen |
+| 3 aggressiv | 3 Außen-Käufer, 0,25 SOL | 15 s, Score 55 | 4 Käufer, 3 Käufe, 0,3 SOL | 15 % | viele Calls, viele Fehlalarme |
+
+Was das in Nachrichten bedeutet, zeigt eine Simulation mit 400 synthetischen
+Launches (Mischung nach der öffentlichen Forschung: 45 % tot, 25 % schwach,
+12 % gebündelt, 5 % Dev-Dump, 2 % Wallet-Ring, 11 % organisch oder heiß),
+hochgerechnet auf rund 1.000 pump.fun-Launches pro Stunde. Das ist kein
+Live-Test, sondern ein Rechenmodell, die echten Zahlen liefert erst `--record`
+mit `outcome` und `evaluate`:
+
+| Stufe | BLICK je Stunde | davon organisch/heiß | GO je Stunde | davon organisch/heiß | GO typisch nach |
+|---|---|---|---|---|---|
+| 1 | ~70 | 85 % | ~20 | 100 % | 90 s |
+| 2 | ~80 | 73 % | ~90 | 79 % | 25 s |
+| 3 | ~80 | 40 % | ~120 | 69 % | 18 s |
+
+Auch Stufe 1 schickt also gut einen Alarm pro Minute, wenn BLICK an ist. Und
+"organisch" heißt nur, dass keine Rug-Mechanik im Spiel war, nicht, dass der
+Token gestiegen ist. Auf Stufe 3 gehen Bundles bis 15 % und Wallet-Ringe mit
+vier Käufern als BLICK oder GO durch, dafür kommt der Call rund 7 s früher.
 
 Die Hintergrundabfragen per RPC (Creator-Historie, Wallet-Profile, Slot der
-Create-Transaktion) starten erst, wenn ein Token echte Käufer zeigt, damit das
-Kontingent für die Token draufgeht, die es wert sind. Mit `--no-side` läuft der
-Live-Modus ganz ohne RPC-Last, dann fehlen aber die Warnungen SERIE, SCHNELL,
-FRISCH und FUNDER. `--commitment processed` liefert Trades einen Tick früher,
+Create-Transaktion) starten erst, wenn ein Token mindestens 5 echte Käufer
+zeigt (Stufe 1: 8), und nur solange das Stundenbudget reicht: `--budget`
+(Standard 4000 Anfrage-Einheiten pro Stunde, also etwa 100.000 Helius-Credits
+am Tag, dazu 5.000 bis 10.000 für den Websocket). Ist das Budget aufgebraucht,
+laufen Bewertung und Alarme weiter, nur die Warnungen SERIE, SCHNELL, FRISCH
+und FUNDER fehlen dann. Mit `--no-side` läuft der Live-Modus ganz ohne
+RPC-Last; dann fehlen dieselben Warnungen dauerhaft, und der Erstellungs-Slot
+wird nie korrigiert, sodass ein spät gemeldetes Bundle als echte Käufer
+durchgehen kann. `--commitment processed` liefert Trades einen Tick früher,
 `confirmed` ist sicherer. Mit `--record` landen alle Alarme samt Merkmalen in
 der Datei, sodass `outcome` und `evaluate` je Alarmstufe zeigen, wie viele
 BLICK- und GO-Token danach wirklich gewachsen sind. Erst damit weißt du, ob
 Stufe 3 für dich mehr Treffer bringt oder nur mehr Lärm.
+
+Die Stellschrauben, wenn dir die Mischung nicht passt:
+
+- `--tiers go,rug` oder `--notify go,rug`: nur den eigentlichen Call und den
+  Ausstieg schicken, kein BLICK (halbiert die Nachrichten).
+- `--stufe 1` oder `--yes-threshold 75`: weniger, dafür bessere GO.
+- `--blick-buyers 4 --blick-inflow 0.3`: BLICK auf Stufe 2 etwas früher, ohne
+  die GO-Regeln zu lockern.
+- `--min-age 30`: GO später, dafür mit mehr Handelsdaten.
+- `--commitment processed`: eine Bestätigungsstufe früher, gelegentlich ein
+  Trade, den die Kette wieder verwirft.
 
 Zwei Dinge sind bewusst nicht drin: Der PumpPortal-Trade-Stream
 (`subscribeTokenTrade`) wäre schneller als jedes RPC, kostet aber 0,01 SOL je
@@ -201,10 +246,12 @@ Slots), `DEV-DUMP`, `DEV-RAUS 40%`, `SERIE 12/0/11` (frühere Token /
 graduiert / tot), `SCHNELL` (Creator startet im Minutentakt), `FRISCH 5/6`
 (frische frühe Wallets), `FUNDER 4` (vom Creator finanziert), `TOP1 35%`,
 `TOP10 61%`, `BOTS 40%`, `WASH`, `SELF-PUMP`, `EXIT 62%` (Erstkäufer raus),
-`FAKE-MC 0.006` (Volumen der letzten Stunde geteilt durch MC), `DÜNN 0.006`
-(Liquidität geteilt durch MC), `STILL 95s`, `NOSOC`, `LÜCKE` (Daten
-unvollständig), `MINDEST` (Score reicht, Mindestmengen fehlen). Die ganze
-Liste zeigt `python -m holder_scorer legend`.
+`DUMP 35%` (Kurs in 60 s gefallen), `UNSICHTBAR 18%` (Supply, das die Kurve
+verlassen hat, ohne dass ein gesehener Trade es erklärt: Käufe vor dem
+Zuhören), `FAKE-MC 0.006` (Volumen der letzten Stunde geteilt durch MC),
+`DÜNN 0.006` (Liquidität geteilt durch MC), `STILL 95s`, `NOSOC`, `LÜCKE`
+(Daten unvollständig), `MINDEST` (Score reicht, Mindestmengen fehlen). Die
+ganze Liste zeigt `python -m holder_scorer legend`.
 
 Die Marktzahlen (MC in USD, Volumen der letzten Stunde, Liquidität,
 Käufe/Verkäufe) kommen von DexScreener, kostenlos und ohne Schlüssel, und
@@ -351,6 +398,12 @@ ist als Raten.
   teilweise geladen (die ersten 60 und die letzten 150 Sekunden). Bundle- und
   Dev-Werte bleiben dann erhalten, die Holder-Historie wird als unbekannt
   behandelt.
+- Der Live-Modus sieht nur Trades ab dem Moment, in dem er einen Token
+  abonniert hat. Was davor lief (etwa Käufe im selben Block wie der Launch,
+  deren Log-Nachricht nie ankam), erkennt er nur an der Lücke zwischen
+  Kurvenstand und gesehenen Käufen (Warnung UNSICHTBAR) und über die
+  nachgeladene Create-Transaktion. Ist der Erstellungs-Slot nur geschätzt,
+  hält er BLICK und GO bis zu 15 s zurück.
 - Ein Urteil JA ist keine Kaufempfehlung, sondern "kein bekanntes Warnsignal,
   genug echte Käufer und gerade Zulauf". Wie viele JA-Token danach wirklich
   wachsen, sagt dir erst `evaluate`.

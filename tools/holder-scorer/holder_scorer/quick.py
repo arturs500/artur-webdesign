@@ -36,7 +36,30 @@ from .scoring import (
     short_flags,
 )
 
-RUG_FLAGS = {"BUNDLE", "DEV-DUMP", "SERIE", "TOP1", "TOP10", "WASH", "FAKE-MC", "DÜNN", "FUNDER"}
+RUG_FLAGS = {"BUNDLE", "DEV-DUMP", "SERIE", "TOP1", "TOP10", "WASH", "FAKE-MC", "DÜNN", "FUNDER", "EXIT", "DUMP"}
+GO_BLOCKING_FLAGS = RUG_FLAGS | {"DEV-RAUS", "DEV-GROSS", "SCHNELL", "FRISCH", "BOTS", "SELF-PUMP", "STILL", "MAYHEM", "USDC", "UNSICHTBAR"}
+GO_MAX_BUNDLE_SHARE = 0.10  # a bundle at or above this share turns a JA into WARTE (below it the flag still shows)
+
+
+def _bundle_share_from_flag(flag: str) -> float | None:
+    try:
+        return float(flag.split(" ")[1].split("/")[0].rstrip("%")) / 100.0
+    except (IndexError, ValueError):
+        return None
+
+
+def go_blockers(flags: list[str], max_bundle_share: float = GO_MAX_BUNDLE_SHARE) -> list[str]:
+    """Flags that keep a JA verdict from becoming GO."""
+    out: list[str] = []
+    for f in flags:
+        head = f.split(" ")[0]
+        if head == "BUNDLE":
+            share = _bundle_share_from_flag(f)
+            if share is not None and share >= max_bundle_share:
+                out.append(f)
+        elif head in GO_BLOCKING_FLAGS:
+            out.append(f)
+    return out
 
 
 @dataclass
@@ -106,7 +129,7 @@ def word_for(verdict: Verdict | None, flags: list[str], phase: str) -> str:
         return "?"
     label = verdict.label
     if label == LABEL_YES:
-        return "GO"
+        return "WARTE" if go_blockers(flags) else "GO"
     if label == LABEL_NO:
         if rug:
             return "RUG"
@@ -197,6 +220,8 @@ def report_from_features(
     flags += [f for f in market_flags(market, phase, qc) if f.split(" ")[0] not in {x.split(" ")[0] for x in flags}]
     r.flags = flags
     r.word = word_for(verdict, flags, phase)
+    if verdict is not None and verdict.label == LABEL_YES and r.word == "WARTE":
+        r.notes.append("Score reicht für GO, aber Warnsignal: " + ", ".join(go_blockers(flags)))
     return r
 
 

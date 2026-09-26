@@ -39,6 +39,7 @@ class ScoringConfig:
     # hard-fail rules
     dev_dump_share: float = 0.9
     dev_dump_min_buy: float = 0.005
+    dev_big_hold: float = 0.10  # dev still holds this share of the supply: dump risk, warning DEV-GROSS (no GO)
     max_top10_share: float = 0.60
     max_largest_holder: float = 0.30
     max_largest_float: float = 0.60
@@ -50,6 +51,14 @@ class ScoringConfig:
     early_stall_age_s: float = 90.0
     early_stall_gap_s: float = 60.0
     max_wash_share: float = 0.40
+    # exit rules: what makes a token unbuyable now and, in the live mode, a "get out" alert
+    bundle_exit_min_share: float = 0.05  # a creation-block bundle of at least this share ...
+    bundle_exit_sold: float = 0.5  # ... that sold at least this fraction
+    early_exit_sold: float = 0.7  # first buyers sold this fraction of their position
+    early_exit_min_buyers: int = 5
+    crash_60s: float = -0.30  # price change over 60 s at or below this ...
+    crash_min_sells: int = 2  # ... with at least this many sells
+    max_hidden_float: float = 0.02  # tokens out of the curve that no observed trade explains
     # factor weights (maximum points, sum = 100)
     w_momentum: float = 25.0
     w_pressure: float = 15.0
@@ -76,6 +85,7 @@ class ScoringConfig:
             early_stall_gap_s=25.0,
             stall_age_s=120.0,
             stall_gap_s=60.0,
+            dev_dump_share=0.5,
         )
 
 
@@ -158,6 +168,17 @@ def hard_fail_reasons(f: Features, cfg: ScoringConfig) -> list[str]:
             reasons.append(f"kein Trade seit {f.seconds_since_last_trade:.0f} s bei {f.age_s:.0f} s Alter (früh eingeschlafen)")
     if f.wash_share is not None and f.wash_share >= cfg.max_wash_share and f.unique_traders >= 8:
         reasons.append(f"{_pct(f.wash_share)} der Wallets handeln hin und her (Wash-Trading)")
+    if (
+        f.creation_window_share is not None
+        and f.creation_window_sold_share is not None
+        and f.creation_window_share >= cfg.bundle_exit_min_share
+        and f.creation_window_sold_share >= cfg.bundle_exit_sold
+    ):
+        reasons.append(f"Bundle ({_pct(f.creation_window_share)} des Supplys) hat {_pct(f.creation_window_sold_share)} verkauft")
+    if f.early_sold_share is not None and f.early_sold_share >= cfg.early_exit_sold and f.unique_outside_buyers >= cfg.early_exit_min_buyers:
+        reasons.append(f"Erstkäufer haben {_pct(f.early_sold_share)} ihrer Position verkauft (Exit)")
+    if f.price_change_60s is not None and f.price_change_60s <= cfg.crash_60s and f.sells_60s >= cfg.crash_min_sells:
+        reasons.append(f"Kurs {f.price_change_60s * 100:+.0f} % in 60 s bei {f.sells_60s} Verkäufen (Dump)")
     return reasons
 
 
@@ -335,6 +356,8 @@ def short_flags(f: Features, cfg: ScoringConfig) -> list[str]:
             flags.append("DEV-DUMP")
         elif f.dev_sold_share >= 0.2:
             flags.append(f"DEV-RAUS {pct(f.dev_sold_share)}")
+        elif f.dev_holds_share is not None and f.dev_holds_share >= cfg.dev_big_hold:
+            flags.append(f"DEV-GROSS {pct(f.dev_holds_share)}")
     if f.creator_prior_tokens:
         dead_rate = (f.creator_dead or 0) / f.creator_prior_tokens
         if f.creator_prior_tokens >= 3 and (f.creator_graduated or 0) == 0 and dead_rate >= 0.6:
@@ -359,8 +382,12 @@ def short_flags(f: Features, cfg: ScoringConfig) -> list[str]:
         flags.append(f"BOTS {pct(f.bot_buy_share)}")
     if f.price_change_60s is not None and f.price_change_60s >= 0.25 and f.new_buyers_60s <= 2:
         flags.append("SELF-PUMP")
+    if f.price_change_60s is not None and f.price_change_60s <= cfg.crash_60s and f.sells_60s >= cfg.crash_min_sells:
+        flags.append(f"DUMP {f.price_change_60s * 100:+.0f}%")
     if f.early_sold_share is not None and f.early_sold_share >= 0.5:
         flags.append(f"EXIT {pct(f.early_sold_share)}")
+    if f.hidden_float_share is not None and f.hidden_float_share >= cfg.max_hidden_float:
+        flags.append(f"UNSICHTBAR {pct(f.hidden_float_share)}")
     if f.age_s is not None and f.seconds_since_last_trade is not None:
         if (f.age_s >= cfg.stall_age_s and f.seconds_since_last_trade >= cfg.stall_gap_s) or (
             f.age_s >= cfg.early_stall_age_s and f.seconds_since_last_trade >= cfg.early_stall_gap_s

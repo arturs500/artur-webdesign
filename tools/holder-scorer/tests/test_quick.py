@@ -142,3 +142,15 @@ def test_format_short_handles_missing_values():
     r = QuickReport(mint=MINT, word="?", phase="unknown")
     text = format_short(r)
     assert "MC   ?" in text and "Hold ?" in text and text.endswith("⚠️   –")
+
+
+def test_every_flag_word_has_a_legend_entry():
+    import inspect
+    import re
+
+    from holder_scorer import notify, quick, scoring
+
+    src = inspect.getsource(scoring.short_flags) + inspect.getsource(quick)
+    heads = set(re.findall(r'flags\.append\(f?"([A-ZÄÖÜ0-9-]+)', src))
+    assert "BUNDLE" in heads and "DEV-GROSS" in heads and "FAKE-MC" in heads
+    assert heads <= set(notify.FLAGS), heads - set(notify.FLAGS)

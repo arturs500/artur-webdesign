@@ -12,14 +12,16 @@ Data flow:
   once as fallback)
 * the on-chain side checks that need RPC calls (creator history, wallet
   profiles, the create transaction's slot) run in the background and are
-  only started once a token shows real buyers
+  only started once a token shows real buyers, within an hourly budget
 
 Every token is re-scored after each trade (at most once a second) and
 produces at most three alerts:
 
 * BLICK: first real buyers, no warning signal, still no full verdict
-* GO: the scorer's verdict incl. minimum quantities
-* RUG / TOT: a token that got BLICK or GO turned bad (get out)
+* GO: the scorer's verdict incl. minimum quantities, no warning signal
+* RUG / TOT: a token that got BLICK or GO turned bad (get out): dev dump,
+  bundle or first buyers exiting, a price crash, a stall, or the market cap
+  falling more than a third below its level at GO
 
 Which thresholds apply is chosen by ``stufe`` 1 (careful), 2 (default) or 3
 (aggressive: more calls, more wrong calls).
@@ -67,7 +69,7 @@ from .pump import (
     derive_bonding_curve,
     parse_transaction,
 )
-from .quick import QuickReport, report_from_features
+from .quick import QuickReport, go_blockers, report_from_features
 from .rpc import RpcError, SolanaRpc
 from .scoring import ScoringConfig, score_features
 from .watch import PUMPPORTAL_WS, accept_launch
@@ -78,6 +80,10 @@ CREATE_B64_PREFIX = "G3KpTd7rY3"
 COMPLETE_B64_PREFIX = "X3JhnNQumA"
 VIRTUAL_TOKEN_OFFSET = INITIAL_VIRTUAL_TOKEN_RESERVES - INITIAL_REAL_TOKEN_RESERVES  # virtual - real tokens on a fresh curve
 CREATION_WINDOW_S = 1.5  # trades arriving this soon after the create are treated as the creation block
+BLICK_VETO_FLAGS = (
+    "DEV-DUMP", "DEV-RAUS", "DEV-GROSS", "SERIE", "SCHNELL", "FUNDER", "FRISCH", "TOP1", "TOP10", "WASH", "BOTS",
+    "SELF-PUMP", "EXIT", "DUMP", "STILL", "MAYHEM", "USDC", "UNSICHTBAR",
+)
 
 
 @dataclass
@@ -85,15 +91,21 @@ class LiveConfig:
     stufe: int = 2
     track_seconds: float = 240.0
     final_linger_s: float = 30.0
+    idle_expire_s: float = 60.0  # drop a token that never saw an outside trade
     eval_interval_s: float = 1.0
     blick_min_outside_buyers: int = 5
     blick_min_inflow_sol: float = 0.5
     blick_max_age_s: float = 60.0
-    blick_max_bundle_share: float = 0.10
-    creator_scan_min_buyers: int = 3
+    max_bundle_share: float = 0.10  # creation-block share above which neither BLICK nor GO is sent
+    go_mc_drop: float = 0.35  # RUG alert when the market cap falls this far below its level at GO
+    creator_scan_min_buyers: int = 5
     profiles_min_buyers: int = 5
+    creator_scan_tx: int = 30
     max_side_tasks: int = 4
+    max_http_tasks: int = 6
+    rpc_units_per_hour: float = 4000.0  # budget for background RPC work (about 100 000 Helius credits a day)
     create_tx_delay_s: float = 2.0
+    guessed_window_grace_s: float = 15.0  # with a guessed creation slot, wait this long for the real one
     max_alert_retries: int = 3
     commitment: str = "confirmed"
     fetch_missing_events: bool = True
@@ -105,15 +117,15 @@ class LiveConfig:
     @classmethod
     def for_stufe(cls, stufe: int) -> tuple["LiveConfig", ScoringConfig]:
         if stufe <= 1:
-            return cls(stufe=1, blick_min_outside_buyers=8, blick_min_inflow_sol=1.0, blick_max_bundle_share=0.05), ScoringConfig()
+            return cls(stufe=1, blick_min_outside_buyers=8, blick_min_inflow_sol=1.0, max_bundle_share=0.05, creator_scan_min_buyers=8), ScoringConfig()
         if stufe >= 3:
             scoring = ScoringConfig.early()
-            scoring.min_age_s = 12.0
+            scoring.min_age_s = 15.0
             scoring.yes_threshold = 55.0
             scoring.yes_min_outside_buyers = 4
             scoring.yes_min_outside_buys_120s = 3
             scoring.yes_min_net_inflow_120s_sol = 0.3
-            return cls(stufe=3, blick_min_outside_buyers=3, blick_min_inflow_sol=0.25, blick_max_bundle_share=0.15), scoring
+            return cls(stufe=3, blick_min_outside_buyers=3, blick_min_inflow_sol=0.25, max_bundle_share=0.15, creator_scan_min_buyers=3), scoring
         return cls(stufe=2), ScoringConfig.early()
 
 
@@ -136,9 +148,12 @@ class TokenState:
     seen_sigs: set[str] = field(default_factory=set)
     failed: int = 0
     curve: BondingCurveState | None = None
+    curve_slot: int = 0
     last_trade_at: float | None = None
     create_slot_known: bool = False
+    window_guessed: bool = False  # the creation slot was inferred from a late trade, bundles may be misclassified
     missing_sigs: list[str] = field(default_factory=list)
+    missing_retries: dict[str, int] = field(default_factory=dict)
     creator_history: CreatorHistory | None = None
     creator_profile: WalletProfile | None = None
     creator_first_sig: str | None = None
@@ -148,20 +163,21 @@ class TokenState:
     pending: set[str] = field(default_factory=set)
     done: set[str] = field(default_factory=set)
     tiers_sent: dict[str, float] = field(default_factory=dict)
+    go_mc_sol: float | None = None
     last_eval: float = 0.0
     last_word: str = "?"
     final: bool = False
     final_at: float | None = None
     complete: bool = False
-    sub_id: int | None = None
     dirty: bool = True
-    curve_slot: int = 0
     alert_failures: int = 0
-    missing_retries: dict[str, int] = field(default_factory=dict)
 
     @property
     def age(self) -> float:
         return time.time() - self.created_at
+
+    def outside_trades(self) -> int:
+        return sum(1 for t in self.trades if t.user != self.creator)
 
 
 def _lamports(x: Any) -> int:
@@ -223,8 +239,9 @@ def parse_log_events(logs: list[str], program_id: str = PUMP_PROGRAM_ID) -> tupl
 class LiveEngine:
     """The pure state machine: feed it launches and log notifications, read alerts from the callback.
 
-    RPC side work is delegated to ``run_side_task`` (a callable that runs a function in a thread and
-    calls back with the result) so tests can drive the engine synchronously.
+    RPC side work is delegated to ``run_side_task(name, fn, done, delay, group)`` (a callable that runs
+    ``fn`` in a thread and calls ``done`` with the result on the event loop) so tests can drive the
+    engine synchronously. ``group`` is "rpc" or "http"; rpc work is subject to the hourly budget.
     """
 
     def __init__(
@@ -241,13 +258,28 @@ class LiveEngine:
         self.cfg = config
         self.scoring = scoring
         self.on_alert = on_alert
-        self.cache = cache or ProfileCache()
+        self.cache = cache or ProfileCache(ttl_s=7200.0)
         self.run_side_task = run_side_task
         self.price_hint = price_hint
         self.tokens: dict[str, TokenState] = {}
-        self.stats = {"launches": 0, "tracked": 0, "trades": 0, "missing": 0, "alerts": 0, "blick": 0, "go": 0, "rug": 0, "expired": 0, "side_tasks": 0}
-        self.side_running = 0
+        self.stats = {
+            "launches": 0, "tracked": 0, "trades": 0, "missing": 0, "dropped_missing": 0, "alerts": 0,
+            "blick": 0, "go": 0, "rug": 0, "expired": 0, "side_tasks": 0, "side_skipped_budget": 0,
+        }
+        self._budget_window_start = 0.0
+        self._budget_units_start = 0
         self._lock = threading.Lock()
+
+    # --- budget ---------------------------------------------------------------------------------
+    def rpc_budget_ok(self, now: float | None = None) -> bool:
+        """True while the background RPC work of the current hour is within the configured budget."""
+        if self.rpc is None or not hasattr(self.rpc, "stats"):
+            return True
+        now = now if now is not None else time.time()
+        units = int(self.rpc.stats.get("requests", 0))
+        if now - self._budget_window_start >= 3600:
+            self._budget_window_start, self._budget_units_start = now, units
+        return (units - self._budget_units_start) < self.cfg.rpc_units_per_hour
 
     # --- launches ---------------------------------------------------------------------------
     def on_launch(self, msg: dict[str, Any], now: float | None = None) -> TokenState | None:
@@ -333,8 +365,12 @@ class LiveEngine:
         for ce in creates:
             if ce.mint == mint:
                 ce.slot, ce.signature = slot, signature
+                had_uri = bool(state.create.uri)
                 state.create = ce
                 state.create_slot_known = True
+                state.window_guessed = False
+                if ce.uri and not had_uri:
+                    self._schedule_metadata(state)
         added = 0
         for tr in trades:
             if tr.mint != mint:
@@ -364,8 +400,9 @@ class LiveEngine:
                 # bundles land in the creation block: the earliest slot seen within 1.5 s stands in for slot 0
                 state.create.slot = tr.slot if state.create.slot == 0 else min(state.create.slot, tr.slot)
             elif state.create.slot == 0:
-                # no trade seen inside the creation window: put the create well before this trade
+                # no trade seen inside the creation window: put the create well before this trade (a guess)
                 state.create.slot = max(0, tr.slot - CREATION_WINDOW_SLOTS - 1)
+                state.window_guessed = True
             for t in state.trades:
                 # the synthetic dev buy follows the create slot until the real create transaction is known
                 if t.slot == 0 or (t.ix_name == "create" and t.signature == state.create.signature):
@@ -411,7 +448,11 @@ class LiveEngine:
                     had_uri = bool(state.create.uri)
                     state.create = ce
                     state.create_slot_known = True
+                    state.window_guessed = False
                     state.dirty = True
+                    for t in state.trades:
+                        if t.ix_name == "create" and t.signature == ce.signature:
+                            t.slot = ce.slot
                     if ce.uri and not had_uri:
                         self._schedule_metadata(state)  # about 5 % of PumpPortal frames carry no name/symbol/uri
             for tr in parsed.trades:
@@ -449,12 +490,17 @@ class LiveEngine:
                         state.missing_sigs.append(sig)
                         kept += 1
                     else:
-                        self.stats["dropped_missing"] = self.stats.get("dropped_missing", 0) + 1
+                        self.stats["dropped_missing"] += 1
         return kept
 
     # --- side tasks ---------------------------------------------------------------------------
-    def _spawn(self, state: TokenState, name: str, fn: Callable[[], Any], apply: Callable[[TokenState, Any], None], delay: float = 0.0) -> None:
+    def _spawn(
+        self, state: TokenState, name: str, fn: Callable[[], Any], apply: Callable[[TokenState, Any], None], delay: float = 0.0, group: str = "rpc"
+    ) -> None:
         if self.run_side_task is None or name in state.pending or name in state.done:
+            return
+        if group == "rpc" and not self.rpc_budget_ok():
+            self.stats["side_skipped_budget"] += 1
             return
         state.pending.add(name)
         self.stats["side_tasks"] += 1
@@ -472,7 +518,7 @@ class LiveEngine:
                 apply(state, result)
             state.dirty = True
 
-        self.run_side_task(name, guarded, done, delay)
+        self.run_side_task(name, guarded, done, delay, group)
 
     def _schedule_metadata(self, state: TokenState) -> None:
         if not state.create.uri:
@@ -482,7 +528,7 @@ class LiveEngine:
             if isinstance(data, dict):
                 st.metadata, st.metadata_ok = data, True
 
-        self._spawn(state, "metadata", lambda: _fetch_json(state.create.uri), apply)
+        self._spawn(state, "metadata", lambda: _fetch_json(state.create.uri), apply, group="http")
 
     def _schedule_create_tx(self, state: TokenState) -> None:
         if self.rpc is None:
@@ -490,6 +536,8 @@ class LiveEngine:
         sig = state.create.signature
 
         def fetch() -> Any:
+            if state.create_slot_known:
+                return None  # the create's own log notification arrived in the meantime
             txs = self.rpc.get_transactions([sig])
             if txs.get(sig) is None:
                 time.sleep(2.0)  # not confirmed yet: one more try
@@ -505,11 +553,12 @@ class LiveEngine:
         if self.rpc is None or not state.creator:
             return
         creator, mint, launch = state.creator, state.mint, int(state.created_at)
+        scan_tx = self.cfg.creator_scan_tx
 
         def apply(st: TokenState, res: Any) -> None:
             st.creator_history, st.creator_profile, st.creator_first_sig = res
 
-        self._spawn(state, "creator", lambda: _creator_history(self.rpc, creator, mint, launch, 40, self.cache), apply)
+        self._spawn(state, "creator", lambda: _creator_history(self.rpc, creator, mint, launch, scan_tx, self.cache), apply)
 
     def _schedule_profiles(self, state: TokenState) -> None:
         if self.rpc is None:
@@ -602,32 +651,58 @@ class LiveEngine:
         age = now - state.created_at
         sent = state.tiers_sent
         cfg = self.cfg
-        # BUNDLE is judged against the stufe's own limit below, everything else in this list vetoes BLICK
-        warning = any(
-            f.split(" ")[0] in ("DEV-DUMP", "DEV-RAUS", "SERIE", "SCHNELL", "FUNDER", "FRISCH", "TOP1", "TOP10", "WASH", "BOTS", "SELF-PUMP", "EXIT", "STILL", "MAYHEM", "USDC")
-            for f in report.flags
-        )
+        bundle_share = feats.creation_window_share
+        bundle_ok = bundle_share is None or bundle_share < cfg.max_bundle_share
+        # a creation slot inferred from a late trade may hide a bundle: wait a little for the real one
+        window_uncertain = state.window_guessed and not state.create_slot_known and cfg.fetch_create_tx and age < cfg.guessed_window_grace_s
+        veto = any(f.split(" ")[0] in BLICK_VETO_FLAGS for f in report.flags)
         if (
             "BLICK" in cfg.tiers
             and "BLICK" not in sent
             and "GO" not in sent
             and age <= cfg.blick_max_age_s
             and word not in ("RUG", "TOT", "GO")
-            and not warning
+            and not veto
+            and bundle_ok
+            and not window_uncertain
             and feats.unique_outside_buyers >= cfg.blick_min_outside_buyers
             and (feats.organic_net_flow_120s_sol or 0.0) >= cfg.blick_min_inflow_sol
-            and (feats.creation_window_share is None or feats.creation_window_share < cfg.blick_max_bundle_share)
         ):
             blick = QuickReport(**{**report.__dict__})
             blick.word = "BLICK"
             self._emit(state, "BLICK", blick, None, now)
-        if "GO" in cfg.tiers and word == "GO" and "GO" not in sent:
+        go_ok = (
+            word == "GO"
+            and not veto
+            and bundle_ok
+            and not window_uncertain
+            and not go_blockers(report.flags, cfg.max_bundle_share)
+            and (feats.organic_net_flow_120s_sol is None or feats.organic_net_flow_120s_sol > 0)
+        )
+        if "GO" in cfg.tiers and go_ok and "GO" not in sent:
+            state.go_mc_sol = feats.mc_sol
             self._emit(state, "GO", report, "nach BLICK" if "BLICK" in sent else None, now)
-        if word in ("RUG", "TOT"):
-            if "RUG" in cfg.tiers and ("BLICK" in sent or "GO" in sent) and "RUG" not in sent:
-                self._emit(state, "RUG", report, "nach GO" if "GO" in sent else "nach BLICK", now)
-            if age >= 30 or word == "RUG":
-                state.final, state.final_at = True, now
+        # get-out signals for tokens that got an alert
+        bad = word in ("RUG", "TOT")
+        mc_drop = (
+            "GO" in sent
+            and state.go_mc_sol
+            and feats.mc_sol is not None
+            and feats.mc_sol <= state.go_mc_sol * (1.0 - cfg.go_mc_drop)
+        )
+        if (bad or mc_drop) and "RUG" in cfg.tiers and ("BLICK" in sent or "GO" in sent) and "RUG" not in sent:
+            suffix = "nach GO" if "GO" in sent else "nach BLICK"
+            if mc_drop and not bad:
+                out = QuickReport(**{**report.__dict__})
+                out.word = "RUG"
+                drop = 1.0 - feats.mc_sol / state.go_mc_sol
+                self._emit(state, "RUG", out, f"{suffix} · MC −{drop * 100:.0f} % seit GO", now)
+            else:
+                self._emit(state, "RUG", report, suffix, now)
+        if bad and (age >= 30 or word == "RUG"):
+            state.final, state.final_at = True, now
+        elif mc_drop and "RUG" in sent:
+            state.final, state.final_at = True, now
 
     def tick(self, now: float | None = None) -> list[str]:
         """Evaluate due tokens, expire old ones. Returns mints to unsubscribe."""
@@ -635,7 +710,13 @@ class LiveEngine:
         expired: list[str] = []
         for mint, state in list(self.tokens.items()):
             age = now - state.created_at
-            if age > self.cfg.track_seconds or (state.final and state.final_at is not None and now - state.final_at > self.cfg.final_linger_s) or state.complete:
+            idle = state.outside_trades() == 0 and age > self.cfg.idle_expire_s and not state.tiers_sent
+            if (
+                age > self.cfg.track_seconds
+                or (state.final and state.final_at is not None and now - state.final_at > self.cfg.final_linger_s)
+                or state.complete
+                or idle
+            ):
                 expired.append(mint)
                 continue
             if state.final:
@@ -787,14 +868,14 @@ async def run_live(
 
     loop = asyncio.get_running_loop()
     stop = asyncio.Event()
-    sem = asyncio.Semaphore(config.max_side_tasks)
+    sems = {"rpc": asyncio.Semaphore(config.max_side_tasks), "http": asyncio.Semaphore(config.max_http_tasks)}
     rpc.stop.clear()
 
-    def run_side_task(name: str, fn: Callable[[], Any], done: Callable[[Any], None], delay: float = 0.0) -> None:
+    def run_side_task(name: str, fn: Callable[[], Any], done: Callable[[Any], None], delay: float = 0.0, group: str = "rpc") -> None:
         async def runner() -> None:
             if delay > 0:
                 await asyncio.sleep(delay)  # wait outside the semaphore so the slot stays free
-            async with sem:
+            async with sems.get(group, sems["rpc"]):
                 try:
                     result = await asyncio.to_thread(fn)
                 except RpcError as exc:
@@ -873,16 +954,16 @@ async def run_live(
                 def load_price():
                     return sol_usd()
 
-                run_side_task("price", load_price, lambda v: price_state.update(value=v) if v else None)
+                run_side_task("price", load_price, lambda v: price_state.update(value=v) if v else None, 0.0, "http")
             if now - last_status >= status_every_s:
                 last_status = now
                 s = engine.stats
                 print(
                     f"Status: {s['tracked']} Token im Blick, {s['launches']} Launches, {s['trades']} Trades, "
-                    f"Alarme BLICK {s['blick']} / GO {s['go']} / RUG {s['rug']}, Hintergrundabfragen {s['side_tasks']}, "
-                    f"nachgeladen {s['missing']}, Log-Benachrichtigungen {stream.stats['notifications']} "
-                    f"({stream.stats['bytes'] / 1e6:.1f} MB, bei Helius etwa {stream.stats['bytes'] / 1e6 * 20:.0f} Credits), "
-                    f"RPC-Einheiten {rpc.stats['requests']}"
+                    f"Alarme BLICK {s['blick']} / GO {s['go']} / RUG {s['rug']}, Hintergrundabfragen {s['side_tasks']} "
+                    f"(wegen Budget ausgelassen {s['side_skipped_budget']}), nachgeladen {s['missing']}, "
+                    f"Log-Benachrichtigungen {stream.stats['notifications']} ({stream.stats['bytes'] / 1e6:.1f} MB, "
+                    f"bei Helius etwa {stream.stats['bytes'] / 1e6 * 20:.0f} Credits), RPC-Einheiten {rpc.stats['requests']}"
                 )
 
     tasks = [loop.create_task(pumpportal()), loop.create_task(stream.run(stop)), loop.create_task(ticker())]
