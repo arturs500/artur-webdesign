@@ -73,7 +73,13 @@ def trade_event_bytes(
     creator: bytes | None = None,
     full: bool = True,
     ix_name: str = "buy",
+    reserves: tuple[int, int] | None = None,
 ) -> bytes:
+    """Borsh-encode a TradeEvent. ``reserves`` = (virtual SOL lamports, virtual token raw units) after the trade."""
+    if reserves is None:
+        v_sol, v_tokens = 30_000_000_000 + sol, 1_073_000_000_000_000 - tokens
+    else:
+        v_sol, v_tokens = reserves
     w = (
         W()
         .pubkey(mint)
@@ -82,10 +88,10 @@ def trade_event_bytes(
         .boolean(is_buy)
         .pubkey(user)
         .i64(ts)
-        .u64(30_000_000_000 + sol)
-        .u64(1_073_000_000_000_000 - tokens)
-        .u64(sol)
-        .u64(793_100_000_000_000 - tokens)
+        .u64(v_sol)
+        .u64(v_tokens)
+        .u64(max(0, v_sol - 30_000_000_000))
+        .u64(max(0, v_tokens - 279_900_000_000_000))
     )
     if full:
         w.pubkey(key()).u64(100).u64(sol // 100).pubkey(creator or key()).u64(30).u64(sol // 300)

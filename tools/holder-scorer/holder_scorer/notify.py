@@ -15,6 +15,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from .quick import QuickReport
 
 WORDS = {
+    "BLICK": ("👀", "Frühalarm im Live-Modus: erste echte Käufer, kein Warnsignal, noch kein volles Urteil"),
     "GO": ("🟢", "kaufbar: kein Warnsignal, genug echte Käufer, gerade Zulauf"),
     "WARTE": ("🟡", "unklar oder Mindestmengen fehlen: nochmal prüfen, nicht kaufen"),
     "FRÜH": ("⏳", "zu jung für ein Urteil (unter dem Mindestalter)"),
@@ -92,12 +93,15 @@ def fmt_age(seconds: float | None) -> str:
     return f"{s // 3600}h{(s % 3600) // 60:02d}m"
 
 
-def format_short(r: "QuickReport") -> str:
-    """Ten short lines: verdict, numbers stacked, flags last."""
+def format_short(r: "QuickReport", suffix: str | None = None, link: bool = False) -> str:
+    """Ten short lines: verdict, numbers stacked, flags last (plus an optional link line)."""
     emoji = WORDS.get(r.word, ("❔", ""))[0]
     label = r.symbol or (r.name[:12] if r.name else r.mint[:6])
     score = f" {r.score:.0f}" if r.score is not None else ""
-    lines = [f"{emoji} {r.word}{score} · {label} · {fmt_age(r.age_s)}"]
+    head = f"{emoji} {r.word}{score} · {label} · {fmt_age(r.age_s)}"
+    if suffix:
+        head += f" · {suffix}"
+    lines = [head]
     mc = fmt_usd(r.mc_usd)
     if r.mc_sol is not None:
         mc += f" · {fmt_sol(r.mc_sol)}"
@@ -141,6 +145,8 @@ def format_short(r: "QuickReport") -> str:
         soc += f" · Bots {fmt_pct(r.bots_share)}"
     lines.append(f"Soc  {soc}")
     lines.append("⚠️   " + (" · ".join(r.flags) if r.flags else "–"))
+    if link:
+        lines.append(f"pump.fun/coin/{r.mint}")
     return "\n".join(lines)
 
 

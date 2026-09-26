@@ -1,0 +1,813 @@
+"""Live-Modus: alerts as early as the chain allows, without polling.
+
+Data flow:
+
+* launches come from the free PumpPortal stream (``subscribeNewToken``);
+  the create message already carries creator, name, symbol, uri, the dev's
+  initial buy and the curve state
+* trades come from the standard Solana websocket of your RPC provider:
+  one ``logsSubscribe`` per tracked token; pump.fun writes every trade as a
+  ``Program data:`` log line, so each notification is decoded on the spot,
+  no ``getTransaction`` needed (a log without a decodable event is fetched
+  once as fallback)
+* the on-chain side checks that need RPC calls (creator history, wallet
+  profiles, the create transaction's slot) run in the background and are
+  only started once a token shows real buyers
+
+Every token is re-scored after each trade (at most once a second) and
+produces at most three alerts:
+
+* BLICK: first real buyers, no warning signal, still no full verdict
+* GO: the scorer's verdict incl. minimum quantities
+* RUG / TOT: a token that got BLICK or GO turned bad (get out)
+
+Which thresholds apply is chosen by ``stufe`` 1 (careful), 2 (default) or 3
+(aggressive: more calls, more wrong calls).
+"""
+from __future__ import annotations
+
+import asyncio
+import base64
+import json
+import threading
+import time
+from dataclasses import dataclass, field
+from typing import Any, Callable
+
+from .collect import (
+    CreatorHistory,
+    HolderInfo,
+    ProfileCache,
+    Snapshot,
+    WalletProfile,
+    _creator_history,
+    _early_wallets,
+    _fetch_json,
+    derive_balances,
+)
+from .encoding import BorshError
+from .features import CREATION_WINDOW_SLOTS, compute_features
+from .market import sol_usd
+from .pump import (
+    COMPLETE_EVENT_DISC,
+    CREATE_EVENT_DISC,
+    INITIAL_REAL_TOKEN_RESERVES,
+    INITIAL_VIRTUAL_SOL_RESERVES,
+    INITIAL_VIRTUAL_TOKEN_RESERVES,
+    LAMPORTS_PER_SOL,
+    TOKEN_DECIMALS,
+    TOKEN_TOTAL_SUPPLY,
+    TRADE_EVENT_DISC,
+    BondingCurveState,
+    CreateEvent,
+    TradeEvent,
+    decode_create_event,
+    decode_trade_event,
+    derive_bonding_curve,
+    parse_transaction,
+)
+from .quick import QuickReport, report_from_features
+from .rpc import RpcError, SolanaRpc
+from .scoring import ScoringConfig, score_features
+from .watch import PUMPPORTAL_WS, accept_launch
+
+PROGRAM_DATA = "Program data: "
+TRADE_B64_PREFIX = "vdt/007mYe"  # base64 of the TradeEvent discriminator
+CREATE_B64_PREFIX = "G3KpTd7rY3"
+COMPLETE_B64_PREFIX = "X3JhnNQumA"
+VIRTUAL_TOKEN_OFFSET = INITIAL_VIRTUAL_TOKEN_RESERVES - INITIAL_REAL_TOKEN_RESERVES  # virtual - real tokens on a fresh curve
+CREATION_WINDOW_S = 1.5  # trades arriving this soon after the create are treated as the creation block
+
+
+@dataclass
+class LiveConfig:
+    stufe: int = 2
+    track_seconds: float = 240.0
+    final_linger_s: float = 30.0
+    eval_interval_s: float = 1.0
+    blick_min_outside_buyers: int = 5
+    blick_min_inflow_sol: float = 0.5
+    blick_max_age_s: float = 60.0
+    blick_max_bundle_share: float = 0.10
+    creator_scan_min_buyers: int = 3
+    profiles_min_buyers: int = 5
+    max_side_tasks: int = 2
+    commitment: str = "confirmed"
+    fetch_missing_events: bool = True
+    fetch_create_tx: bool = True
+    include_link: bool = True
+    tiers: tuple[str, ...] = ("BLICK", "GO", "RUG")
+    max_tracked: int = 400
+
+    @classmethod
+    def for_stufe(cls, stufe: int) -> tuple["LiveConfig", ScoringConfig]:
+        if stufe <= 1:
+            return cls(stufe=1, blick_min_outside_buyers=8, blick_min_inflow_sol=1.0, blick_max_bundle_share=0.05), ScoringConfig()
+        if stufe >= 3:
+            scoring = ScoringConfig.early()
+            scoring.min_age_s = 12.0
+            scoring.yes_threshold = 55.0
+            scoring.yes_min_outside_buyers = 4
+            scoring.yes_min_outside_buys_120s = 3
+            scoring.yes_min_net_inflow_120s_sol = 0.3
+            return cls(stufe=3, blick_min_outside_buyers=3, blick_min_inflow_sol=0.25, blick_max_bundle_share=0.15), scoring
+        return cls(stufe=2), ScoringConfig.early()
+
+
+@dataclass
+class Alert:
+    tier: str  # BLICK | GO | RUG
+    report: QuickReport
+    text: str
+    state: "TokenState"
+
+
+@dataclass
+class TokenState:
+    mint: str
+    created_at: float
+    creator: str
+    create: CreateEvent
+    bonding_curve: str
+    trades: list[TradeEvent] = field(default_factory=list)
+    seen_sigs: set[str] = field(default_factory=set)
+    failed: int = 0
+    curve: BondingCurveState | None = None
+    last_trade_at: float | None = None
+    create_slot_known: bool = False
+    missing_sigs: list[str] = field(default_factory=list)
+    creator_history: CreatorHistory | None = None
+    creator_profile: WalletProfile | None = None
+    creator_first_sig: str | None = None
+    early_wallets: list[WalletProfile] = field(default_factory=list)
+    metadata: dict[str, Any] | None = None
+    metadata_ok: bool = False
+    pending: set[str] = field(default_factory=set)
+    done: set[str] = field(default_factory=set)
+    tiers_sent: dict[str, float] = field(default_factory=dict)
+    last_eval: float = 0.0
+    last_word: str = "?"
+    final: bool = False
+    final_at: float | None = None
+    complete: bool = False
+    sub_id: int | None = None
+    dirty: bool = True
+
+    @property
+    def age(self) -> float:
+        return time.time() - self.created_at
+
+
+def _lamports(x: Any) -> int:
+    try:
+        v = float(x)
+    except (TypeError, ValueError):
+        return 0
+    return int(round(v * LAMPORTS_PER_SOL)) if v < 10**7 else int(v)
+
+
+def _raw_tokens(x: Any) -> int:
+    try:
+        v = float(x)
+    except (TypeError, ValueError):
+        return 0
+    return int(round(v * 10**TOKEN_DECIMALS)) if v < 5 * 10**9 else int(v)
+
+
+def parse_log_events(logs: list[str]) -> tuple[list[TradeEvent], list[CreateEvent], bool]:
+    """Decode pump.fun events from ``Program data:`` log lines. Returns (trades, creates, completed)."""
+    trades: list[TradeEvent] = []
+    creates: list[CreateEvent] = []
+    completed = False
+    for line in logs:
+        if not line.startswith(PROGRAM_DATA):
+            continue
+        payload = line[len(PROGRAM_DATA) :]
+        try:
+            if payload.startswith(TRADE_B64_PREFIX):
+                raw = base64.b64decode(payload)
+                if raw[:8] == TRADE_EVENT_DISC:
+                    trades.append(decode_trade_event(raw[8:]))
+            elif payload.startswith(CREATE_B64_PREFIX):
+                raw = base64.b64decode(payload)
+                if raw[:8] == CREATE_EVENT_DISC:
+                    creates.append(decode_create_event(raw[8:]))
+            elif payload.startswith(COMPLETE_B64_PREFIX):
+                raw = base64.b64decode(payload)
+                if raw[:8] == COMPLETE_EVENT_DISC:
+                    completed = True
+        except (ValueError, BorshError):
+            continue
+    return trades, creates, completed
+
+
+class LiveEngine:
+    """The pure state machine: feed it launches and log notifications, read alerts from the callback.
+
+    RPC side work is delegated to ``run_side_task`` (a callable that runs a function in a thread and
+    calls back with the result) so tests can drive the engine synchronously.
+    """
+
+    def __init__(
+        self,
+        rpc: SolanaRpc | None,
+        config: LiveConfig,
+        scoring: ScoringConfig,
+        on_alert: Callable[[Alert], None],
+        cache: ProfileCache | None = None,
+        run_side_task: Callable[[str, Callable[[], Any], Callable[[Any], None]], None] | None = None,
+        price_hint: Callable[[], float | None] | None = None,
+    ):
+        self.rpc = rpc
+        self.cfg = config
+        self.scoring = scoring
+        self.on_alert = on_alert
+        self.cache = cache or ProfileCache()
+        self.run_side_task = run_side_task
+        self.price_hint = price_hint
+        self.tokens: dict[str, TokenState] = {}
+        self.stats = {"launches": 0, "tracked": 0, "trades": 0, "missing": 0, "alerts": 0, "blick": 0, "go": 0, "rug": 0, "expired": 0, "side_tasks": 0}
+        self.side_running = 0
+        self._lock = threading.Lock()
+
+    # --- launches ---------------------------------------------------------------------------
+    def on_launch(self, msg: dict[str, Any], now: float | None = None) -> TokenState | None:
+        now = now if now is not None else time.time()
+        ok, _ = accept_launch(msg)
+        if not ok:
+            return None
+        mint = msg["mint"]
+        if mint in self.tokens:
+            return None
+        self.stats["launches"] += 1
+        if len(self.tokens) >= self.cfg.max_tracked:
+            return None
+        creator = msg.get("traderPublicKey") or msg.get("creator") or ""
+        curve_key = msg.get("bondingCurveKey") or derive_bonding_curve(mint)
+        create = CreateEvent(
+            name=str(msg.get("name") or ""),
+            symbol=str(msg.get("symbol") or ""),
+            uri=str(msg.get("uri") or ""),
+            mint=mint,
+            bonding_curve=curve_key,
+            user=creator,
+            creator=creator,
+            timestamp=int(now),
+            virtual_token_reserves=INITIAL_VIRTUAL_TOKEN_RESERVES,
+            virtual_sol_reserves=INITIAL_VIRTUAL_SOL_RESERVES,
+            real_token_reserves=INITIAL_REAL_TOKEN_RESERVES,
+            token_total_supply=TOKEN_TOTAL_SUPPLY,
+            signature=str(msg.get("signature") or ""),
+            slot=0,
+            block_time=int(now),
+        )
+        state = TokenState(mint=mint, created_at=now, creator=creator, create=create, bonding_curve=curve_key)
+        if create.signature:
+            state.seen_sigs.add(create.signature)
+        v_tokens = _raw_tokens(msg.get("vTokensInBondingCurve") or 0) or INITIAL_VIRTUAL_TOKEN_RESERVES
+        v_sol = _lamports(msg.get("vSolInBondingCurve") or 0) or INITIAL_VIRTUAL_SOL_RESERVES
+        initial_buy = _raw_tokens(msg.get("initialBuy") or 0)
+        sol_amount = _lamports(msg.get("solAmount") or 0)
+        if initial_buy > 0 and creator:
+            if sol_amount <= 0:
+                sol_amount = max(0, v_sol - INITIAL_VIRTUAL_SOL_RESERVES)
+            state.trades.append(
+                TradeEvent(
+                    mint=mint,
+                    sol_amount=sol_amount,
+                    token_amount=initial_buy,
+                    is_buy=True,
+                    user=creator,
+                    timestamp=int(now),
+                    virtual_sol_reserves=v_sol,
+                    virtual_token_reserves=v_tokens,
+                    real_sol_reserves=max(0, v_sol - INITIAL_VIRTUAL_SOL_RESERVES),
+                    real_token_reserves=max(0, v_tokens - VIRTUAL_TOKEN_OFFSET),
+                    creator=creator,
+                    ix_name="create",
+                    signature=create.signature,
+                    slot=0,
+                    block_time=int(now),
+                )
+            )
+            self._update_curve(state, state.trades[-1])
+        self.tokens[mint] = state
+        self.stats["tracked"] = len(self.tokens)
+        self._schedule_metadata(state)
+        if self.cfg.fetch_create_tx and create.signature:
+            self._schedule_create_tx(state)
+        return state
+
+    # --- trades -----------------------------------------------------------------------------
+    def on_logs(self, mint: str, slot: int, signature: str, err: Any, logs: list[str], now: float | None = None) -> int:
+        """Apply one logsNotification. Returns the number of trades added."""
+        now = now if now is not None else time.time()
+        state = self.tokens.get(mint)
+        if state is None or signature in state.seen_sigs:
+            return 0
+        state.seen_sigs.add(signature)
+        if err is not None:
+            state.failed += 1
+            return 0
+        trades, creates, completed = parse_log_events(logs)
+        if completed:
+            state.complete = True
+        for ce in creates:
+            if ce.mint == mint:
+                ce.slot, ce.signature = slot, signature
+                state.create = ce
+                state.create_slot_known = True
+        added = 0
+        for tr in trades:
+            if tr.mint != mint:
+                continue
+            tr.slot, tr.signature, tr.block_time = slot, signature, int(now)
+            if not tr.timestamp:
+                tr.timestamp = int(now)
+            self._add_trade(state, tr, now)
+            added += 1
+        if not trades and not creates and not completed:
+            # the log carried no decodable event: fetch the transaction once (fallback for CPI-only emission)
+            if self.cfg.fetch_missing_events:
+                state.missing_sigs.append(signature)
+                self.stats["missing"] += 1
+        return added
+
+    def _add_trade(self, state: TokenState, tr: TradeEvent, now: float) -> None:
+        # A dev buy inside the create tx arrives twice (synthetic + fetched): keep the fetched one.
+        if tr.signature == state.create.signature and state.trades and state.trades[0].signature == tr.signature:
+            state.trades[0] = tr
+        else:
+            state.trades.append(tr)
+        if not state.create_slot_known and now - state.created_at <= CREATION_WINDOW_S and tr.slot:
+            # bundles land in the creation block: the first trades seen within 1.5 s define slot 0
+            state.create.slot = tr.slot
+            for t in state.trades:
+                if t.slot == 0:
+                    t.slot = tr.slot
+        elif not state.create_slot_known and state.create.slot == 0 and tr.slot:
+            # no trade seen inside the creation window: put the create well before this trade
+            state.create.slot = max(0, tr.slot - CREATION_WINDOW_SLOTS - 1)
+            for t in state.trades:
+                if t.slot == 0:
+                    t.slot = state.create.slot
+        state.trades.sort(key=lambda t: (t.slot, t.timestamp))
+        state.last_trade_at = now
+        state.dirty = True
+        self.stats["trades"] += 1
+        self._update_curve(state, tr)
+
+    def _update_curve(self, state: TokenState, tr: TradeEvent) -> None:
+        if tr.virtual_token_reserves <= 0:
+            return
+        state.curve = BondingCurveState(
+            virtual_token_reserves=tr.virtual_token_reserves,
+            virtual_quote_reserves=tr.virtual_sol_reserves,
+            real_token_reserves=tr.real_token_reserves,
+            real_quote_reserves=tr.real_sol_reserves,
+            token_total_supply=TOKEN_TOTAL_SUPPLY,
+            complete=state.complete,
+            creator=state.creator or None,
+        )
+
+    def apply_fetched_transactions(self, txs: dict[str, Any], now: float | None = None) -> int:
+        """Fallback path: decode fetched transactions for signatures whose logs carried no event."""
+        now = now if now is not None else time.time()
+        added = 0
+        for sig, tx in txs.items():
+            parsed = parse_transaction(sig, tx)
+            if parsed is None:
+                continue
+            for ce in parsed.creates:
+                state = self.tokens.get(ce.mint)
+                if state is not None:
+                    state.create = ce
+                    state.create_slot_known = True
+                    state.dirty = True
+            for tr in parsed.trades:
+                state = self.tokens.get(tr.mint)
+                if state is None:
+                    continue
+                if any(t.signature == sig and t.user == tr.user and t.token_amount == tr.token_amount for t in state.trades):
+                    continue
+                if not tr.timestamp:
+                    tr.timestamp = int(now)
+                self._add_trade(state, tr, now)
+                added += 1
+        return added
+
+    def take_missing(self, limit: int = 20) -> list[str]:
+        out: list[str] = []
+        for state in self.tokens.values():
+            while state.missing_sigs and len(out) < limit:
+                out.append(state.missing_sigs.pop(0))
+            if len(out) >= limit:
+                break
+        return out
+
+    # --- side tasks ---------------------------------------------------------------------------
+    def _spawn(self, state: TokenState, name: str, fn: Callable[[], Any], apply: Callable[[TokenState, Any], None]) -> None:
+        if self.run_side_task is None or name in state.pending or name in state.done:
+            return
+        state.pending.add(name)
+        self.stats["side_tasks"] += 1
+
+        def done(result: Any) -> None:
+            state.pending.discard(name)
+            state.done.add(name)
+            if result is not None:
+                apply(state, result)
+            state.dirty = True
+
+        self.run_side_task(name, fn, done)
+
+    def _schedule_metadata(self, state: TokenState) -> None:
+        if not state.create.uri:
+            return
+
+        def apply(st: TokenState, data: Any) -> None:
+            if isinstance(data, dict):
+                st.metadata, st.metadata_ok = data, True
+
+        self._spawn(state, "metadata", lambda: _fetch_json(state.create.uri), apply)
+
+    def _schedule_create_tx(self, state: TokenState) -> None:
+        if self.rpc is None:
+            return
+        sig = state.create.signature
+
+        def fetch() -> Any:
+            time.sleep(1.5)  # give the transaction time to confirm
+            txs = self.rpc.get_transactions([sig])
+            if txs.get(sig) is None:
+                time.sleep(2.0)
+                txs = self.rpc.get_transactions([sig])
+            return txs
+
+        def apply(st: TokenState, txs: Any) -> None:
+            self.apply_fetched_transactions(txs)
+
+        self._spawn(state, "create_tx", fetch, apply)
+
+    def _schedule_creator(self, state: TokenState) -> None:
+        if self.rpc is None or not state.creator:
+            return
+        creator, mint, launch = state.creator, state.mint, int(state.created_at)
+
+        def apply(st: TokenState, res: Any) -> None:
+            st.creator_history, st.creator_profile, st.creator_first_sig = res
+
+        self._spawn(state, "creator", lambda: _creator_history(self.rpc, creator, mint, launch, 40, self.cache), apply)
+
+    def _schedule_profiles(self, state: TokenState) -> None:
+        if self.rpc is None:
+            return
+        devs = {state.creator}
+        wallets: list[str] = []
+        for t in state.trades:
+            if t.is_buy and t.user not in devs and t.user not in wallets:
+                wallets.append(t.user)
+            if len(wallets) >= 4:
+                break
+        if not wallets:
+            return
+        launch = int(state.created_at)
+        creator, first_sig = state.creator, state.creator_first_sig
+
+        def apply(st: TokenState, res: Any) -> None:
+            profiles, creator_funder, _notes = res
+            st.early_wallets = profiles
+            if creator_funder and st.creator_profile:
+                st.creator_profile.funder = creator_funder
+
+        self._spawn(state, "profiles", lambda: _early_wallets(self.rpc, wallets, launch, self.cache, creator, first_sig), apply)
+
+    # --- evaluation ---------------------------------------------------------------------------
+    def snapshot(self, state: TokenState, now: float) -> Snapshot:
+        balances = derive_balances(state.trades)
+        snap = Snapshot(
+            mint=state.mint,
+            bonding_curve=state.bonding_curve,
+            collected_at=now,
+            curve=state.curve,
+            create=state.create,
+            trades=list(state.trades),
+            total_signatures=len(state.trades) + state.failed + (0 if state.trades and state.trades[0].ix_name == "create" else 1),
+            failed_tx=state.failed,
+            sig_meta=[(int(state.created_at) + 31, True)] * state.failed,
+            history_ok=True,
+            head_complete=True,
+            partial_history=False,
+            launch_hint=state.created_at,
+            holders=[HolderInfo(o, a) for o, a in balances.items() if a > 0],
+            holders_source="trades",
+            metadata=state.metadata or {},
+            metadata_ok=state.metadata_ok,
+            creator_history=state.creator_history,
+            creator_profile=state.creator_profile,
+            early_wallets=list(state.early_wallets),
+        )
+        return snap
+
+    def evaluate(self, state: TokenState, now: float | None = None) -> QuickReport:
+        now = now if now is not None else time.time()
+        snap = self.snapshot(state, now)
+        feats = compute_features(snap, now)
+        verdict = score_features(feats, self.scoring)
+        price = self.price_hint() if self.price_hint else None
+        report = report_from_features(state.mint, feats, verdict, self.scoring, None, price, state.create.name or None, state.create.symbol or None, "curve")
+        state.last_eval = now
+        state.dirty = False
+        state.last_word = report.word
+        # side checks once the token shows real buyers
+        if feats.unique_outside_buyers >= self.cfg.creator_scan_min_buyers:
+            self._schedule_creator(state)
+        if feats.unique_outside_buyers >= self.cfg.profiles_min_buyers:
+            self._schedule_profiles(state)
+        self._alerts(state, report, feats, now)
+        return report
+
+    def _emit(self, state: TokenState, tier: str, report: QuickReport, suffix: str | None, now: float) -> None:
+        from .notify import format_short
+
+        text = format_short(report, suffix=suffix, link=self.cfg.include_link)
+        state.tiers_sent[tier] = now
+        self.stats["alerts"] += 1
+        self.stats[tier.lower()] = self.stats.get(tier.lower(), 0) + 1
+        self.on_alert(Alert(tier=tier, report=report, text=text, state=state))
+
+    def _alerts(self, state: TokenState, report: QuickReport, feats, now: float) -> None:
+        if state.final:
+            return
+        word = report.word
+        age = now - state.created_at
+        sent = state.tiers_sent
+        cfg = self.cfg
+        warning = any(f.split(" ")[0] in ("BUNDLE", "DEV-DUMP", "DEV-RAUS", "SERIE", "SCHNELL", "FUNDER", "TOP1", "TOP10", "WASH", "SELF-PUMP", "EXIT", "STILL") for f in report.flags)
+        if (
+            "BLICK" in cfg.tiers
+            and "BLICK" not in sent
+            and "GO" not in sent
+            and age <= cfg.blick_max_age_s
+            and word not in ("RUG", "TOT")
+            and not warning
+            and feats.unique_outside_buyers >= cfg.blick_min_outside_buyers
+            and (feats.organic_net_flow_120s_sol or 0.0) >= cfg.blick_min_inflow_sol
+            and (feats.creation_window_share is None or feats.creation_window_share < cfg.blick_max_bundle_share)
+        ):
+            blick = QuickReport(**{**report.__dict__})
+            blick.word = "BLICK"
+            self._emit(state, "BLICK", blick, None, now)
+        if "GO" in cfg.tiers and word == "GO" and "GO" not in sent:
+            self._emit(state, "GO", report, "nach BLICK" if "BLICK" in sent else None, now)
+        if word in ("RUG", "TOT"):
+            if "RUG" in cfg.tiers and ("BLICK" in sent or "GO" in sent) and "RUG" not in sent:
+                self._emit(state, "RUG", report, "nach GO" if "GO" in sent else "nach BLICK", now)
+            if age >= 30 or word == "RUG":
+                state.final, state.final_at = True, now
+
+    def tick(self, now: float | None = None) -> list[str]:
+        """Evaluate due tokens, expire old ones. Returns mints to unsubscribe."""
+        now = now if now is not None else time.time()
+        expired: list[str] = []
+        for mint, state in list(self.tokens.items()):
+            age = now - state.created_at
+            if age > self.cfg.track_seconds or (state.final and state.final_at is not None and now - state.final_at > self.cfg.final_linger_s) or state.complete:
+                expired.append(mint)
+                continue
+            due = state.dirty or now - state.last_eval >= max(5.0, self.cfg.eval_interval_s * 5)
+            if due and now - state.last_eval >= self.cfg.eval_interval_s and (state.trades or age >= 5):
+                try:
+                    self.evaluate(state, now)
+                except Exception as exc:  # noqa: BLE001 - one token must not stop the loop
+                    state.dirty = False
+                    state.last_eval = now
+                    print(f"[{mint[:8]}] Bewertung fehlgeschlagen: {exc!r}")
+        for mint in expired:
+            self.tokens.pop(mint, None)
+            self.stats["expired"] += 1
+        self.stats["tracked"] = len(self.tokens)
+        return expired
+
+
+# --- websocket runner -----------------------------------------------------------------------------
+
+
+def ws_url_from_rpc(url: str) -> str:
+    if url.startswith("https://"):
+        return "wss://" + url[len("https://") :]
+    if url.startswith("http://"):
+        return "ws://" + url[len("http://") :]
+    return url
+
+
+class SolanaLogStream:
+    """One websocket connection with a logsSubscribe per tracked mint."""
+
+    def __init__(self, url: str, commitment: str, on_logs: Callable[[str, int, str, Any, list[str]], None]):
+        self.url = url
+        self.commitment = commitment
+        self.on_logs = on_logs
+        self.ws = None
+        self._id = 0
+        self.pending: dict[int, str] = {}  # request id -> mint
+        self.subs: dict[int, str] = {}  # subscription id -> mint
+        self.mint_sub: dict[str, int] = {}
+        self.wanted: set[str] = set()
+        self.stats = {"notifications": 0, "reconnects": 0}
+
+    async def subscribe(self, mint: str) -> None:
+        self.wanted.add(mint)
+        if self.ws is None or mint in self.mint_sub:
+            return
+        self._id += 1
+        self.pending[self._id] = mint
+        await self.ws.send(json.dumps({"jsonrpc": "2.0", "id": self._id, "method": "logsSubscribe", "params": [{"mentions": [mint]}, {"commitment": self.commitment}]}))
+
+    async def unsubscribe(self, mint: str) -> None:
+        self.wanted.discard(mint)
+        sub = self.mint_sub.pop(mint, None)
+        if sub is None or self.ws is None:
+            return
+        self.subs.pop(sub, None)
+        self._id += 1
+        try:
+            await self.ws.send(json.dumps({"jsonrpc": "2.0", "id": self._id, "method": "logsUnsubscribe", "params": [sub]}))
+        except Exception:  # noqa: BLE001
+            pass
+
+    def handle(self, raw: str) -> None:
+        try:
+            msg = json.loads(raw)
+        except ValueError:
+            return
+        if not isinstance(msg, dict):
+            return
+        if msg.get("method") == "logsNotification":
+            params = msg.get("params") or {}
+            sub = params.get("subscription")
+            mint = self.subs.get(sub)
+            if mint is None:
+                return
+            result = params.get("result") or {}
+            slot = int((result.get("context") or {}).get("slot") or 0)
+            value = result.get("value") or {}
+            self.stats["notifications"] += 1
+            self.on_logs(mint, slot, str(value.get("signature") or ""), value.get("err"), list(value.get("logs") or []))
+            return
+        rid = msg.get("id")
+        if rid in self.pending:
+            mint = self.pending.pop(rid)
+            if "result" in msg and isinstance(msg["result"], int):
+                self.subs[msg["result"]] = mint
+                self.mint_sub[mint] = msg["result"]
+            else:
+                print(f"logsSubscribe für {mint[:8]} abgelehnt: {msg.get('error')}")
+
+    async def run(self, stop: asyncio.Event) -> None:
+        import websockets
+
+        backoff = 2.0
+        while not stop.is_set():
+            try:
+                async with websockets.connect(self.url, ping_interval=20, max_size=4 * 1024 * 1024) as ws:
+                    self.ws = ws
+                    self.pending.clear()
+                    self.subs.clear()
+                    self.mint_sub.clear()
+                    for mint in list(self.wanted):
+                        await self.subscribe(mint)
+                    backoff = 2.0
+                    async for raw in ws:
+                        self.handle(raw)
+                        if stop.is_set():
+                            break
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:  # noqa: BLE001
+                self.ws = None
+                self.stats["reconnects"] += 1
+                print(f"Log-Stream getrennt ({exc!r}), neuer Versuch in {backoff:.0f} s")
+                await asyncio.sleep(backoff)
+                backoff = min(60.0, backoff * 2)
+        self.ws = None
+
+
+async def run_live(
+    rpc: SolanaRpc,
+    config: LiveConfig,
+    scoring: ScoringConfig,
+    on_alert: Callable[[Alert], None],
+    ws_url: str | None = None,
+    cache: ProfileCache | None = None,
+    status_every_s: float = 60.0,
+) -> None:
+    try:
+        import websockets
+    except ImportError as exc:
+        raise SystemExit("Für den Live-Modus fehlt das Paket 'websockets': pip install websockets") from exc
+
+    loop = asyncio.get_running_loop()
+    stop = asyncio.Event()
+    sem = asyncio.Semaphore(config.max_side_tasks)
+    rpc.stop.clear()
+
+    def run_side_task(name: str, fn: Callable[[], Any], done: Callable[[Any], None]) -> None:
+        async def runner() -> None:
+            async with sem:
+                try:
+                    result = await asyncio.to_thread(fn)
+                except RpcError as exc:
+                    if "abgebrochen" in str(exc):
+                        return
+                    result = None
+                    print(f"Hintergrundabfrage {name} fehlgeschlagen: {exc}")
+                except Exception as exc:  # noqa: BLE001
+                    result = None
+                    print(f"Hintergrundabfrage {name} fehlgeschlagen: {exc!r}")
+                done(result)
+
+        loop.create_task(runner())
+
+    price_state = {"value": None, "at": 0.0}
+
+    def price_hint() -> float | None:
+        return price_state["value"]
+
+    engine = LiveEngine(rpc, config, scoring, on_alert, cache=cache, run_side_task=run_side_task, price_hint=price_hint)
+    stream = SolanaLogStream(ws_url or ws_url_from_rpc(rpc.url), config.commitment, lambda *a: engine.on_logs(*a))
+
+    async def pumpportal() -> None:
+        backoff = 5.0
+        while not stop.is_set():
+            try:
+                async with websockets.connect(PUMPPORTAL_WS, ping_interval=20) as ws:
+                    await ws.send(json.dumps({"method": "subscribeNewToken"}))
+                    backoff = 5.0
+                    print(f"Live-Modus Stufe {config.stufe}: Launches von PumpPortal, Trades aus den Logs von {stream.url.split('?')[0]}")
+                    async for raw in ws:
+                        try:
+                            msg = json.loads(raw)
+                        except ValueError:
+                            continue
+                        if not isinstance(msg, dict):
+                            continue
+                        state = engine.on_launch(msg)
+                        if state is not None:
+                            await stream.subscribe(state.mint)
+                        if stop.is_set():
+                            break
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:  # noqa: BLE001
+                print(f"PumpPortal getrennt ({exc!r}), neuer Versuch in {backoff:.0f} s")
+                await asyncio.sleep(backoff)
+                backoff = min(60.0, backoff * 2)
+
+    async def ticker() -> None:
+        last_status = time.time()
+        while not stop.is_set():
+            await asyncio.sleep(config.eval_interval_s)
+            now = time.time()
+            for mint in engine.tick(now):
+                await stream.unsubscribe(mint)
+            missing = engine.take_missing()
+            if missing:
+
+                def fetch(sigs=missing):
+                    return rpc.get_transactions(sigs)
+
+                run_side_task("missing", fetch, lambda txs: engine.apply_fetched_transactions(txs) if txs else None)
+            if now - price_state["at"] > 120:
+                price_state["at"] = now
+
+                def load_price():
+                    return sol_usd()
+
+                run_side_task("price", load_price, lambda v: price_state.update(value=v) if v else None)
+            if now - last_status >= status_every_s:
+                last_status = now
+                s = engine.stats
+                print(
+                    f"Status: {s['tracked']} Token im Blick, {s['launches']} Launches, {s['trades']} Trades, "
+                    f"Alarme BLICK {s['blick']} / GO {s['go']} / RUG {s['rug']}, Hintergrundabfragen {s['side_tasks']}, "
+                    f"nachgeladen {s['missing']}, Log-Benachrichtigungen {stream.stats['notifications']}, RPC-Einheiten {rpc.stats['requests']}"
+                )
+
+    tasks = [loop.create_task(pumpportal()), loop.create_task(stream.run(stop)), loop.create_task(ticker())]
+    try:
+        await asyncio.gather(*tasks)
+    finally:
+        stop.set()
+        rpc.stop.set()
+        for t in tasks:
+            t.cancel()
+
+
+def live(rpc: SolanaRpc, config: LiveConfig, scoring: ScoringConfig, on_alert: Callable[[Alert], None], **kwargs) -> None:
+    try:
+        asyncio.run(run_live(rpc, config, scoring, on_alert, **kwargs))
+    except KeyboardInterrupt:
+        pass
+    finally:
+        rpc.stop.clear()

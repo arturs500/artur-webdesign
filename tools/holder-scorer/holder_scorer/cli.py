@@ -155,6 +155,45 @@ def cmd_watch(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_live(args: argparse.Namespace) -> int:
+    from .live import LiveConfig, live
+
+    rpc = make_rpc(args.rpc, args.rps)
+    config, scoring = LiveConfig.for_stufe(args.stufe)
+    if args.track is not None:
+        config.track_seconds = args.track
+    config.commitment = args.commitment
+    config.include_link = not args.no_link
+    config.fetch_missing_events = not args.no_fetch
+    if args.no_side:
+        config.creator_scan_min_buyers = 10**9
+        config.profiles_min_buyers = 10**9
+        config.fetch_create_tx = False
+    if args.min_age is not None:
+        scoring.min_age_s = args.min_age
+    if args.yes_threshold is not None:
+        scoring.yes_threshold = args.yes_threshold
+    tiers = tuple(t.strip().upper() for t in (args.tiers or "blick,go,rug").split(",") if t.strip())
+    config.tiers = tiers
+    notify_words = {w.strip().upper() for w in (args.notify or "blick,go,rug").split(",") if w.strip()}
+    if args.telegram and not telegram_configured():
+        print("Telegram nicht konfiguriert: TELEGRAM_BOT_TOKEN und TELEGRAM_CHAT_ID setzen", file=sys.stderr)
+        return 2
+
+    def on_alert(alert):
+        print(f"\n{time.strftime('%H:%M:%S')}  {alert.tier}")
+        print(alert.text)
+        if args.record and alert.report.verdict is not None:
+            append_record(args.record, alert.report.verdict, {"tier": alert.tier, "word": alert.report.word, "flags": alert.report.flags, "stufe": args.stufe})
+        if args.telegram and alert.tier in notify_words:
+            import threading
+
+            threading.Thread(target=send_telegram, args=(alert.text,), daemon=True).start()
+
+    live(rpc, config, scoring, on_alert, ws_url=args.ws)
+    return 0
+
+
 def cmd_selftest(args: argparse.Namespace) -> int:
     rpc = make_rpc(args.rpc, args.rps)
     try:
@@ -239,6 +278,23 @@ def build_parser() -> argparse.ArgumentParser:
     _add_rpc_args(w)
     _add_score_args(w)
     w.set_defaults(func=cmd_watch)
+
+    lv = sub.add_parser("live", help="Live-Modus: Trades aus den Logs, Alarme BLICK/GO/RUG so früh wie möglich")
+    lv.add_argument("--stufe", type=int, choices=(1, 2, 3), default=2, help="1 vorsichtig, 2 Standard, 3 aggressiv (mehr Calls, mehr Fehlalarme)")
+    lv.add_argument("--tiers", help="welche Alarme erzeugt werden, kommagetrennt (Standard blick,go,rug)")
+    lv.add_argument("--notify", help="welche Alarme per Telegram gehen (Standard blick,go,rug)")
+    lv.add_argument("--telegram", action="store_true", help="Alarme per Telegram senden")
+    lv.add_argument("--record", help="Alarme samt Merkmalen an diese JSONL-Datei anhängen (für outcome/evaluate)")
+    lv.add_argument("--track", type=float, help="Sekunden, die ein Token beobachtet wird (Standard 240)")
+    lv.add_argument("--commitment", choices=("processed", "confirmed"), default="confirmed", help="processed ist einen Tick schneller, confirmed sicherer")
+    lv.add_argument("--ws", help="Websocket-URL des RPC (Standard: aus der RPC-URL abgeleitet)")
+    lv.add_argument("--no-side", action="store_true", help="keine Hintergrundabfragen (Creator, Wallets, Create-Transaktion): null RPC-Last, weniger Warnungen")
+    lv.add_argument("--no-fetch", action="store_true", help="Logs ohne Event nicht per getTransaction nachladen")
+    lv.add_argument("--no-link", action="store_true", help="keine pump.fun-Link-Zeile in den Nachrichten")
+    lv.add_argument("--min-age", type=float, help="Mindestalter für GO in Sekunden")
+    lv.add_argument("--yes-threshold", type=float, help="Score ab dem GO gilt")
+    _add_rpc_args(lv)
+    lv.set_defaults(func=cmd_live)
 
     t = sub.add_parser("selftest", help="Datensammlung an einem echten Token prüfen")
     t.add_argument("mint")

@@ -22,7 +22,8 @@ from .collect import ProfileCache, Snapshot, collect
 from .features import Features, compute_features
 from .market import MarketData, fetch_market
 from .notify import format_legend, format_short, send_telegram
-from .quick import QuickConfig, QuickReport, quick_check
+from .live import Alert, LiveConfig, LiveEngine, live
+from .quick import QuickConfig, QuickReport, quick_check, report_from_features
 from .rpc import RpcError, SolanaRpc
 from .scoring import (
     LABEL_GRADUATED,
@@ -41,8 +42,13 @@ from .scoring import (
 __all__ = [
     "evaluate_token",
     "quick_check",
+    "report_from_features",
     "QuickReport",
     "QuickConfig",
+    "live",
+    "LiveEngine",
+    "LiveConfig",
+    "Alert",
     "format_short",
     "format_legend",
     "send_telegram",

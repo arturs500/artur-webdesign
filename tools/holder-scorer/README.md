@@ -94,6 +94,59 @@ python -m holder_scorer watch --early --telegram --notify go,rug
 python -m holder_scorer legend
 ```
 
+## Live-Modus: mehr Calls, so früh wie möglich
+
+```bash
+python -m holder_scorer live --stufe 2 --telegram --record live.jsonl
+```
+
+Der Live-Modus wartet nicht und lädt keine Transaktionen einzeln nach. Er
+hört zwei Ströme gleichzeitig:
+
+- **Launches** vom kostenlosen PumpPortal-Stream. Die Create-Nachricht bringt
+  Creator, Name, Symbol, Metadaten-Link, den Dev-Kauf und den Kurvenstand mit.
+- **Trades** vom Standard-Websocket deines RPC-Anbieters (`logsSubscribe` je
+  beobachtetem Token). pump.fun schreibt jeden Trade als `Program data`-Zeile
+  in die Logs, die Zeile wird sofort dekodiert. Kein `getTransaction`, keine
+  Wartezeit, und Log-Abos kosten bei Helius keine Anfrage-Einheiten. Nur wenn
+  eine Log-Zeile ausnahmsweise kein Event enthält, wird die Transaktion einmal
+  nachgeladen.
+
+Jeder Token wird nach jedem Trade neu bewertet (höchstens einmal pro Sekunde)
+und erzeugt höchstens drei Alarme:
+
+| Alarm | Wann | Was du damit machst |
+|---|---|---|
+| 👀 BLICK | erste echte Käufer, kein Warnsignal, noch kein volles Urteil; typisch 5 bis 15 s nach dem Start | Chart öffnen, selbst entscheiden |
+| 🟢 GO | das volle Urteil inklusive Mindestmengen; typisch 15 bis 40 s (Stufe 2) | der eigentliche Call |
+| 🔴 RUG / ⚫ TOT | ein Token mit BLICK oder GO ist gekippt (Dev-Dump, Bundle raus, Stillstand) | raus |
+
+Die Stufe bestimmt, wie viele Calls du bekommst und wie viele davon falsch
+sind. Mehr Calls heißt immer auch mehr Fehlalarme, das ist keine
+Einstellungsfrage, sondern Mathematik:
+
+| Stufe | BLICK ab | GO ab | Mindestmengen für GO | Wofür |
+|---|---|---|---|---|
+| 1 vorsichtig | 8 Außen-Käufer, 1,0 SOL Zufluss | 90 s Alter, Score 65 | 12 Käufer, 8 Käufe/120 s, 1,0 SOL | wenige, gute Calls |
+| 2 Standard | 5 Außen-Käufer, 0,5 SOL | 20 s, Score 65 | 6 Käufer, 5 Käufe, 0,5 SOL | ausgewogen |
+| 3 aggressiv | 3 Außen-Käufer, 0,25 SOL | 12 s, Score 55 | 4 Käufer, 3 Käufe, 0,3 SOL | viele Calls, viele Fehlalarme |
+
+Die Hintergrundabfragen per RPC (Creator-Historie, Wallet-Profile, Slot der
+Create-Transaktion) starten erst, wenn ein Token echte Käufer zeigt, damit das
+Kontingent für die Token draufgeht, die es wert sind. Mit `--no-side` läuft der
+Live-Modus ganz ohne RPC-Last, dann fehlen aber die Warnungen SERIE, SCHNELL,
+FRISCH und FUNDER. `--commitment processed` liefert Trades einen Tick früher,
+`confirmed` ist sicherer. Mit `--record` landen alle Alarme samt Merkmalen in
+der Datei, sodass `outcome` und `evaluate` je Alarmstufe zeigen, wie viele
+BLICK- und GO-Token danach wirklich gewachsen sind. Erst damit weißt du, ob
+Stufe 3 für dich mehr Treffer bringt oder nur mehr Lärm.
+
+Zwei Dinge sind bewusst nicht drin: Der PumpPortal-Trade-Stream
+(`subscribeTokenTrade`) wäre schneller als jedes RPC, kostet aber 0,01 SOL je
+10.000 Trade-Nachrichten und einen API-Key mit Wallet, bei allen Launches also
+grob 0,5 SOL am Tag. Und eine Bewertung im Erstellungs-Block gibt es nicht,
+weil es dort noch nichts zu bewerten gibt; wer dort kauft, kauft blind.
+
 ## Die Kurznachricht
 
 Jede Bewertung ist zehn kurze Zeilen: ein Wort als Urteil, die Kennzahlen

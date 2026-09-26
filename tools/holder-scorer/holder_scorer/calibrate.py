@@ -292,6 +292,11 @@ def evaluate(path: str) -> EvalReport:
         subset = [l for r, l in zip(records, labels) if (r.get("features") or {}).get(flag) is True]
         if subset:
             lines.append(f"  {flag}=True  n={len(subset):<4} Trefferquote {sum(subset) / len(subset) * 100:.1f} %")
+    tiers = sorted({r.get("tier") for r in records if r.get("tier")})
+    for tier in tiers:
+        subset = [l for r, l in zip(records, labels) if r.get("tier") == tier]
+        if subset:
+            lines.append(f"  Alarm {tier:<6} n={len(subset):<4} Trefferquote {sum(subset) / len(subset) * 100:.1f} %")
     pre = [r for r in all_records if r.get("label") == LABEL_PREFILTER and isinstance(r.get("outcome"), dict) and r["outcome"].get("holders_later") is not None]
     if pre:
         grown = sum(1 for r in pre if (r["outcome"].get("holders_later") or 0) >= 20)

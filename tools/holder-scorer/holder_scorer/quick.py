@@ -21,7 +21,7 @@ from .collect import ProfileCache, collect
 from .encoding import BorshError
 from .features import Features, compute_features
 from .market import MarketData, fetch_market, sol_usd
-from .pump import LAMPORTS_PER_SOL, decode_bonding_curve, derive_bonding_curve
+from .pump import decode_bonding_curve, derive_bonding_curve
 from .rpc import RpcError, SolanaRpc
 from .scoring import (
     LABEL_GRADUATED,
@@ -150,6 +150,56 @@ def market_flags(market: MarketData | None, phase: str, cfg: QuickConfig) -> lis
     return flags
 
 
+def report_from_features(
+    mint: str,
+    feats: Features,
+    verdict: Verdict | None,
+    cfg: ScoringConfig,
+    market: MarketData | None = None,
+    price: float | None = None,
+    name: str | None = None,
+    symbol: str | None = None,
+    phase: str = "curve",
+    quick: QuickConfig | None = None,
+) -> QuickReport:
+    """Fold on-chain features (and optional market data) into the numbers of a short message."""
+    qc = quick or QuickConfig()
+    r = QuickReport(mint=mint, word="?", phase=phase, name=name, symbol=symbol, verdict=verdict, market=market, sol_usd=price)
+    r.age_s = feats.age_s
+    r.score = verdict.score if verdict else None
+    r.mc_sol = feats.mc_sol
+    r.mc_usd = (feats.mc_sol * price) if (feats.mc_sol is not None and price) else (market.market_cap_usd if market else None)
+    r.volume_sol = feats.volume_sol
+    r.volume_usd = (feats.volume_sol * price) if (feats.volume_sol is not None and price) else (market.volume_h1_usd if market else None)
+    r.volume_60s_sol = feats.volume_60s_sol
+    r.turnover = feats.turnover
+    r.liquidity_sol = feats.curve_sol
+    r.liquidity_usd = (feats.curve_sol * price) if (feats.curve_sol is not None and price) else None
+    r.liq_to_mc = feats.liq_to_mc
+    r.progress = feats.progress
+    r.holders = feats.holders_now
+    if feats.holders_now_trades is not None and feats.holders_60s_ago is not None:
+        r.holders_delta_60s = feats.holders_now_trades - feats.holders_60s_ago
+    r.buys = feats.organic_buys_120s
+    r.sells = feats.organic_sells_120s
+    r.net_flow_sol = feats.organic_net_flow_120s_sol
+    r.dev_share = feats.dev_buy_share
+    r.dev_sold = feats.dev_sold_share
+    r.bundle_share = feats.creation_window_share
+    r.creator_prior = feats.creator_prior_tokens
+    r.creator_graduated = feats.creator_graduated
+    r.creator_dead = feats.creator_dead
+    r.bots_share = feats.bot_buy_share
+    r.socials_text = _socials_text(feats, market)
+    if verdict is not None:
+        r.notes = list(verdict.notes)
+    flags = short_flags(feats, cfg)
+    flags += [f for f in market_flags(market, phase, qc) if f.split(" ")[0] not in {x.split(" ")[0] for x in flags}]
+    r.flags = flags
+    r.word = word_for(verdict, flags, phase)
+    return r
+
+
 def quick_check(
     mint: str,
     rpc: SolanaRpc,
@@ -180,16 +230,16 @@ def quick_check(
         except BorshError:
             curve = None
     if curve is None:
-        report.phase = "unknown"
-        report.notes.append("keine pump.fun-Kurve gefunden; nur Marktzahlen")
+        phase = "unknown"
     elif curve.complete:
-        report.phase = "graduated"
+        phase = "graduated"
     else:
-        report.phase = "curve"
+        phase = "curve"
 
     feats: Features | None = None
     verdict: Verdict | None = None
-    if report.phase == "curve":
+    snap = None
+    if phase == "curve":
         snap = collect(
             mint,
             rpc,
@@ -204,9 +254,6 @@ def quick_check(
         feats = compute_features(snap, when)
         verdict = score_features(feats, cfg)
         verdict.notes.extend(n for n in snap.notes if n not in verdict.notes)
-        report.verdict = verdict
-        report.name, report.symbol = (snap.create.name, snap.create.symbol) if snap.create else (None, None)
-        report.notes.extend(verdict.notes)
 
     market: MarketData | None = None
     if market_future is not None:
@@ -215,70 +262,42 @@ def quick_check(
         except Exception:  # noqa: BLE001 - market data is best effort
             market = None
     pool.shutdown(wait=False)
-    report.market = market
     price = sol_usd(market.sol_usd if market else None) if (feats is not None or market is not None) else None
-    report.sol_usd = price
-    if market is not None:
-        report.name = report.name or market.name
-        report.symbol = report.symbol or market.symbol
-        if report.phase != "curve" and market.pair_created_at:
-            report.age_s = max(0.0, when - market.pair_created_at)
 
-    # numbers -------------------------------------------------------------------------
     if feats is not None:
-        report.age_s = feats.age_s
-        report.score = verdict.score if verdict else None
-        report.mc_sol = feats.mc_sol
-        report.mc_usd = (feats.mc_sol * price) if (feats.mc_sol is not None and price) else (market.market_cap_usd if market else None)
-        report.volume_sol = feats.volume_sol
-        report.volume_usd = (feats.volume_sol * price) if (feats.volume_sol is not None and price) else (market.volume_h1_usd if market else None)
-        report.volume_60s_sol = feats.volume_60s_sol
-        report.turnover = feats.turnover
-        report.liquidity_sol = feats.curve_sol
-        report.liquidity_usd = (feats.curve_sol * price) if (feats.curve_sol is not None and price) else None
-        report.liq_to_mc = feats.liq_to_mc
-        report.progress = feats.progress
-        report.holders = feats.holders_now
-        if feats.holders_now_trades is not None and feats.holders_60s_ago is not None:
-            report.holders_delta_60s = feats.holders_now_trades - feats.holders_60s_ago
-        report.buys = feats.organic_buys_120s
-        report.sells = feats.organic_sells_120s
-        report.net_flow_sol = feats.organic_net_flow_120s_sol
-        report.dev_share = feats.dev_buy_share
-        report.dev_sold = feats.dev_sold_share
-        report.bundle_share = feats.creation_window_share
-        report.creator_prior = feats.creator_prior_tokens
-        report.creator_graduated = feats.creator_graduated
-        report.creator_dead = feats.creator_dead
-        report.bots_share = feats.bot_buy_share
-    elif market is not None:
-        report.mc_usd = market.market_cap_usd or market.fdv_usd
-        report.mc_sol = (report.mc_usd / price) if (report.mc_usd and price) else None
-        report.volume_usd = market.volume_h1_usd
-        report.volume_sol = (market.volume_h1_usd / price) if (market.volume_h1_usd is not None and price) else None
-        if report.mc_usd and market.volume_h1_usd is not None:
-            report.turnover = market.volume_h1_usd / report.mc_usd
-        report.liquidity_usd = market.liquidity_usd
-        report.liquidity_sol = market.liquidity_quote
-        if report.mc_usd and market.liquidity_usd is not None:
-            report.liq_to_mc = market.liquidity_usd / report.mc_usd
-        report.buys = market.buys_h1 if market.buys_h1 is not None else market.buys_m5
-        report.sells = market.sells_h1 if market.sells_h1 is not None else market.sells_m5
-        if report.phase == "graduated":
-            try:
-                das = rpc.das_get_token_accounts(mint)
-            except RpcError:
-                das = None
-            if das is not None:
-                report.holders = sum(1 for a in das if a["amount"] > 10**9)
-    report.socials_text = _socials_text(feats, market)
-
-    # flags and word ------------------------------------------------------------------------
-    flags = short_flags(feats, cfg) if feats is not None else []
-    flags += [f for f in market_flags(market, report.phase, qc) if f.split(" ")[0] not in {x.split(" ")[0] for x in flags}]
-    report.flags = flags
-    report.word = word_for(verdict, flags, report.phase)
-    if report.phase == "unknown" and market is None:
-        report.word = "?"
+        name, symbol = (snap.create.name, snap.create.symbol) if (snap and snap.create) else (None, None)
+        report = report_from_features(mint, feats, verdict, cfg, market, price, name, symbol, phase, qc)
+    else:
+        report.phase = phase
+        report.sol_usd = price
+        report.market = market
+        if phase == "unknown":
+            report.notes.append("keine pump.fun-Kurve gefunden; nur Marktzahlen")
+        if market is not None:
+            report.name, report.symbol = market.name, market.symbol
+            if market.pair_created_at:
+                report.age_s = max(0.0, when - market.pair_created_at)
+            report.mc_usd = market.market_cap_usd or market.fdv_usd
+            report.mc_sol = (report.mc_usd / price) if (report.mc_usd and price) else None
+            report.volume_usd = market.volume_h1_usd
+            report.volume_sol = (market.volume_h1_usd / price) if (market.volume_h1_usd is not None and price) else None
+            if report.mc_usd and market.volume_h1_usd is not None:
+                report.turnover = market.volume_h1_usd / report.mc_usd
+            report.liquidity_usd = market.liquidity_usd
+            report.liquidity_sol = market.liquidity_quote
+            if report.mc_usd and market.liquidity_usd is not None:
+                report.liq_to_mc = market.liquidity_usd / report.mc_usd
+            report.buys = market.buys_h1 if market.buys_h1 is not None else market.buys_m5
+            report.sells = market.sells_h1 if market.sells_h1 is not None else market.sells_m5
+            if phase == "graduated":
+                try:
+                    das = rpc.das_get_token_accounts(mint)
+                except RpcError:
+                    das = None
+                if das is not None:
+                    report.holders = sum(1 for a in das if a["amount"] > 10**9)
+        report.socials_text = _socials_text(None, market)
+        report.flags = market_flags(market, phase, qc)
+        report.word = word_for(None, report.flags, phase) if market is not None else "?"
     report.elapsed_s = time.monotonic() - t0
     return report
