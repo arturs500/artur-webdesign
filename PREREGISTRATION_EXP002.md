@@ -12,6 +12,8 @@
 Kennzeichnung von Fakten: **[direkt geprüft]** (Quelle am Abrufdatum geladen), **[Snippet]** (nur
 Suchergebnis-Snippet, Seite gesperrt), **NICHT VERIFIZIERT**. Werte, die beim Freeze festgelegt werden
 müssen, sind mit **BEIM FREEZE FIXIEREN** markiert; bis dahin gelten die genannten Defaults.
+Alle mit **[direkt geprüft]** markierten Quellen wurden am **2026-09-29** geladen; dieses Abrufdatum gilt für
+das gesamte Dokument, soweit nicht anders angegeben.
 
 ---
 
@@ -24,6 +26,55 @@ Operationalisierung: Abschnitte 4 (Treatment), 6 (Simulation/Kosten), 7–9 (Met
 PASS/FAIL). Der **Primärtest** ist eine einzige, vorab festgelegte Kombination (Entry T+30 s, Exit
 +5 min, Abschnitt 8.5); T+5 s und T+60 s sowie weitere Exit-Horizonte sind sekundär.
 
+## 1a. Wirkmechanismus und Kausalannahmen
+
+Die Hypothese ist eine Vorhersage über Follower-Renditen. Damit sie einen Edge beschreibt und nicht nur eine
+Korrelation, muss der angenommene Wirkmechanismus vorab benannt werden, ebenso die Alternativerklärungen,
+die dieselbe Beobachtung erzeugen könnten. PASS/FAIL prüft nur die Vorhersage; die Mechanismus-Kette legt
+fest, welche sekundären Analysen sie stützen oder untergraben würden.
+
+**Angenommene Kausalkette (H1):**
+
+1. Ein Dev mit hoher point-in-time Graduation-Quote besitzt wiederholbare Fähigkeiten oder Ressourcen
+   (Marketing-Reichweite, Community, Bundling-Infrastruktur, Timing), die die Wahrscheinlichkeit erhöhen, dass
+   ein neuer Launch früh Nachfrage anzieht.
+2. Diese Nachfrage trifft in den ersten Sekunden bis Minuten auf die Bonding Curve und hebt den Preis.
+3. Ein Follower, der bei T+δ kauft und nach H verkauft, realisiert einen Teil dieses Anstiegs – abzüglich
+   Gebühren, Priority-Fees und des eigenen Preiseinflusses.
+4. Notwendige Bedingung: Der Effekt ist nicht bereits vollständig von schnelleren Teilnehmern (Bots, die
+   denselben Dev verfolgen) eingepreist, bevor der Follower bei T+δ kauft.
+
+**Alternativerklärungen (H0-Varianten), die dieselbe Rohbeobachtung erzeugen könnten:**
+
+- **Self-Buy-Mechanik:** Der Dev kauft im Create-Slot selbst; der Preis ist bei T+δ bereits höher, und der
+  spätere Verlauf hängt davon ab, wann der Dev verkauft. Kontrolle: Matching auf Self-Buy-Strata (Bin 0 vs.
+  Quintile) und getrennte Auswertung nach `self_buy_flag`; ein Dev-Verkauf vor dem Exit ist im Replay
+  enthalten.
+- **Bekanntheits-Front-Running:** Andere Follower-Bots kaufen früher als T+δ; der Follower kauft die Spitze.
+  Sichtbar als: positive Rendite bei T+5 s, negative bei T+30/60 s. Deshalb sind alle drei Entry-Zeitpunkte
+  Teil des Designs; der Primärtest bei T+30 s ist der konservative Mittelwert.
+- **Survivorship in der Dev-Historie:** Devs mit vielen Launches sind Serien-Launcher; ihre Graduationen
+  können auf Bundles beruhen, die nach Graduation abverkauft werden. Kontrolle: nur gereifte Vor-Launches,
+  Cap N = 20 je Dev, dev-gleichgewichtete Robustheit.
+- **Regime-Effekt:** Graduationen häufen sich in Marktphasen mit hoher Aktivität; Treatment-Events fallen dann
+  in "gute Stunden". Kontrolle: Matching im selben 6-h-UTC-Block.
+- **Mechanischer Kurvenpreis:** Auf der Bonding Curve steigt der Preis mit jedem Kauf; eine positive
+  Rohrendite entsteht schon, wenn nach dem Follower noch irgendjemand kauft. Kontrolle: Netto nach Gebühren
+  und eigenem Impact; Vergleich mit gematchten Kontrollen (Differenz `d`), nicht nur `mean(r) > 0`.
+
+**Was die Baseline kontrolliert und was nicht:** Das Matching kontrolliert Zeitfenster (Regime) und
+Initialzustand (Self-Buy-Höhe). Es kontrolliert **nicht** Marketing-Reichweite, Bot-Aufmerksamkeit oder
+Token-Narrativ – das sind Teile des angenommenen Mechanismus und dürfen nicht herausgematcht werden.
+
+**Vorab festgelegte Interpretation sekundärer Muster (ändert PASS/FAIL nicht):**
+
+| Muster | Lesart |
+|---|---|
+| PASS bei T+30 s, aber `mean(r)` fällt monoton von T+5 s zu T+60 s | Effekt wird schnell eingepreist; Edge hängt an Latenz (kritisch für jede spätere Umsetzung) |
+| PASS nur ohne Self-Buy (Bin 0), nicht mit Self-Buy | Mechanismus über Nachfrage, nicht über Dev-Kapital |
+| PASS nur unter optimistischer Graduation-Behandlung | Ergebnis hängt an wenigen Graduationen; Fragilitätsindikator prüfen |
+| `mean(r) > 0`, aber `mean(d)` nicht > 0 | Kein dev-spezifischer Edge, nur Kurvenmechanik/Regime |
+
 ## 2. Definitionen
 
 - **Programm:** Pump.fun Bonding-Curve-Programm `6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P`
@@ -32,8 +83,14 @@ PASS/FAIL). Der **Primärtest** ist eine einzige, vorab festgelegte Kombination 
 - **Launch (Event):** ein `create`/`create_v2`-Aufruf mit CreateEvent (mint, bonding_curve, user, creator,
   timestamp, Startreserven, quote_mint) [direkt geprüft, Decoder aus der offiziellen IDL:
   https://raw.githubusercontent.com/sevenlabs-hq/carbon/main/decoders/pumpfun-decoder/src/types/create_event.rs].
-- **Dev:** der `creator`-Pubkey des CreateEvents (kann vom Signer abweichen [direkt geprüft, PUMP_PROGRAM_README]).
-  Dev-Identität = Wallet; Wallet-Clustering findet in EXP002 nicht statt (OQ-018).
+- **Dev:** der `creator`-Pubkey des CreateEvents, sofern `is_holder_reward = false` (Creator kann vom Signer
+  abweichen [direkt geprüft, PUMP_PROGRAM_README]). Bei Holder-Rewards-Coins (seit 2026-09-12) setzt das Programm
+  als `creator` eine programmkontrollierte PDA je Mint ("the program records a pump.fun controlled address as the
+  coin's creator instead") [direkt geprüft: https://raw.githubusercontent.com/pump-fun/pump-public-docs/main/docs/HOLDER_REWARDS_README.md
+  und idl/pump.json, `create_v2`: "is_holder_reward … sets the creator to the holder-rewards PDA of the mint"].
+  Für diese Launches gilt als Dev der `user` (Signer der Create-Transaktion) – Default, **BEIM FREEZE FIXIEREN**
+  (OQ-023); Sensitivität: Holder-Rewards-Launches ausschließen, Anteil berichten. `is_holder_reward` ist
+  Pflichtfeld. Dev-Identität = Wallet; Wallet-Clustering findet in EXP002 nicht statt (OQ-018).
 - **Entscheidungszeitpunkt `t_dec`:** Position (slot, tx_index) der Create-Transaktion; `t_create` =
   Blockzeit des Create-Slots (Unix-Sekunden, geschätzt aus Vote-Timestamps [direkt geprüft:
   https://raw.githubusercontent.com/solana-foundation/solana-com/main/apps/docs/content/docs/en/rpc/http/getblocktime.mdx]).
@@ -41,6 +98,9 @@ PASS/FAIL). Der **Primärtest** ist eine einzige, vorab festgelegte Kombination 
   virtual_token_reserves, real_sol_reserves, real_token_reserves, fee_basis_points, fee,
   creator_fee_basis_points, creator_fee, …) [direkt geprüft:
   https://raw.githubusercontent.com/sevenlabs-hq/carbon/main/decoders/pumpfun-decoder/src/types/trade_event.rs].
+  Die offizielle IDL (Refresh 2026-09-12) führt zusätzlich `holder_rewards_bps`, `holder_rewards` im TradeEvent
+  sowie `creator_fee_bps`, `is_holder_reward` im CreateEvent; sie ist die Primärquelle für Feldlisten
+  [direkt geprüft: https://raw.githubusercontent.com/pump-fun/pump-public-docs/main/idl/pump.json].
 - **Graduation (Complete):** `complete = true` wird am Ende eines `buy` gesetzt, wenn `real_token_reserves == 0`
   [direkt geprüft, PUMP_PROGRAM_README]. `t_complete` = Blockzeit dieses Trades (CompleteEvent), **nicht**
   die spätere Migrations-Transaktion (CompletePumpAmmMigrationEvent).
@@ -50,7 +110,8 @@ PASS/FAIL). Der **Primärtest** ist eine einzige, vorab festgelegte Kombination 
   Trade bis zu einem Zeitpunkt; Anfangszustand aus dem CreateEvent (nicht aus Konstanten, wegen Mayhem-Mode
   und Programmänderungen 2026, OQ-023).
 - **Standard-Initialzustand (Plausibilitätswert):** Global-Parameter [direkt geprüft, PUMP_PROGRAM_README]:
-  `initial_virtual_token_reserves` = 1 073 000 000 000 000 (6 Dezimalstellen → 1,073 Mrd. Token),
+  `initial_virtual_token_reserves` = 1 073 000 000 000 000 (6 Dezimalstellen [direkt geprüft: https://raw.githubusercontent.com/pump-fun/pump-fun-skills/main/create-coin/SKILL.md,
+  "6 decimals for pump tokens"] → 1,073 Mrd. Token),
   `initial_virtual_sol_reserves` = 30 000 000 000 Lamports (30 SOL), `initial_real_token_reserves` =
   793 100 000 000 000, `token_total_supply` = 1 000 000 000 000 000. Abgeleitet: Startpreis
   30 / 1,073e9 ≈ 2,796e-8 SOL je Token, Start-Mcap ≈ 27,96 SOL; Graduation nach ca. 85 SOL Nettozufluss
@@ -73,14 +134,15 @@ Kein Look-ahead: Für ein Event mit Position `t_dec` dürfen ausschließlich Dat
 strikt vor `t_dec` verwendet werden. Konkret:
 
 1. **Gereifte Vor-Launches des Devs:** alle Launches desselben `creator` mit
-   `t_create_prev ∈ [t_create − L, t_create − 7 d]`. Launches der letzten 7 Tage vor dem Event zählen
-   nicht (Rechtszensierung: ihre Graduation wäre noch offen).
+   `t_create_prev ∈ [t_create − L, t_create − 7 d)` (halboffen). Launches der letzten 7 Tage vor dem Event
+   zählen nicht (Rechtszensierung: ihre Graduation wäre noch offen).
 2. `n_prev` = Anzahl gereifter Vor-Launches; `grad_prev` = Anzahl davon mit `t_complete_prev ≤ t_create_prev + 7 d`
-   (damit automatisch `t_complete_prev < t_create`).
+   **und** Position des Complete-Trades strikt vor `t_dec` (slot, tx_index).
 3. **Treatment-Regel (eine Regel, Default, BEIM FREEZE FIXIEREN, OQ-010):**
    `n_prev ≥ 10` **und** `grad_prev ≥ 2` **und** `grad_prev / n_prev ≥ 0,10`.
-   Hinweis: Bei `n_prev < 20` wirkt `grad_prev ≥ 2` als 20-%-Schwelle; das ist gewollt (Schutz gegen einen
-   einzelnen Zufallstreffer).
+   Hinweis: Bei `n_prev = 10` wirkt `grad_prev ≥ 2` als 20-%-Schwelle (ein einzelner Treffer reicht nicht); für
+   `n_prev ≥ 11` ist `grad_prev ≥ 2` durch die 10-%-Regel bereits impliziert (effektive Mindestquote `2 / n_prev`,
+   z. B. 18,2 % bei 11, 10,5 % bei 19, 10 % ab 20).
 4. **Sekundär (deskriptiv, ändert PASS/FAIL nicht):** Relativ-Regel – Wilson-95%-Untergrenze von
    `grad_prev / n_prev` größer als die Basisrate des Vorzeitraums (Abschnitt 12).
 5. **Kontrollpool:** alle Launches der Population, die zu ihrem eigenen `t_dec` **nicht** Treatment sind
@@ -153,12 +215,19 @@ Integer-Arithmetik wie das Programm (u64, Abrundung):
   aus dem TradeEvent [direkt geprüft, trade_event.rs]. Für die eigene simulierte Order gilt der Fee-Satz des
   zeitlich letzten realen Trades vor dem Fill (gleicher Mcap-Bereich), sonst die Tabelle:
   Bonding Curve **0,30 % Creator + 0,95 % Protokoll = 1,25 %** je Seite [direkt geprüft, offizielle
-  Gebührentabelle fees.png: https://raw.githubusercontent.com/pump-fun/pump-public-docs/main/docs/fees.png];
+  Gebührentabelle fees.png: https://raw.githubusercontent.com/pump-fun/pump-public-docs/main/docs/fees.png]. Die
+  Tabelle ist ein Snapshot (Commit "Publish fee program README", 2025-08-29); maßgeblich sind die On-chain-Tiers im
+  `FeeConfig`-Account des Fee-Programms (`fee_tiers`, `stable_fee_tiers` für USDC-Quote, `exotic_flat_fees`)
+  [direkt geprüft: https://raw.githubusercontent.com/pump-fun/pump-public-docs/main/idl/pump_fees.json]; beim
+  Freeze wird `FeeConfig` per RPC ausgelesen und der Slot dokumentiert;
   dynamische Gebühren gelten seit "Monday, September 1, 20:00 UTC" [direkt geprüft:
   https://raw.githubusercontent.com/pump-fun/pump-public-docs/main/docs/FEE_PROGRAM_README.md] (Jahr aus dem
   Wochentag abgeleitet: 2025); davor Legacy `fee_basis_points == 100` [direkt geprüft, PUMP_PROGRAM_README].
   Der Fee-Satz ist damit **zeitindexiert**, nicht konstant (OQ-012).
-- **Gebühr auf beiden Seiten:** Buy `x = S × (1 − f_buy)` fließt in die Kurve; Sell `sol_net_out = sol_out_gross × (1 − f_sell)`.
+- **Gebühr auf beiden Seiten:** Buy: in die Kurve fließt `x = S × (1 − f_buy)` (Gebühr aus S) **oder**
+  `x = S / (1 + f_buy)` (Gebühr auf den Kurvenbetrag) – welche Variante das Programm rechnet, entscheidet die
+  Simulator-Validierung (6.6); Differenz bei S = 0,5 SOL und 1,25 % nur 0,015 % von S. Sell:
+  `sol_net_out = sol_out_gross × (1 − f_sell)`.
 
 ### 6.4 Transaktionskosten
 
@@ -166,19 +235,24 @@ Integer-Arithmetik wie das Programm (u64, Abrundung):
   https://raw.githubusercontent.com/solana-foundation/solana-com/main/apps/docs/content/docs/en/core/fees/fee-structure.mdx].
   Annahme: 1 Signatur je Transaktion; Buy + Sell (+ Close) = 2–3 Transaktionen.
 - Priority-Fee `= ceil(cu_price_µLamports × cu_limit / 1 000 000)`, berechnet auf das **angeforderte**
-  CU-Limit [direkt geprüft, fee-structure.mdx und compute-budget.mdx]. CU-Limit 100 000 je Buy/Sell
-  (Empfehlung der pump.fun-FAQ [direkt geprüft:
-  https://raw.githubusercontent.com/pump-fun/pump-public-docs/main/docs/FAQ.md]).
+  CU-Limit [direkt geprüft, fee-structure.mdx und compute-budget.mdx]. CU-Limit primär 120 000 je Buy/Sell
+  (Default des offiziellen pump.fun-Skills, "Bonding buy/sell | 120_000 each" [direkt geprüft:
+  https://raw.githubusercontent.com/pump-fun/pump-fun-skills/main/swap/SKILL.md]); Sensitivität 100 000
+  (pump.fun-FAQ, "static big enough CU limit like 100_000" [direkt geprüft:
+  https://raw.githubusercontent.com/pump-fun/pump-public-docs/main/docs/FAQ.md]) (OQ-013).
   Szenarien für `cu_price`: low 10 000, **medium 120 000 (primär)**, high 500 000 µLamports/CU
   (Beispielwerte aus der Helius-Priority-Fee-Doku [direkt geprüft:
   https://raw.githubusercontent.com/helius-labs/core-ai/main/helius-plugin/skills/build/references/priority-fees.md];
   keine Marktstatistik). Alternative, falls die Daten es erlauben: Median der CU-Preise der realen
-  Pump.fun-Trades im Entry-Slot (OQ-013). Beispiel medium: 5 000 + 12 000 = 17 000 Lamports je Transaktion.
+  Pump.fun-Trades im Entry-Slot (OQ-013). Beispiel medium: 5 000 + ceil(120 000 × 120 000 / 1 000 000) = 5 000 + 14 400 = 19 400 Lamports je
+  Transaktion (bei 100 000 CU: 17 000).
 - Jito-Tip: optional 0,0001 SOL je Transaktion (Default im offiziellen pump.fun-Skill [direkt geprüft:
   https://raw.githubusercontent.com/pump-fun/pump-fun-skills/main/swap/SKILL.md]); primär **ohne** Tip,
   Sensitivität mit Tip.
 - Associated-Token-Account: Rent-Exempt-Einlage für den Token-Account beim Kauf (Größenordnung 0,002 SOL,
-  **NICHT VERIFIZIERT** – am Stichtag per `getMinimumBalanceForRentExemption(165)` abfragen, OQ-013);
+  **NICHT VERIFIZIERT** – am Stichtag per `getMinimumBalanceForRentExemption(165)` abfragen; 165 Byte =
+  `Account::LEN` des SPL-Token-Programms [direkt geprüft: https://raw.githubusercontent.com/solana-program/token/main/interface/src/state.rs],
+  OQ-013);
   Rückholung durch `closeAccount` nach vollständigem Verkauf als dritte Transaktion (Basisgebühr).
   Primär: Rent als Kosten, Rückholung minus Basisgebühr als Ertrag; Sensitivität ohne Rückholung.
 
@@ -266,12 +340,21 @@ kein PASS/FAIL.
 ## 10. Datenquellen
 
 Vergleich und Empfehlung in `docs/exp002_data_sources.md`. Default (**BEIM FREEZE FIXIEREN**, OQ-020):
-primär Dune (SQL über decodierte Pump.fun-Events inkl. Reserven, `block_time`, `block_slot`, `tx_index`,
-Historie ab 2024-01-14 [direkt geprüft, Spellbook-SQL]); sekundär Helius Developer für Roh-Transaktionen
-zur Simulator-Validierung. Preise überwiegend NICHT VERIFIZIERT (OQ-007). Kein Kauf ohne Freigabe.
+primär Dune (SQL über `solana.instruction_calls`, `block_time`, `block_slot`, `tx_index`, Historie ab
+2024-01-14 [direkt geprüft, Spellbook-SQL]); sekundär Helius Developer für Roh-Transaktionen zur
+Simulator-Validierung. Preise überwiegend NICHT VERIFIZIERT (OQ-007). Kein Kauf ohne Freigabe.
+Einschränkungen des Spellbook-Modells [direkt geprüft: Spellbook-SQL und idl/pump.json]: Es erkennt nur die
+Instruktion `create` (Diskriminator `0x181ec828051c0777`), nicht `create_v2` (`0xd6904cec5f8b31b4`, seit
+IDL-Commit 2025-11-07, Pflicht für Mayhem/USDC/Holder-Rewards), und dekodiert aus dem TradeEvent nur die
+virtuellen Reserven, keine realen Reserven und keine Fee-Felder. Population, Creator und Trades werden deshalb
+per eigener SQL über die Event-Diskriminatoren (CreateEvent, TradeEvent, CompleteEvent) in
+`solana.instruction_calls` gebildet; reale Reserven ersatzweise aus den Startwerten des CreateEvents:
+`rT = rT0 − (vT0 − vT)`, `rS = vS − vS0`.
 
-Decoder-Anforderungen: versionsfeste Event-Layouts (ältere CreateEvents ohne `creator`/`timestamp`),
-Fee-Felder je Trade, Quote-Mint-Filter, Mayhem-Flag (OQ-023).
+Decoder-Anforderungen: versionsfeste Event-Layouts (ältere CreateEvents ohne `creator`/`timestamp`; neue
+Trailing-Felder `holder_rewards_bps`, `holder_rewards`, `creator_fee_bps`, `is_holder_reward` – in älteren Logs
+als 0/false lesen), Fee-Felder je Trade, Quote-Mint-Filter, Mayhem-Flag, `is_holder_reward` (OQ-023); die
+IDL-Datei `idl/pump.json` wird beim Freeze auf einen Stand gepinnt (SHA-256 in die Prereg).
 
 ## 11. Erlaubte Vorab-Schritte und No-Peek-Erklärung
 
@@ -313,9 +396,13 @@ Plausibilitätsreferenz.
 - Blockzeit ist sekundengenau und geschätzt; Reihenfolge innerhalb einer Sekunde per (slot, tx_index);
   Worst-Case-Ordnung für den eigenen Fill.
 - Reaktionen anderer Follower auf unsere Order sind nicht modellierbar; die Simulation ist kontrafaktisch.
-- Programmänderungen 2025/2026 (dynamische Gebühren, Creator-Fee, USDC-Quote, Mayhem-Mode, Cashback/Buyback,
-  negative virtuelle Quote-Reserven [direkt geprüft, Commit-Historie pump-fun/pump-public-docs]) machen
-  eine zeitindexierte Behandlung von Gebühren und Kurvenparametern nötig.
+- Programmänderungen 2025/2026 machen eine zeitindexierte Behandlung von Gebühren, Kurvenparametern und
+  Dev-Identität nötig [direkt geprüft: Commit-Historie idl/pump.json in pump-fun/pump-public-docs]: Creator-Fee
+  (Mai 2025), dynamische Gebühren (Sept. 2025), Mayhem-Mode/`create_v2` (IDL 2025-11-07), Cashback-Update
+  (2026-02-17), USDC-quotierte Coins (2026-05-07), Holder-Rewards mit Creator-PDA und Cashback-Deprecation
+  (2026-09-12); Buyback-Felder ohne datierbaren Commit (NICHT VERIFIZIERT). Negative virtuelle Quote-Reserven
+  betreffen nur PumpSwap-Pools (`Pool::virtual_quote_reserves`), nicht die Bonding Curve [direkt geprüft:
+  https://raw.githubusercontent.com/pump-fun/pump-public-docs/main/docs/NEGATIVE_VIRTUAL_QUOTE_RESERVES.md].
 - Preise der Datenquellen sind weitgehend unverifiziert (OQ-007).
 
 ## 14. Offene Punkte (nur IDs)
@@ -328,3 +415,4 @@ OQ-023 – Details und Defaults in OPEN_QUESTIONS.md.
 | Version | Datum | Änderung |
 |---|---|---|
 | v0.1 DRAFT | 2026-09-29 | Erstentwurf nach Auftrag; Hypothese wörtlich übernommen; Design-Review-Fixes eingearbeitet (gereifte Dev-Historie, rollierender Lookback, Mcap-Bins, Simulator-Validierung, Graduation-Doppelbehandlung, Cluster-Bootstrap). Nicht eingefroren. |
+| v0.1.1 DRAFT | 2026-09-29 | Audit-Fixes: Dev-Regel für Holder-Rewards-Coins (Creator = PDA seit 2026-09-12), Spellbook erkennt nur `create` (nicht `create_v2`) und nur virtuelle Reserven, offizielle IDL als Primärquelle, Fee-Snapshot datiert + FeeConfig, CU-Limit 120 000 primär, halboffenes Reifungsintervall, beide Buy-Gebührenvarianten, Abschnitt 1a Wirkmechanismus. Hypothese unverändert. Nicht eingefroren. |

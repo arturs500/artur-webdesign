@@ -9,7 +9,7 @@ Die Netzwerk-Policy der Arbeitsumgebung sperrte am 2026-09-29 die Websites aller
 (helius.dev, bitquery.io, dune.com, flipsidecrypto.xyz, quicknode.com, triton.one, shyft.to,
 chainstack.com, allium.so, goldsky.com, moralis.com, pumpportal.fun, solana.com, docs.jito.wtf) sowie
 News-/Paper-Seiten (OPEN_QUESTIONS.md OQ-007). Erreichbar waren `github.com`, `raw.githubusercontent.com`,
-`registry.npmjs.org`, `pypi.org`. Deshalb gilt:
+`registry.npmjs.org`, `pypi.org` (kanonische Host-Liste: OPEN_QUESTIONS.md OQ-007). Deshalb gilt:
 
 - **[direkt geprüft]** = aus dem offiziellen GitHub-Repository des Anbieters (z. B. Helius-Doku-Quellen in
   `helius-labs/core-ai`, Dune-Spellbook-SQL, Bitquery-Beispiel-Repo, Pump.fun-`pump-public-docs`).
@@ -24,7 +24,7 @@ Pflichtfelder je Launch (Definitionen in `PREREGISTRATION_EXP002.md`):
 
 | Bedarf | Feld/Ereignis | Warum |
 |---|---|---|
-| Create-Event | mint, bonding_curve, **creator**, user (Signer), slot, block_time, tx_index, virtuelle/reale Startreserven, quote_mint | Population, Dev-Identität, Initialzustand, SOL-Quote-Filter |
+| Create-Event (Instruktionen `create` **und** `create_v2`) | mint, bonding_curve, **creator**, user (Signer), **is_holder_reward**, slot, block_time, tx_index, virtuelle/reale Startreserven, quote_mint | Population, Dev-Identität (bei Holder-Rewards-Coins ist `creator` eine PDA → Dev = user, OQ-023), Initialzustand, SOL-Quote-Filter |
 | Trades (erste 60 min + Exit-Horizont) | is_buy, sol_amount, token_amount, user, slot, block_time, tx_index, virtuelle/reale Reserven **nach** dem Trade, Fee-Felder | Kurvenzustand bei Entry/Exit, Replay, Self-Buy, Simulator-Validierung |
 | Complete-Event / Migration | mint, slot, block_time | Graduation (7-Tage-Regel), Exit-Sonderfall |
 | Dev-Historie | alle Creates + Completes im rollierenden 90-Tage-Lookback vor jedem Event | point-in-time Graduation-Quote je Dev |
@@ -37,7 +37,9 @@ CreateEvent (u. a. `creator`, `timestamp`, Startreserven, `quote_mint`), TradeEv
 `creator_fee`), CompleteEvent, CompletePumpAmmMigrationEvent [direkt geprüft über die aus der offiziellen
 IDL generierten Codama-Decoder, Quelle: https://raw.githubusercontent.com/sevenlabs-hq/carbon/main/decoders/pumpfun-decoder/src/types/trade_event.rs
 und .../create_event.rs, abgerufen 2026-09-29; IDL selbst: https://github.com/pump-fun/pump-public-docs/tree/main/idl].
-Ältere Event-Layouts (ohne `creator`/`timestamp`) existieren [direkt geprüft:
+Die offizielle IDL (Refresh 2026-09-12) enthält zusätzlich `holder_rewards_bps`/`holder_rewards` (TradeEvent) und
+`creator_fee_bps`/`is_holder_reward` (CreateEvent) [direkt geprüft: https://raw.githubusercontent.com/pump-fun/pump-public-docs/main/idl/pump.json];
+die Carbon-Feldlisten sind insoweit veraltet. Ältere Event-Layouts (ohne `creator`/`timestamp`) existieren [direkt geprüft:
 https://raw.githubusercontent.com/rckprtr/pumpdotfun-sdk/main/src/IDL/pump-fun.json] – Decoder müssen
 versionsfest sein. Die Blockzeit ist auf Solana sekundengenau und geschätzt ("stake-weighted mean of the
 Vote timestamps") [direkt geprüft: https://raw.githubusercontent.com/solana-foundation/solana-com/main/apps/docs/content/docs/en/rpc/http/getblocktime.mdx,
@@ -56,12 +58,12 @@ Legende: ✓ belegt, ~ abgeleitet/Drittquelle, NV nicht verifiziert, ✗ nicht v
 
 | Quelle | Create + Creator | Trades sekundengenau (slot, block_time) | Complete/Migration | Historie | Preis/Monat, Free-Tier | Limits/Credits | Format |
 |---|---|---|---|---|---|---|---|
-| **Dune** (Spellbook `pumpdotfun_solana`) | ✓ Create-Erkennung; Creator per CreateEvent-Decoding in SQL ~ | ✓ `block_time`, `block_slot`, `tx_index`, Reserven aus TradeEvent | ~ (CompleteEvent decodierbar; dekodierte Tabellen NV) | ✓ ab 2024-01-14 | Free evtl. nur Lesezugriff seit 2026-09-10 (NV); Analyst 75 USD, Plus 399 USD (NV/Drittquelle) | Credits pro Query/Export (Drittquelle) | SQL, API, CSV |
+| **Dune** (Spellbook `pumpdotfun_solana` + eigene SQL auf `solana.instruction_calls`) | ~ Spellbook erkennt nur `create`, nicht `create_v2`; Population + Creator per eigener SQL über den CreateEvent-Diskriminator | ✓ `block_time`, `block_slot`, `tx_index`; Spellbook nur virtuelle Reserven, reale Reserven/Fees per eigener Dekodierung | ~ (CompleteEvent decodierbar; dekodierte Tabellen NV) | ✓ ab 2024-01-14 | Free evtl. nur Lesezugriff seit 2026-09-10 (NV); Analyst 75 USD, Plus 399 USD (NV/Drittquelle) | Credits pro Query/Export (Drittquelle) | SQL, API, CSV |
 | **Helius** (RPC + Enhanced/`getTransactionsForAddress`) | ✓ per eigenem Decoding der Roh-Tx | ✓ slot + blockTime | ✓ per Decoding | Archiv-RPC (Tiefe NV); LaserStream nur 24 h Replay | Developer 49 USD (10 Mio. Credits) ✓; Business 499 USD; Free ~ | Enhanced-API 100 Credits/Call; gTFA ~10–110 Credits; 50 RPS (Developer) ✓ | JSON-RPC, gRPC, Webhook |
-| **Bitquery** (Pump.fun-API) | ✓ `Transaction.Signer` = Dev | ✓ `Block.Time` (Sekundenpräzision NV) | ✓ Raydium-Pfad; PumpSwap NV | Archiv ab Juni 2024 (NV) | Personal 49 USD, Scale 299 USD, Archiv-Packs ab 100 USD (alle NV) | Points (NV) | GraphQL, WebSocket, Kafka |
-| **Eigener RPC / Yellowstone-Geyser** (Triton, QuickNode, Shyft, Chainstack) | ✓ Echtzeit, eigenes Decoding | slot ✓, Blockzeit nur aus `blocks_meta` ✓ | ✓ Echtzeit | ✗ nur Replay ~100–3 000 Slots | Chainstack 49/149 USD, QuickNode 499 USD, Shyft ab 199 USD, Triton PAYG (alle NV) | NV | gRPC/protobuf |
+| **Bitquery** (Pump.fun-API) | ~ `Transaction.Signer` (= `user`, nicht `creator`; Prereg-Definition braucht CreateEvent-Dekodierung) | ✓ `Block.Time` (Sekundenpräzision NV) | ✓ Raydium-Pfad; PumpSwap NV | Archiv ab Juni 2024 (NV) | Personal 49 USD, Scale 299 USD, Archiv-Packs ab 100 USD (alle NV) | Points (NV) | GraphQL, WebSocket, Kafka |
+| **Eigener RPC / Yellowstone-Geyser** (Triton, QuickNode, Shyft, Chainstack) | ✓ Echtzeit, eigenes Decoding | slot ✓; Blockzeit aus `blocks_meta`/`blocks` (Tx-Updates nur slot) ✓ | ✓ Echtzeit | ✗ nur Replay ~100–3 000 Slots | Chainstack 49/149 USD, QuickNode 499 USD, Shyft ab 199 USD, Triton PAYG (alle NV) | NV | gRPC/protobuf |
 | **Flipside** | NV | NV | NV | NV | Repos 2026-07-02 archiviert ✓; Datengeschäft an SonarX verkauft ~ | – | SQL (legacy) |
-| **Old Faithful** (Triton, Solana-Archiv) | ✓ eigenes Decoding | ✓ | ✓ | ✓ ab Epoche 0 | Selbsthosting, 100e GB; Preis NV | – | CAR, JSON-RPC, gRPC |
+| **Old Faithful** (Triton, Solana-Archiv) | ✓ eigenes Decoding | ✓ | ✓ | ✓ ab Epoche 0 | Selbsthosting, 100e GB je Epoche (Gesamtarchiv vielfach größer); Preis NV | – | CAR, JSON-RPC, gRPC |
 | **BigQuery** `crypto_solana_mainnet_us` | roh | ✓ roh | roh | evtl. seit 2025-03 nicht aktualisiert (NV) | Abfragekosten NV | – | SQL |
 | **Substreams** (Pinax/StreamingFast) | ✓ Decoder vorhanden | ✓ Blockmodell | ✓ Decoder | NV | NV | NV | protobuf → Sinks |
 | **Vybe** `/v4/trades` | ✗ nicht dokumentiert | ✓ `blockTime` | ✗ nicht dokumentiert | NV | Free-Tier ✓; 49/600 USD (NV) | 1 000 Zeilen/Seite ✓ | REST |
@@ -81,6 +83,12 @@ Legende: ✓ belegt, ~ abgeleitet/Drittquelle, NV nicht verifiziert, ✗ nicht v
   (veraltet seit den dynamischen Gebühren) [direkt geprüft] (Quelle:
   https://raw.githubusercontent.com/duneanalytics/spellbook/main/dbt_subprojects/solana/models/_sector/dex/pumpdotfun/solana/pumpdotfun_solana_base_trades.sql,
   abgerufen 2026-09-29).
+- **Einschränkungen [direkt geprüft, Spellbook-SQL + idl/pump.json]:** Die Create-Erkennung prüft nur den
+  Diskriminator der Instruktion `create` (`0x181ec828051c0777`); `create_v2` (`0xd6904cec5f8b31b4`, seit IDL-Commit
+  2025-11-07, Pflicht für Mayhem/USDC/Holder-Rewards, im offiziellen pump.fun-Skill verwendet) wird nicht erfasst.
+  Aus dem TradeEvent werden nur die virtuellen Reserven dekodiert (Offsets nach `timestamp`), keine realen Reserven
+  und keine Fee-Felder; die Roh-Spalte `data` fehlt im finalen SELECT. Folge: Population, Creator, reale Reserven
+  und Fees per eigener SQL über die Event-Diskriminatoren in `solana.instruction_calls` bilden.
 - Weitere Modelle `pumpdotfun_solana_trades`, `pumpdotfun_version_1_base_trades` [direkt geprüft]
   (Quelle: .../pumpdotfun/solana/schema.yml, abgerufen 2026-09-29). Trader-Attribution für OKX-Routen im
   September 2026 korrigiert [direkt geprüft] (Quelle: https://github.com/duneanalytics/spellbook/pull/10036).
@@ -116,7 +124,7 @@ Legende: ✓ belegt, ~ abgeleitet/Drittquelle, NV nicht verifiziert, ✗ nicht v
 ### 3.3 Bitquery
 
 - Pump.fun-API-Beispiele: Create über `TokenSupplyUpdates` mit `Method: "create"`, liefert `Block.Time`,
-  `Transaction.Signer` (Dev) und Mint; Trades mit `Block.Time`, `Transaction.Signature`, Buy/Sell-Amounts,
+  `Transaction.Signer` (= `user`/Signer, nicht der `creator` der Prereg-Definition) und Mint; Trades mit `Block.Time`, `Transaction.Signature`, Buy/Sell-Amounts,
   `Dex.ProtocolName = "pump"`; "Last Trade Before Graduation"-Query (Raydium-Pfad); `dataset: realtime`
   vs. Archiv/Combined [direkt geprüft] (Quelle: https://raw.githubusercontent.com/bitquery/Pump-Fun-API/main/README.md,
   abgerufen 2026-09-29). PumpSwap-Migration-Query: NV. Streaming via Kafka/Protobuf-Repos ✓.
@@ -128,7 +136,7 @@ Legende: ✓ belegt, ~ abgeleitet/Drittquelle, NV nicht verifiziert, ✗ nicht v
 ### 3.4 Eigener RPC / Yellowstone-Geyser
 
 - `SubscribeRequest.from_slot`, Filter `account_include/exclude/required`; Tx-Updates ohne Blockzeit
-  (nur slot), Blockzeit über `blocks_meta` [direkt geprüft] (Quelle:
+  (nur slot), Blockzeit über `blocks_meta` oder `blocks` [direkt geprüft] (Quelle:
   https://raw.githubusercontent.com/rpcpool/yellowstone-grpc/master/yellowstone-grpc-proto/proto/geyser.proto,
   abgerufen 2026-09-29). Replay ist Reconnect-Puffer, kein Backfill: Chainstack ~100 Slots [direkt geprüft]
   (https://github.com/chainstacklabs/grpc-geyser-tutorial); QuickNode 3 000 Slots, Shyft ~150 Slots [Snippet, NV].
@@ -146,7 +154,8 @@ Legende: ✓ belegt, ~ abgeleitet/Drittquelle, NV nicht verifiziert, ✗ nicht v
 
 - Old Faithful: vollständige Historie ab Epoche 0 als CAR-Dateien, JSON-RPC/gRPC-Server, `getBlock`,
   `getTransaction`, `getSignaturesForAddress` [direkt geprüft] (https://github.com/rpcpool/yellowstone-faithful);
-  "100s of GB", Selbsthosting – zu aufwendig für EXP002.
+  "100s of GB" **je Epoche** (README: "To avoid fetching the full dataset for an epoch (100s of GB)"), Gesamtarchiv
+  entsprechend vielfach größer; Selbsthosting – zu aufwendig für EXP002.
 - BigQuery `crypto_solana_mainnet_us` (Rohdaten) [direkt geprüft] (https://raw.githubusercontent.com/blockchain-etl/public-datasets/master/README.md);
   seit 2025-03 evtl. stale [Snippet, NV].
 - Substreams: Pump.fun-Decoder (Bonding Curve, PumpSwap) vorhanden [direkt geprüft]
@@ -161,9 +170,10 @@ Legende: ✓ belegt, ~ abgeleitet/Drittquelle, NV nicht verifiziert, ✗ nicht v
 
 ## 4. Empfehlung (Preis-Leistung, kein Kauf)
 
-1. **Primär: Dune** – einzige geprüfte Quelle, die Create-Erkennung, TradeEvent-Felder **inklusive
-   Reserven**, `block_time`/`block_slot`/`tx_index` und eine Historie ab 2024-01-14 per SQL liefert und
-   CSV-Export erlaubt. Damit lassen sich Dev-Historie (Millionen Creates), Basisrate, Matching-Pool und die
+1. **Primär: Dune** – einzige geprüfte Quelle, die Pump.fun-Events per SQL (eigene Abfragen über die
+   Event-Diskriminatoren in `solana.instruction_calls`, weil das Spellbook nur `create` und nur virtuelle Reserven
+   dekodiert), `block_time`/`block_slot`/`tx_index` und eine Historie ab 2024-01-14 liefert und CSV-Export
+   erlaubt. Damit lassen sich Dev-Historie (Millionen Creates), Basisrate, Matching-Pool und die
    Trades der ausgewählten ~1 200 Launches in wenigen Abfragen ziehen. Fees **nicht** aus `fee_tier`
    (hart 0,01), sondern aus den Event-Feldern decodieren. Kosten: Analyst 75 USD/Monat bis Plus 399 USD/Monat
    (beide NV; abhängig vom Export-Volumen und davon, ob der Free-Tier noch Abfragen erlaubt).

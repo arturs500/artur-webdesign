@@ -34,10 +34,14 @@ Status-Werte: `offen`, `entschieden`, `geschlossen`.
 - Kontext: `scripts/channel_discovery.py`, Anhang A der Prereg (nicht einsehbar, siehe OQ-001).
 - Gewähltes Default-Kriterium A.1 (Nutzerentscheidung 2026-09-29): Suche über eine feste Keyword-Liste
   mit `contacts.search`, nur Broadcast-Kanäle (keine Gruppen/Megagroups), Ranking nach
-  `participants_count` absteigend (Tiebreak `channel_id` aufsteigend), Filter: mindestens ein Post in den
-  letzten 7 Tagen vor dem Stichtag, Top-50.
+  `participants_count` absteigend (Tiebreak `channel_id` aufsteigend), Filter: mindestens ein Post ab Stichtag
+  00:00 UTC minus 7 Tage bis zum Abrufzeitpunkt (der Lauf erfolgt am Stichtag selbst), Top-50.
 - Frage: Deckt sich A.1 mit dem Kriterium in Anhang A der Prereg (Keyword-Liste, Aktivitätsfenster,
   Sprache/Region, Ausschlüsse)?
+- Zusatzentscheidung: `contacts.search` bietet in TL-Layer 229 die Flags `broadcasts` und `bots` (Telethon 1.45.0:
+  `SearchRequest(q, limit, broadcasts=None, bots=None)` [direkt geprüft per Introspektion]). Die Server-Semantik ist
+  NICHT VERIFIZIERT (core.telegram.org gesperrt). Default: Flag nicht gesetzt; bei Übernahme (`broadcasts=True`)
+  wird `CRITERION_VERSION` auf A.2 angehoben und das Flag in den Kriterium-Hash aufgenommen.
 - Default: A.1 wie im Skript kodiert; Keyword-Liste und Parameter sind Teil des Kriteriums.
 - Blockiert: **EXP001-Freeze**.
 - Status: `offen`.
@@ -46,7 +50,8 @@ Status-Werte: `offen`, `entschieden`, `geschlossen`.
 
 - Datum: 2026-09-29
 - Kontext: `scripts/channel_discovery.py`; `channelFull.participants_count` ist ein optionales Feld
-  [direkt geprüft, gotd/td-Method-Beschreibung, siehe scripts/README_channel_discovery.md].
+  [direkt geprüft: Flag-Feld des Typs `channelFull` in https://raw.githubusercontent.com/gotd/td/main/tg/tl_chat_full_gen.go;
+  Telethon 1.45.0 `types.ChannelFull.participants_count: Optional[int] = None`].
 - Frage: Sollen Kanäle mit Telegram-Flag `scam`/`fake` oder `restricted` aus den Top-50 ausgeschlossen
   werden? Wie werden Kanäle ohne `participants_count` gerankt?
 - Default: Flags werden nur protokolliert (Spalten in der CSV), nicht gefiltert; Kanäle ohne
@@ -100,7 +105,10 @@ Status-Werte: `offen`, `entschieden`, `geschlossen`.
   `flipsidecrypto.xyz`, `core.telegram.org`, `my.telegram.org`, `docs.telethon.dev`, `codeberg.org`,
   `solana.com`, `docs.jito.wtf`, `pump.fun`, `quicknode.com`, `triton.one`, `shyft.to`,
   `chainstack.com`, `api.tgstat.ru`, `telemetr.io` sowie News-/Paper-Seiten (theblock.co, coindesk.com,
-  arxiv.org, zenodo.org). Erreichbar waren `pypi.org`, `github.com`, `raw.githubusercontent.com`.
+  arxiv.org, zenodo.org), außerdem `skills.lc`, `data.birdeye.so`, `bds-support.birdeye.so`, `allium.so`,
+  `goldsky.com`, `moralis.com`, `pumpportal.fun`. Erreichbar waren `pypi.org`, `raw.githubusercontent.com`,
+  `github.com` (Seiten und Raw; `api.github.com` liefert 403), `pkg.go.dev`, `registry.npmjs.org`. Diese Liste
+  ist die kanonische Host-Liste für alle Edge-Lab-Dokumente.
 - Frage: Sollen die Hosts in den Environment-Einstellungen freigegeben werden, damit alle
   [Snippet]-Angaben (v. a. Preise, CU-Tabelle, Rate-Limits) direkt geprüft werden können?
 - Default: Kennzeichnung beibehalten; vor einer Kaufentscheidung oder einem Freeze, der auf einer
@@ -135,8 +143,9 @@ Status-Werte: `offen`, `entschieden`, `geschlossen`.
 - Datum: 2026-09-29
 - Kontext: `PREREGISTRATION_EXP002.md`, Treatment-Definition.
 - Default: gereifte Vor-Launches (Create mindestens 7 Tage vor dem Entscheidungszeitpunkt),
-  `n_prev >= 10`, `grad_prev >= 2`, `grad_prev / n_prev >= 0,10`. Hinweis: Bei `n_prev < 20` wirkt
-  `grad_prev >= 2` faktisch als 20-%-Schwelle; das ist gewollt (Schutz gegen 1-Treffer-Zufall).
+  `n_prev >= 10`, `grad_prev >= 2`, `grad_prev / n_prev >= 0,10`. Hinweis: Bei `n_prev = 10` wirkt
+  `grad_prev >= 2` als 20-%-Schwelle (ein Treffer reicht nicht); ab `n_prev >= 11` ist die Bedingung durch die
+  10-%-Regel impliziert (effektive Mindestquote `2 / n_prev`).
 - Alternative: Relativ-Regel (Wilson-Untergrenze der Dev-Quote > Basisrate des Vorzeitraums) – nur als
   sekundäre Analyse.
 - Blockiert: **EXP002-Freeze**.
@@ -159,7 +168,10 @@ Status-Werte: `offen`, `entschieden`, `geschlossen`.
   Bonding Curve 0,30 % Creator + 0,95 % Protokoll = 1,25 % [direkt geprüft]; die Annahme aus PR #1
   (holder-scorer) ist damit bestätigt, gilt aber erst seit Einführung der dynamischen Gebühren
   (Datum laut Doku "Monday, September 1, 20:00 UTC", Jahr aus dem Wochentag abgeleitet: 2025). Davor
-  galt die Legacy-Gebühr von 100 bps. Das TradeEvent führt die tatsächlich gezahlten Fee-Felder mit.
+  galt die Legacy-Gebühr von 100 bps. Das TradeEvent führt die tatsächlich gezahlten Fee-Felder mit. fees.png ist
+  ein Snapshot (Commit "Publish fee program README", 2025-08-29); maßgeblich sind die On-chain-Tiers im
+  `FeeConfig`-Account (`fee_tiers`, `stable_fee_tiers`, `exotic_flat_fees`) [direkt geprüft: idl/pump_fees.json];
+  beim Freeze per RPC auslesen und Slot dokumentieren.
 - Default: Fees je Trade aus den Event-Feldern (`fee_basis_points`, `fee`, `creator_fee_basis_points`,
   `creator_fee`); Fallback zeitindexierte Tabelle. Kein konstanter Satz.
 - Blockiert: **EXP002-Freeze**.
@@ -170,10 +182,12 @@ Status-Werte: `offen`, `entschieden`, `geschlossen`.
 - Datum: 2026-09-29
 - Kontext: `PREREGISTRATION_EXP002.md`, Kostenmodell.
 - Default: drei Szenarien für den Compute-Unit-Preis (low 10 000 / medium 120 000 / high 500 000
-  µLamports pro CU, Beispielwerte aus der Helius-Priority-Fee-Doku [direkt geprüft]) bei 100 000 CU pro
-  Buy/Sell (pump.fun-FAQ [direkt geprüft]); primär medium. Jito-Tip optional 0,0001 SOL (Default im
+  µLamports pro CU, Beispielwerte aus der Helius-Priority-Fee-Doku [direkt geprüft]) bei 120 000 CU pro
+  Buy/Sell (Default des offiziellen pump.fun-Skills, swap/SKILL.md [direkt geprüft]; die pump.fun-FAQ nennt
+  100 000 [direkt geprüft] → Sensitivität); primär medium. Jito-Tip optional 0,0001 SOL (Default im
   pump.fun-Skill [direkt geprüft]). ATA-Rent: Wert am Stichtag per
-  `getMinimumBalanceForRentExemption(165)` abfragen – **NICHT VERIFIZIERT** (Größenordnung 0,002 SOL).
+  `getMinimumBalanceForRentExemption(165)` abfragen – **NICHT VERIFIZIERT** (Größenordnung 0,002 SOL); 165 Byte =
+  `Account::LEN` des SPL-Token-Programms [direkt geprüft: solana-program/token, interface/src/state.rs].
 - Blockiert: **EXP002-Freeze**.
 - Status: `offen`.
 
@@ -233,8 +247,9 @@ Status-Werte: `offen`, `entschieden`, `geschlossen`.
 
 - Datum: 2026-09-29
 - Kontext: Auftrag Phase B, Punkt 7; `PREREGISTRATION_EXP002.md`.
-- Befund: Berichtete Werte reichen von 0,198 % (Mai–Juni 2026, arXiv/Zenodo, Snippet) über 0,63 %
-  (Sept. 2025), 1,15 % (Anfang 2026), 1,4 % (Jan. 2025) bis 2,7 % (j.tools) und kurzfristig 4,7–6,7 %
+- Befund: Berichtete Werte reichen von 0,198 % (2026-05-08 bis 2026-06-10, Zenodo 21383616, Snippet) über 0,63 %
+  (Sept. 2025, arXiv 2602.14860v1, Snippet), 1,15 % (Anfang 2026), 1,4 % (Jan. 2025) bis 2,7 % (j.tools) und
+  kurzfristig 4,7–6,7 %
   nach der BOOST-Änderung (Juli 2026). Alle Werte **NICHT VERIFIZIERT** (nur Snippets, Seiten gesperrt);
   Definitionen und Zeiträume unterscheiden sich.
 - Entscheidung: Die Basisrate wird **nicht übernommen**, sondern aus den eigenen Daten gemessen:
@@ -285,10 +300,17 @@ Status-Werte: `offen`, `entschieden`, `geschlossen`.
 
 - Datum: 2026-09-29
 - Kontext: `PREREGISTRATION_EXP002.md`, Population.
-- Befund [direkt geprüft, Commit-Historie pump-fun/pump-public-docs]: 2026 kamen USDC-quotierte Coins
-  (`virtual_sol_reserves` → `virtual_quote_reserves`), Mayhem-Mode mit veränderbaren virtuellen
-  Reserven, Cashback/Buyback-Fee-Felder und negative virtuelle Quote-Reserven (2026-09-29) hinzu.
-- Default: Nur Launches mit SOL als Quote-Mint; Kurvenparameter je Coin aus dem CreateEvent lesen,
-  nicht aus Konstanten; Mayhem-Coins als Flag mitführen und in einer Sensitivität ausschließen.
+- Befund [direkt geprüft: Commit-Historie idl/pump.json in pump-fun/pump-public-docs, abgerufen 2026-09-29]:
+  Mayhem-Mode und `create_v2` (IDL 2025-11-07), Cashback-Update (2026-02-17), USDC-quotierte Coins
+  (`virtual_sol_reserves` → `virtual_quote_reserves`, 2026-05-07), **Holder-Rewards** (2026-09-12: bei
+  `is_holder_reward = true` setzt das Programm als `creator` eine PDA je Mint; Cashback deprecated). Negative
+  virtuelle Quote-Reserven betreffen nur PumpSwap-Pools (docs/NEGATIVE_VIRTUAL_QUOTE_RESERVES.md), nicht die
+  Bonding Curve. Buyback-Felder: kein datierbarer Commit (NICHT VERIFIZIERT). Das Dune-Spellbook erkennt nur
+  `create`, nicht `create_v2` (siehe docs/exp002_data_sources.md).
+- Frage: Dev-Identität bei Holder-Rewards-Coins (`user` als Dev vs. Ausschluss); Umgang mit `create_v2`.
+- Default: Nur Launches mit SOL als Quote-Mint; Population über den CreateEvent-Diskriminator (deckt `create` und
+  `create_v2`); Dev = `creator`, bei `is_holder_reward = true` Dev = `user` (Signer), Sensitivität ohne
+  Holder-Rewards-Coins; Kurvenparameter je Coin aus dem CreateEvent lesen, nicht aus Konstanten; Mayhem-Coins
+  als Flag mitführen und in einer Sensitivität ausschließen; `idl/pump.json` beim Freeze pinnen (SHA-256).
 - Blockiert: **EXP002-Freeze**.
 - Status: `offen`.

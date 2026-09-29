@@ -14,7 +14,8 @@ OPEN_QUESTIONS.md OQ-002/OQ-003):
 2. Nur Broadcast-Kanäle (keine Gruppen/Megagroups, keine Nutzer/Bots), Dedupe nach Kanal-ID.
 3. Je Kanal Abonnentenzahl (`participants_count`) und Flags über `channels.getFullChannel`, letzter
    regulärer Post über die Nachrichtenhistorie.
-4. Aktiv = mindestens ein Post in den 7 Tagen vor dem Stichtag (00:00 UTC).
+4. Aktiv = mindestens ein Post ab Stichtag 00:00 UTC minus 7 Tage bis zum Abrufzeitpunkt (der Lauf erfolgt am
+   Stichtag selbst; ein späterer Lauf mit `--date` in der Vergangenheit würde auch spätere Posts mitzählen).
 5. Ranking nach Abonnenten absteigend (Tiebreak Kanal-ID), Top-50. Scam-/Fake-/Restricted-Flags werden
    protokolliert, nicht gefiltert.
 
@@ -22,8 +23,9 @@ Ausgaben (alle in `data/`):
 
 - `channels_<YYYY-MM-DD>.csv` – die Top-50 (kanonische Datei für die Prereg),
 - `channels_<YYYY-MM-DD>_raw.csv` – alle Kandidaten mit Ausschlussgrund/Fehler (Audit),
-- `channels_<YYYY-MM-DD>.meta.json` – Parameter, Keyword-Hash, Zähler, Fehler, SHA-256 der CSVs und des
-  Skripts, Telethon-Version und TL-Layer.
+- `channels_<YYYY-MM-DD>.meta.json` – Parameter, Kriterium-Hash (`criterion_sha256` über Keywords und
+  Parameter), Keyword-Hash (`keywords_sha256`, nur die Liste), Zähler, Fehler, SHA-256 der CSVs und des Skripts,
+  Telethon-Version und TL-Layer.
 
 Telegram bietet keine offizielle globale "Top-Kanäle"-Liste; die verfügbaren Methoden sind Suche
 (`contacts.search`, `messages.searchGlobal`), eigene Top-Peers und Kanal-Empfehlungen (direkt geprüft über
@@ -71,7 +73,9 @@ die Forks sind gepflegt, aber fragmentiert.
 1. Auf https://my.telegram.org mit der Telefonnummer des Accounts einloggen.
 2. "API development tools" öffnen, eine Anwendung anlegen (App title, Short name; URL nicht nötig).
 3. `api_id` und `api_hash` notieren. Der `api_hash` kann nicht widerrufen werden und darf nirgends
-   veröffentlicht werden (Telegram sperrt veröffentlichte IDs: Fehler `API_ID_PUBLISHED_FLOOD`).
+   veröffentlicht werden (Telegram sperrt veröffentlichte IDs: Fehler `API_ID_PUBLISHED_FLOOD`, "This API id was
+   published somewhere, you can't use it now" [direkt geprüft: Telethon errors.csv,
+   https://raw.githubusercontent.com/LonamiWebs/Telethon/v1/telethon_generator/data/errors.csv, abgerufen 2026-09-29]).
    Quelle der Schritte: Telethon-Doku "Signing In",
    https://raw.githubusercontent.com/LonamiWebs/Telethon/v1/readthedocs/basic/signing-in.rst (abgerufen 2026-09-29);
    die offizielle Seite https://core.telegram.org/api/obtaining_api_id war aus der Arbeitsumgebung nicht
@@ -100,6 +104,7 @@ pip install telethon==1.45.0
 ```bash
 python3 -m py_compile scripts/channel_discovery.py
 python3 scripts/channel_discovery.py --dry-run
+python3 -m unittest scripts/tests/test_channel_discovery.py   # 10 Tests mit Fake-Client, kein Netz
 ```
 
 Der Dry-Run gibt Konfiguration, Aktivitäts-Cutoff, geplante Ausgabepfade, das Request-Budget und den
@@ -139,8 +144,13 @@ python3 scripts/channel_discovery.py --date 2026-10-15
 - `contacts.search` deckt nur einen Teil der Kanäle ab und ist nicht erschöpfend (Issue #1431). Der
   Recall hängt an der Keyword-Liste; sie ist Teil des Kriteriums und darf nach dem Freeze nicht
   geändert werden.
-- `participants_count` ist ein optionales Feld; fehlt es, steht der Kanal am Ende des Rankings (Zähler
-  `participants_count_missing` in meta.json). Entscheidung dazu: OQ-003.
+- `participants_count` ist ein optionales Feld (Flag-Feld des Typs `channelFull` [direkt geprüft:
+  https://raw.githubusercontent.com/gotd/td/main/tg/tl_chat_full_gen.go, abgerufen 2026-09-29]; Telethon 1.45.0:
+  `types.ChannelFull.participants_count: Optional[int] = None`); fehlt es, steht der Kanal am Ende des Rankings
+  (Zähler `participants_count_missing` in meta.json). Entscheidung dazu: OQ-003.
+- `contacts.search` bietet in TL-Layer 229 die Flags `broadcasts`/`bots` (Telethon 1.45.0: `SearchRequest(q, limit,
+  broadcasts=None, bots=None)`, per Introspektion geprüft). Das Skript setzt sie bewusst nicht, weil die
+  Server-Semantik nicht verifiziert werden konnte; eine Übernahme wäre Kriterium A.2 (OQ-002).
 - Kanäle, deren Historie nicht lesbar ist (restricted/privat), werden als "activity_unknown" oder
   "error" ausgeschlossen und in der Roh-CSV geführt.
 - Drittanbieter-Verzeichnisse (TGStat: Suche nur in Bezahlplänen, rtgstat-README

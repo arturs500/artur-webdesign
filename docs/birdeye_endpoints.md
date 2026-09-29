@@ -89,7 +89,7 @@ Definition: "Compute units are a measure of the computational resources consumed
 |---|---|---|
 | `/defi/v3/ohlcv` | **NICHT VERIFIZIERT** | CU-Tabelle war nicht im Snippet enthalten |
 | `/defi/v3/ohlcv/pair` | **NICHT VERIFIZIERT** | – |
-| `/defi/ohlcv` (Legacy) | 40 CU [Drittquelle] | Quelle: https://skills.lc/agiprolabs/claude-trading-skills/agiprolabs-claude-trading-skills-skills-birdeye-api-skill-md, abgerufen 2026-09-29 |
+| `/defi/ohlcv` (Legacy) | 40 CU [Drittquelle; Host bei erneuter Prüfung am 2026-09-29 nicht erreichbar] | Quelle: https://skills.lc/agiprolabs/claude-trading-skills/agiprolabs-claude-trading-skills-skills-birdeye-api-skill-md, abgerufen 2026-09-29 |
 | `/defi/price` (Anker) | 3 CU [Snippet] | Quelle: https://docs.birdeye.so/reference/get-defi-price, abgerufen 2026-09-29 |
 | `/defi/v3/token/txs` (Anker) | 12 CU [Snippet] | Quelle: https://data.birdeye.so/docs/data-api/transactions/get-defi-v3-token-txs, abgerufen 2026-09-29 |
 | Batch-/Multi-APIs | `ceil(N^0.8 × Basis-CU)` [Snippet] | Quelle: https://docs.birdeye.so/docs/batch-token-cu-cost, abgerufen 2026-09-29 |
@@ -168,7 +168,7 @@ Sensitivitätstabelle aufgebaut; Annahmen sind markiert.
 | 200 | 210 | 420 | 840 | 1 260 |
 | 1 000 | 1 050 | 2 100 | 4 200 | 6 300 |
 
-Metadaten-Calls kämen mit E·(1+k) hinzu (E = 200, k = 5: +1 200 Calls). Für H = 4 h ändert sich bei V3
+Metadaten-Calls kämen mit E·(1+k)·1,05 hinzu (E = 200, k = 5: +1 260 Calls inkl. Retries). Für H = 4 h ändert sich bei V3
 nichts; für H = 24 h nur bei Legacy (×2) bzw. Variante (i) (×2).
 
 **CU-Bedarf für OHLCV-Calls (V3, H = 1 h)**
@@ -185,10 +185,10 @@ nichts; für H = 24 h nur bei Legacy (×2) bzw. Variante (i) (×2).
 
 | Plan | CU/Monat | Reicht für E = 200, k = 5? | Monate nötig (Worst Case 252 000 CU) | Sammeldauer 1 260 Calls |
 |---|---|---|---|---|
-| Standard (Free), 30 000 CU, 1 rps | 30 000 | nein (nur k = 0 bei ≤ 100 CU/Call) | 9 | ca. 21 min |
+| Standard (Free), 30 000 CU, 1 rps | 30 000 | nein (nur k = 0 bei ≤ 100 CU/Call oder k = 1 bei 40 CU/Call) | 9 | ca. 21 min |
 | **Lite, 2,5 Mio. CU, 15 rps, 39 USD** | 2 500 000 | **ja, > 9× Puffer**; auch E = 1 000, k = 5 bei 200 CU/Call | 1 | < 2 min (Per-Endpoint-Limit NICHT VERIFIZIERT) |
 | Starter, 8 Mio. CU, 99 USD | 8 000 000 | ja | 1 | – |
-| x402, 0,003 USD/Request | – | 1 260 × 0,003 = 3,78 USD (mit Metadaten-Calls 7,38 USD) | – | Zahlungsabwicklung on-chain nötig; Historientiefe NICHT VERIFIZIERT |
+| x402, 0,003 USD/Request | – | 1 260 × 0,003 = 3,78 USD (mit Metadaten-Calls 2 520 × 0,003 = 7,56 USD) | – | Zahlungsabwicklung on-chain nötig; Historientiefe NICHT VERIFIZIERT |
 
 **Empfehlung (kein Kauf):** Für EXP001 mit ≥ 200 Events und Baselines reicht **Lite (39 USD/Monat)**
 unter allen betrachteten CU-Szenarien mit großem Puffer; das Experiment ist einmalig, ein Monat genügt
@@ -226,6 +226,6 @@ Offiziell (nur Snippet):
   https://data.birdeye.so/docs/data-api/transactions/get-defi-v3-token-txs ·
   https://data.birdeye.so/docs/data-api/price-ohlcv/get-defi-multi-price
 
-Drittquellen (direkt abgerufen):
+Drittquellen (vom Recherche-Agenten am 2026-09-29 abgerufen; skills.lc war bei erneuter Prüfung nicht erreichbar):
 - https://pkg.go.dev/github.com/tigusigalpa/birdeye-go/price · https://github.com/tigusigalpa/birdeye-go
 - https://skills.lc/agiprolabs/claude-trading-skills/agiprolabs-claude-trading-skills-skills-birdeye-api-skill-md

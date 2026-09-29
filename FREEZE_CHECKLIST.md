@@ -16,6 +16,9 @@ des Nutzers ausgeführt.**
       Hinweise, Ablauf am Stichtag, Begründung Telethon vs. Pyrogram.
 - [x] `data/.gitkeep`; `.gitignore` um Sessions/Secrets/Python-Artefakte ergänzt.
 - [x] `OPEN_QUESTIONS.md` mit allen Unklarheiten (OQ-001 … OQ-023).
+- [x] `scripts/tests/test_channel_discovery.py`: 10 Tests mit Fake-Telegram-Client (kein Netz); API-Namen und
+      Parameter des Skripts gegen Telethon 1.45.0 (TL-Layer 229) per Introspektion bestätigt.
+- [x] Audit 2026-09-29 (Zitate, Kennzeichnung, Mathematik) eingearbeitet; Folgen in OQ-002, OQ-012, OQ-013, OQ-023.
 - [x] Phase B: `PREREGISTRATION_EXP002.md` (DRAFT), `docs/exp002_data_sources.md`.
 
 ## 2. Fehlt / Blocker
@@ -26,7 +29,7 @@ des Nutzers ausgeführt.**
 | 2 | Anhang-A-Kriterium A.1 (Keywords, Aktivitätsfenster 7 Tage, Broadcast-only, Top-50, Ranking nach Abonnenten) muss mit dem Text in Anhang A der Prereg abgeglichen werden; Prereg soll auf `scripts/channel_discovery.py` und `criterion_version = "A.1"` verweisen. | OQ-002, OQ-003 | ja |
 | 3 | Baseline-Definition und Horizonte für die CU-Rechnung bestätigen (k, Pre-Window, weitere Horizonte). | OQ-004 | ja, falls Birdeye Datenquelle der Prereg ist |
 | 4 | Birdeye: CU pro OHLCV-Call, 1m-Retention und Abdeckung der Pump.fun-Kurve verifizieren (Free-Tier-Pilot ca. 20 Events, Credits-Usage-Endpoint). | OQ-005 | ja, falls Birdeye Datenquelle der Prereg ist |
-| 5 | Birdeye-Plan-Entscheidung (Empfehlung Lite, 39 USD) – nur Entscheidung, kein Kauf im Auftrag. | OQ-006 | nein (nach Freeze) |
+| 5 | Birdeye-Plan-Entscheidung (Empfehlung Lite, 39 USD [Snippet], OQ-006) – nur Entscheidung, kein Kauf im Auftrag. | OQ-006 | nein (nach Freeze) |
 | 6 | Direktverifikation der [Snippet]-Zahlen nach Freigabe der gesperrten Hosts. | OQ-007 | ja, soweit die Prereg auf diesen Zahlen aufbaut |
 | 7 | Entscheidung zur Ablage im Website-Repo (GitHub Pages/Jekyll) vor einem Merge nach `main`. | OQ-008 | nein (Freeze auf Branch möglich) |
 
@@ -66,4 +69,11 @@ Hinweise zu den Befehlen (Zusatz, nicht Teil der vorgegebenen Befehle):
 
 ## 5. Status
 
-**FREEZE NICHT AUSGEFÜHRT.** Blocker #1 (Datei fehlt) ist offen. Freeze erst nach Bestätigung des Nutzers.
+**FREEZE NICHT AUSGEFÜHRT.** Blocker #1 (Datei fehlt) ist offen.
+
+Freigabe-Status: Der Nutzer hat am 2026-09-29 die Freigabe erteilt ("Freigabe, wenn du alles gründlich geprüft und
+geplant hast"). Sie ist an die Prüfungen in Abschnitt 3 gebunden, die ohne die Datei nicht durchführbar sind.
+Vorgehen, sobald `PREREGISTRATION_EXP001.md` v0.3 im Branch liegt: Datei vollständig lesen, Anhang A gegen
+Kriterium A.1 und die Baseline-Definition gegen die CU-Rechnung abgleichen, Abschnitt 3 abhaken, Ergebnis kurz
+berichten; die Befehle aus Abschnitt 4 werden erst nach diesem Bericht und einem kurzen "Go" ausgeführt, damit das
+Freeze-Artefakt nicht auf einer ungeprüften Fassung entsteht.

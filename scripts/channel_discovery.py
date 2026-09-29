@@ -10,12 +10,15 @@ und schreibt sie reproduzierbar als CSV (plus Roh-CSV und meta.json mit SHA-256)
 Kriterium A.1 (fix, Teil der Prä-Registrierung; Nutzerentscheidung 2026-09-29, siehe OPEN_QUESTIONS.md
 OQ-002/OQ-003):
   1. Suche mit der festen Keyword-Liste KEYWORDS über die Telegram-Methode contacts.search
-     (Telethon: functions.contacts.SearchRequest, limit = SEARCH_LIMIT je Keyword).
+     (Telethon: functions.contacts.SearchRequest, limit = SEARCH_LIMIT je Keyword). Die Flags
+     broadcasts/bots von contacts.search (TL-Layer 229) werden bewusst NICHT gesetzt: Server-Semantik nicht
+     verifiziert; eine Übernahme wäre Kriterium A.2 (OPEN_QUESTIONS.md OQ-002).
   2. Nur Broadcast-Kanäle (types.Channel mit broadcast=True und megagroup=False); Nutzer, Bots,
      Gruppen und Megagroups werden verworfen. Dedupe nach channel_id.
   3. Je Kanal channels.getFullChannel -> participants_count (Abonnenten) und Flags; letzter regulärer
      Post (keine Service-Nachricht) über die Nachrichtenhistorie.
-  4. Aktiv = mindestens ein Post ab (Stichtag 00:00 UTC − ACTIVE_WITHIN_DAYS Tage).
+  4. Aktiv = mindestens ein Post ab (Stichtag 00:00 UTC − ACTIVE_WITHIN_DAYS Tage) bis zum Abrufzeitpunkt
+     (der Lauf erfolgt am Stichtag selbst).
   5. Ranking: participants_count absteigend, Tiebreak channel_id aufsteigend; Kanäle ohne
      participants_count ans Ende (werden gezählt, nicht gefiltert). Top TOP_N.
   Scam-/Fake-/Restricted-Flags werden protokolliert, NICHT gefiltert (OQ-003).
@@ -200,6 +203,11 @@ def criterion_hash(keywords: tuple[str, ...], top_n: int, active_within_days: in
     return sha256_bytes(canonical_json(payload).encode("utf-8"))
 
 
+def keywords_hash(keywords: tuple[str, ...]) -> str:
+    """SHA-256 nur über die Keyword-Liste (kanonisches JSON-Array)."""
+    return sha256_bytes(canonical_json(list(keywords)).encode("utf-8"))
+
+
 def load_keywords(path: Optional[Path]) -> tuple[str, ...]:
     """Liest eine Keyword-Datei (eine Zeile je Keyword, '#' = Kommentar) oder liefert KEYWORDS."""
     if path is None:
@@ -301,11 +309,12 @@ def write_meta(path: Path, meta: dict[str, Any]) -> None:
 
 
 def request_budget(cfg: Config, n_candidates: Optional[int] = None) -> dict[str, Any]:
-    """Grobe Obergrenze der API-Aufrufe: 1 Suche je Keyword (+1 bei globaler Suche), 2 je Kandidat."""
+    """Grobe Obergrenze der API-Aufrufe ohne FloodWait-Wiederholungen (Worst Case ×2): 1 Suche je Keyword
+    (+1 bei globaler Suche), 2 je Kandidat; Kandidaten-Obergrenze = Suchen × SEARCH_LIMIT."""
     per_keyword = 2 if cfg.with_global_search else 1
     searches = len(cfg.keywords) * per_keyword
     if n_candidates is None:
-        n_candidates = len(cfg.keywords) * cfg.search_limit  # Obergrenze
+        n_candidates = searches * cfg.search_limit  # Obergrenze
     return {
         "search_calls": searches,
         "candidates_upper_bound": n_candidates,
@@ -325,7 +334,10 @@ def env_status() -> dict[str, bool]:
 
 
 def telethon_available() -> bool:
-    return importlib.util.find_spec("telethon") is not None
+    try:
+        return importlib.util.find_spec("telethon") is not None
+    except ValueError:  # Modul bereits importiert, aber ohne __spec__ (z. B. in Tests)
+        return "telethon" in sys.modules
 
 
 def dry_run_report(cfg: Config) -> dict[str, Any]:
@@ -336,8 +348,9 @@ def dry_run_report(cfg: Config) -> dict[str, Any]:
         "date": cfg.date_tag,
         "activity_cutoff_utc": iso_utc(cfg.activity_cutoff),
         "keywords": list(cfg.keywords),
-        "keywords_sha256": criterion_hash(cfg.keywords, cfg.top_n, cfg.active_within_days,
-                                          cfg.search_limit, cfg.with_global_search),
+        "keywords_sha256": keywords_hash(cfg.keywords),
+        "criterion_sha256": criterion_hash(cfg.keywords, cfg.top_n, cfg.active_within_days,
+                                           cfg.search_limit, cfg.with_global_search),
         "top_n": cfg.top_n,
         "active_within_days": cfg.active_within_days,
         "search_limit": cfg.search_limit,
@@ -548,8 +561,9 @@ async def run(cfg: Config) -> int:
         "retrieved_at_utc": iso_utc(retrieved_at),
         "finished_at_utc": iso_utc(utc_now()),
         "keywords": list(cfg.keywords),
-        "keywords_sha256": criterion_hash(cfg.keywords, cfg.top_n, cfg.active_within_days,
-                                          cfg.search_limit, cfg.with_global_search),
+        "keywords_sha256": keywords_hash(cfg.keywords),
+        "criterion_sha256": criterion_hash(cfg.keywords, cfg.top_n, cfg.active_within_days,
+                                           cfg.search_limit, cfg.with_global_search),
         "per_keyword_broadcast_hits": per_keyword_hits,
         "top_n": cfg.top_n,
         "active_within_days": cfg.active_within_days,
