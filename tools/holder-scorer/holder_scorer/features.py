@@ -301,6 +301,12 @@ def compute_features(snap: Snapshot, now: float | None = None) -> Features:
         hidden_float = max(0, float_tokens - net_from_trades) / supply
     if not float_tokens or float_tokens <= 0:
         float_tokens = circulating or None
+    # DAS is trusted only when it accounts for (almost) the whole float: a lagging index otherwise looks like
+    # "everyone sold" and produced false DEV-DUMP / bundle-exit verdicts (RUG alerts) on young tokens
+    if das_balances is not None:
+        das_total = sum(v for v in das_balances.values() if v > 0)
+        if not float_tokens or das_total < 0.9 * float_tokens:
+            das_balances = None
     if holders_usable and snap.holders:
         amounts = sorted((h.amount for h in snap.holders), reverse=True)
         top10 = sum(amounts[:10]) / supply

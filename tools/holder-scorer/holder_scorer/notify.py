@@ -7,6 +7,9 @@ message tells you what the bot thinks. Every word is documented in
 from __future__ import annotations
 
 import os
+import queue
+import threading
+import time
 from typing import TYPE_CHECKING
 
 import requests
@@ -17,6 +20,7 @@ if TYPE_CHECKING:  # pragma: no cover
 WORDS = {
     "BLICK": ("👀", "Frühalarm im Live-Modus: erste echte Käufer, kein Warnsignal, noch kein volles Urteil"),
     "GO": ("🟢", "kaufbar: kein Warnsignal, genug echte Käufer, gerade Zulauf"),
+    "WIDERRUF": ("↩️", "Warnsignal nach BLICK: der Frühalarm gilt nicht mehr, kein GO zu erwarten"),
     "WARTE": ("🟡", "unklar oder Mindestmengen fehlen: nochmal prüfen, nicht kaufen"),
     "FRÜH": ("⏳", "zu jung für ein Urteil (unter dem Mindestalter)"),
     "NEIN": ("⚪", "schwach: Score zu niedrig, aber kein Rug-Muster"),
@@ -166,21 +170,96 @@ def format_legend() -> str:
     return "\n".join(out)
 
 
-def send_telegram(text: str, token: str | None = None, chat_id: str | None = None, timeout: float = 6.0) -> bool:
-    """Send a plain-text message through the Telegram Bot API. Returns True on success."""
+def send_telegram_detailed(text: str, token: str | None = None, chat_id: str | None = None, timeout: float = 6.0) -> tuple[bool, float | None, str]:
+    """Send one plain-text message. Returns (ok, retry_after_seconds, reason); retry_after is set on HTTP 429."""
     token = token or os.environ.get("TELEGRAM_BOT_TOKEN")
     chat_id = chat_id or os.environ.get("TELEGRAM_CHAT_ID")
     if not token or not chat_id:
-        return False
+        return False, None, "nicht konfiguriert"
     try:
         resp = requests.post(
             f"https://api.telegram.org/bot{token}/sendMessage",
             json={"chat_id": chat_id, "text": text, "disable_web_page_preview": True},
             timeout=timeout,
         )
-        return resp.status_code == 200 and bool((resp.json() or {}).get("ok"))
-    except (requests.RequestException, ValueError):
+    except requests.RequestException as exc:
+        return False, None, type(exc).__name__
+    try:
+        body = resp.json() or {}
+    except ValueError:
+        body = {}
+    if resp.status_code == 200 and bool(body.get("ok")):
+        return True, None, ""
+    retry_after = None
+    if resp.status_code == 429:
+        try:
+            retry_after = float((body.get("parameters") or {}).get("retry_after") or 1.0)
+        except (TypeError, ValueError):
+            retry_after = 1.0
+    return False, retry_after, f"http {resp.status_code} {str(body.get('description') or '')[:80]}".strip()
+
+
+def send_telegram(text: str, token: str | None = None, chat_id: str | None = None, timeout: float = 6.0) -> bool:
+    """Send a plain-text message through the Telegram Bot API. Returns True on success."""
+    return send_telegram_detailed(text, token, chat_id, timeout)[0]
+
+
+class TelegramSender:
+    """Background sender with one queue: alerts leave in order, 429/network errors are retried, losses are counted.
+
+    The old fire-and-forget thread per message dropped errors silently and could deliver a RUG before its GO.
+    """
+
+    def __init__(self, max_retries: int = 3, min_interval_s: float = 1.0, send=send_telegram_detailed) -> None:
+        self.max_retries = max_retries
+        self.min_interval_s = min_interval_s
+        self._send = send
+        self._queue: "queue.Queue[str | None]" = queue.Queue()
+        self.sent = 0
+        self.failed = 0
+        self.retries = 0
+        self.last_error = ""
+        self.last_sent_at: float | None = None
+        self._thread = threading.Thread(target=self._run, name="telegram-sender", daemon=True)
+        self._thread.start()
+
+    def send(self, text: str) -> None:
+        self._queue.put(text)
+
+    def pending(self) -> int:
+        return self._queue.qsize()
+
+    def _run(self) -> None:
+        while True:
+            text = self._queue.get()
+            if text is None:
+                break
+            self.deliver(text)
+
+    def deliver(self, text: str) -> bool:
+        for attempt in range(self.max_retries + 1):
+            ok, retry_after, reason = self._send(text)
+            if ok:
+                self.sent += 1
+                self.last_sent_at = time.time()
+                time.sleep(self.min_interval_s)  # Telegram allows roughly one message per second per chat
+                return True
+            self.last_error = reason
+            if attempt < self.max_retries:
+                self.retries += 1
+                time.sleep(retry_after if retry_after else min(2.0 * (attempt + 1), 10.0))
+        self.failed += 1
         return False
+
+    def close(self, timeout: float = 15.0) -> None:
+        self._queue.put(None)
+        self._thread.join(timeout)
+
+    def status_line(self) -> str:
+        line = f"Telegram: {self.sent} gesendet · {self.failed} verloren · {self.retries} Wiederholungen · {self.pending()} offen"
+        if self.last_error:
+            line += f" · letzter Fehler: {self.last_error}"
+        return line
 
 
 def telegram_configured() -> bool:

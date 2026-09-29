@@ -205,6 +205,8 @@ def update_outcomes(path: str, rpc: SolanaRpc, horizon_s: float = 900.0, growth_
         outcome = {
             "checked_at": now,
             "elapsed_s": round(now - recorded_at),
+            "horizon_s": horizon_s,
+            "stale": (now - recorded_at) > horizon_s + 300,  # measured long after the horizon: not "growth in 15 min"
             "holders_at_record": base,
             "holders_later": later,
             "progress_later": progress,
@@ -217,6 +219,69 @@ def update_outcomes(path: str, rpc: SolanaRpc, horizon_s: float = 900.0, growth_
         _append_line(path, {"outcome_for": _outcome_ref(rec), "outcome": outcome})
         checked += 1
     return checked
+
+
+def rules_hash(live_config: Any, scoring: Any, version: str) -> str:
+    """Short hash over every threshold in play, so alerts from different rule sets never get mixed up later."""
+    import dataclasses
+    import hashlib
+
+    def plain(obj: Any) -> Any:
+        if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
+            return dataclasses.asdict(obj)
+        return getattr(obj, "__dict__", str(obj))
+
+    payload = {"version": version, "live": plain(live_config), "scoring": plain(scoring)}
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode("utf-8")).hexdigest()[:12]
+
+
+def alert_record_extra(alert: Any, stufe: int, rules: str, version: str, live_config: Any, scoring: Any) -> dict[str, Any]:
+    """Point-in-time context of one live alert: what the engine had seen, at which slot, under which rules.
+
+    Without slot, raw curve reserves and the rule version a call can never be re-checked objectively later.
+    """
+    import dataclasses
+
+    st = alert.state
+    curve = st.curve
+    create = st.create
+    return {
+        "tier": alert.tier,
+        "word": alert.report.word,
+        "flags": alert.report.flags,
+        "stufe": stufe,
+        "version": version,
+        "rules_hash": rules,
+        "live_config": dataclasses.asdict(live_config) if dataclasses.is_dataclass(live_config) else None,
+        "scoring_config": dataclasses.asdict(scoring) if dataclasses.is_dataclass(scoring) else None,
+        "alert_at": time.time(),
+        "launch_received_at": st.created_at,
+        "slot": st.curve_slot,
+        "create_slot": getattr(create, "slot", None),
+        "create_slot_known": st.create_slot_known,
+        "window_guessed": st.window_guessed,
+        "creator": st.creator,
+        "name": getattr(create, "name", None) or None,
+        "symbol": getattr(create, "symbol", None) or None,
+        "uri": getattr(create, "uri", None) or None,
+        "curve": None
+        if curve is None
+        else {
+            "virtual_token_reserves": curve.virtual_token_reserves,
+            "virtual_quote_reserves": curve.virtual_quote_reserves,
+            "real_token_reserves": curve.real_token_reserves,
+            "real_quote_reserves": curve.real_quote_reserves,
+            "complete": curve.complete,
+            "quote_mint": curve.quote_mint,
+            "is_mayhem_mode": curve.is_mayhem_mode,
+        },
+        "trades_seen": len(st.trades),
+        "failed_tx": st.failed,
+        "missing_open": len(st.missing_sigs),
+        "side_checks_done": sorted(st.done),
+        "tiers_sent_before": sorted(st.tiers_sent),
+        "history_note": "nur ab Abonnement gesehene Trades; Käufe im Create-Slot können fehlen (UNSICHTBAR)",
+    }
 
 
 @dataclass

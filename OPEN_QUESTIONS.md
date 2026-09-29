@@ -314,3 +314,49 @@ Status-Werte: `offen`, `entschieden`, `geschlossen`.
   als Flag mitführen und in einer Sensitivität ausschließen; `idl/pump.json` beim Freeze pinnen (SHA-256).
 - Blockiert: **EXP002-Freeze**.
 - Status: `offen`.
+
+## OQ-024 – Sniper (holder-scorer): die bisherigen Calls liegen nicht vor
+
+- Datum: 2026-09-29
+- Kontext: `docs/sniper_review.md`; Nutzerwunsch, die bisherigen Calls des Sniper zu prüfen ("was falsch war").
+- Befund: Im Repo gibt es keine Aufzeichnungen (`live.jsonl`, `papier.jsonl`, `beobachtungen.jsonl`), keine
+  Telegram-Exporte und keine Liste der gesendeten Calls. Laut PR-#1-Text waren RPC/Telegram aus der
+  Entwicklungsumgebung nicht erreichbar; ob das Werkzeug beim Nutzer lief, ist unbekannt. Geprüft werden konnten
+  deshalb nur Code, Regeln und Datenpfad, nicht die realen Alarme.
+- Frage: Existieren Aufzeichnungen? Wenn ja: Dateien in `data/sniper/` ablegen (JSONL wie vom Werkzeug
+  geschrieben) oder eine Liste `mint, Unix-Zeit des Calls, Alarmstufe` liefern.
+- Default: Nachrechnung erst mit Daten; Werkzeug ab jetzt mit `--record` und `--tape` betreiben, damit jeder
+  Alarm später mit Slot, Kurvenstand und Regelversion objektiv nachgerechnet werden kann.
+- Blockiert: keinen Freeze; blockiert die Auswertung "was war falsch" für die Vergangenheit.
+- Status: `offen`.
+
+## OQ-025 – Sniper-Betrieb für Handy-Alarme: Einordnung, Stufe, Budget
+
+- Datum: 2026-09-29
+- Kontext: `docs/sniper_review.md`, `tools/holder-scorer/README.md`.
+- Einordnung: Das Werkzeug enthält keinen Trading-Code (geprüft per Suche nach sendTransaction/Keypair/sign);
+  Alarme aufs Handy sind Beobachtungen einer Call-Quelle unter Test, keine Kaufsignale. Damit bleibt der
+  Betrieb mit der Regel Edge-First vereinbar, solange kein Kapital folgt.
+- Offene Entscheidungen: (a) Stufe 1 mit `--tiers go,widerruf,rug` (Modell laut README: ca. 20 GO je Stunde)
+  statt Stufe 2 (ca. 170 Nachrichten je Stunde, für ein Handy unbrauchbar); (b) `--budget 1000` je Stunde, damit
+  das kostenlose Helius-Kontingent (1 Mio. Credits je Monat [direkt geprüft, helius-labs/core-ai]) nicht nach
+  etwa zehn Tagen leer ist (Standard 4000 je Stunde ≈ 2,9 Mio. je Monat); die Websocket-Kosten "20 Credits je MB"
+  aus dem README sind NICHT VERIFIZIERT; (c) Papier-Latenz 30 s als Standard, weil ein Mensch nach Telegram-Push
+  frühestens 45–100 s nach dem Launch handeln könnte, nicht 2 s.
+- Default: (a) Stufe 1, (b) Budget 1000, (c) Latenz 30 s – wie im README-Startbefehl.
+- Blockiert: keinen Freeze.
+- Status: `offen`.
+
+## OQ-026 – Sniper: Erfolgsmaß und Vorregistrierung (EXP003-Kandidat)
+
+- Datum: 2026-09-29
+- Kontext: `docs/sniper_review.md`, Abschnitt Umbau-Plan.
+- Befund: `outcome`/`evaluate` messen "Holder-Zahl ×1,5 nach 15 Minuten" zum Prüfzeitpunkt statt Netto-Rendite;
+  der Papier-Report wählt die beste von 64 Regeln bzw. 12 Strategien ohne Korrektur. Beides kann Verluste als
+  Treffer zählen.
+- Frage: Soll "Sniper-Alarme als Call-Quelle" als EXP003 vorregistriert werden (Hypothese, Kontrollgruppe,
+  Latenz 30 s, Rendite aus Tape und Kurvenmathematik, Wilson-/Bootstrap-CI, PASS/FAIL vorab)?
+- Default: Ja, nach zwei bis vier Wochen Aufzeichnung mit `--record`/`--tape`; bis dahin keine Kaufentscheidung
+  aus Alarmen ableiten.
+- Blockiert: keinen Freeze.
+- Status: `offen`.

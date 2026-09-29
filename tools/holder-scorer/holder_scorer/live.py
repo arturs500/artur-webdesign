@@ -113,8 +113,9 @@ class LiveConfig:
     fetch_missing_events: bool = True
     fetch_create_tx: bool = True
     include_link: bool = True
-    tiers: tuple[str, ...] = ("BLICK", "GO", "RUG")
+    tiers: tuple[str, ...] = ("BLICK", "GO", "WIDERRUF", "RUG")
     max_tracked: int = 400
+    tape_path: str | None = None  # append every seen trade of an alerted token here (JSONL), for offline replays
 
     @classmethod
     def for_stufe(cls, stufe: int) -> tuple["LiveConfig", ScoringConfig]:
@@ -133,7 +134,7 @@ class LiveConfig:
 
 @dataclass
 class Alert:
-    tier: str  # BLICK | GO | RUG
+    tier: str  # BLICK | GO | WIDERRUF | RUG
     report: QuickReport
     text: str
     state: "TokenState"
@@ -173,6 +174,7 @@ class TokenState:
     complete: bool = False
     dirty: bool = True
     alert_failures: int = 0
+    tape_started: bool = False
 
     @property
     def age(self) -> float:
@@ -417,6 +419,8 @@ class LiveEngine:
                     t.slot = state.create.slot
         state.trades.sort(key=lambda t: (t.slot, t.timestamp))
         state.last_trade_at = now
+        if state.tape_started and self.cfg.tape_path:
+            self._tape(state, tr, now)
         state.dirty = True
         self.stats["trades"] += 1
         self._update_curve(state, tr)
@@ -603,7 +607,7 @@ class LiveEngine:
             trades=list(state.trades),
             total_signatures=len(state.trades) + state.failed + (0 if state.trades and state.trades[0].ix_name == "create" else 1),
             failed_tx=state.failed,
-            sig_meta=[(int(state.created_at) + 31, True)] * state.failed,
+            sig_meta=[],  # block times of failed txs are unknown here: never fabricate "failed after 30 s"
             history_ok=True,
             head_complete=True,
             partial_history=False,
@@ -656,6 +660,39 @@ class LiveEngine:
         state.tiers_sent[tier] = now
         self.stats["alerts"] += 1
         self.stats[tier.lower()] = self.stats.get(tier.lower(), 0) + 1
+        if self.cfg.tape_path and not state.tape_started:
+            # first alert: back-fill everything seen so far, then stream every further trade (see _add_trade)
+            state.tape_started = True
+            for t in list(state.trades):
+                self._tape(state, t, now, backfill=True)
+
+    def _tape(self, state: TokenState, tr: TradeEvent, now: float, backfill: bool = False) -> None:
+        """Append one seen trade of an alerted token to the tape (compact JSONL, append-only, never rewritten)."""
+        import json
+
+        row = {
+            "mint": state.mint,
+            "seen_at": round(now, 3),
+            "backfill": backfill,
+            "slot": tr.slot,
+            "ts": tr.timestamp,
+            "sig": tr.signature,
+            "buy": tr.is_buy,
+            "user": tr.user,
+            "sol": tr.sol_amount,
+            "tok": tr.token_amount,
+            "vS": tr.virtual_sol_reserves,
+            "vT": tr.virtual_token_reserves,
+            "rS": tr.real_sol_reserves,
+            "rT": tr.real_token_reserves,
+            "fee": tr.fee,
+            "creator_fee": tr.creator_fee,
+        }
+        try:
+            with open(self.cfg.tape_path, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps(row, separators=(",", ":")) + "\n")
+        except OSError as exc:
+            print(f"[{state.mint[:8]}] Tape nicht schreibbar: {exc!r}")
 
     def _alerts(self, state: TokenState, report: QuickReport, feats, now: float) -> None:
         if state.final:
@@ -695,8 +732,24 @@ class LiveEngine:
         if "GO" in cfg.tiers and go_ok and "GO" not in sent:
             state.go_mc_sol = feats.mc_sol
             self._emit(state, "GO", report, "nach BLICK" if "BLICK" in sent else None, now)
-        # get-out signals for tokens that got an alert
         bad = word in ("RUG", "TOT")
+        # a soft veto after BLICK (SCHNELL, FRISCH, FUNDER, UNSICHTBAR, bundle over the limit, ...) used to stay
+        # silent: the phone kept a stale BLICK while the engine had already ruled the token out. Say so once.
+        blockers = go_blockers(report.flags, cfg.max_bundle_share)
+        if (
+            "WIDERRUF" in cfg.tiers
+            and "BLICK" in sent
+            and "GO" not in sent
+            and "RUG" not in sent
+            and "WIDERRUF" not in sent
+            and not bad
+            and (veto or not bundle_ok or blockers)
+        ):
+            out = QuickReport(**{**report.__dict__})
+            out.word = "WIDERRUF"
+            reasons = [f for f in report.flags if f.split(" ")[0] in BLICK_VETO_FLAGS or f in blockers] or list(report.flags)
+            self._emit(state, "WIDERRUF", out, "nach BLICK · " + (", ".join(reasons[:4]) if reasons else "Warnsignal"), now)
+        # get-out signals for tokens that got an alert
         mc_drop = (
             "GO" in sent
             and state.go_mc_sol

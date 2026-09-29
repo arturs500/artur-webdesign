@@ -294,6 +294,8 @@ class PaperTrader:
     def _filters_ok(self, s: Strategy, info: dict[str, Any], state: Any) -> tuple[bool, str]:
         if info["wort"] in ("RUG", "TOT", "?") or state.curve is None or state.complete:
             return False, "Urteil " + info["wort"]
+        if not state.curve.quote_is_sol:
+            return False, "keine SOL-Kurve"  # curve math and prices below assume lamports as quote units
         if s.dev_must_hold and (info["dev_verkauft"] or 0.0) > 0:
             return False, "Dev hat verkauft"
         if s.max_bundle is not None and (info["bundle"] or 0.0) > s.max_bundle:
@@ -650,6 +652,8 @@ def simulate_rule(path: dict[str, Any], t_entry: float, entry_price: float, tp: 
     last_close = pts[i0][0]
     for i in range(i0, len(pts)):
         close, hi, lo = pts[i]
+        if i == i0:
+            hi = lo = close  # the entry bucket also holds prices from before the entry: only its close lies after it
         if start + (i + 1) * step - t_entry > hold_s:
             break
         if sl is not None and lo <= entry_price * (1.0 - sl):
@@ -847,11 +851,12 @@ def look_back(rpc: Any, calls: list[tuple[str, float]], size_sol: float = 0.08, 
         except Exception as exc:  # noqa: BLE001
             lines.append(f"{mint[:8]}…: Historie nicht ladbar ({exc})")
             continue
-        entry = next((x for x in trades if x[0] >= t_call + latency_s), None)
-        if entry is None:
-            lines.append(f"{mint[:8]}…: kein Trade nach dem Call gefunden (Token tot oder Historie zu kurz)")
+        t_entry = t_call + latency_s
+        before = [x for x in trades if x[0] <= t_entry]
+        if not before:
+            lines.append(f"{mint[:8]}…: kein Kurvenstand vor dem Einstieg gefunden (Historie zu kurz)")
             continue
-        t_entry, _, curve = entry
+        _, _, curve = before[-1]  # the curve as it stood when our order would have landed, not the next trade after it
         tokens, _, _ = buy_on_curve(curve, int(size_sol * LAMPORTS_PER_SOL))
         if tokens <= 0:
             lines.append(f"{mint[:8]}…: Kauf nicht möglich")

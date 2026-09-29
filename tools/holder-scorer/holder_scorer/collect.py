@@ -534,7 +534,9 @@ def collect(
 
     creator = None
     if snap.create:
-        creator = snap.create.creator or snap.create.user
+        # holder-rewards coins (since 2026-09-12) carry a program-controlled PDA as `creator`; the signer is the deployer
+        holder_reward = bool(getattr(snap.curve, "is_holder_reward", False)) or bool(getattr(snap.create, "is_holder_reward", False))
+        creator = (snap.create.user if holder_reward else snap.create.creator) or snap.create.user
     elif snap.curve and snap.curve.creator:
         creator = snap.curve.creator
     launch_time = snap.create.timestamp if snap.create else (int(launch_hint) if launch_hint else None)

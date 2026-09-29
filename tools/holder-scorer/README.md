@@ -6,6 +6,26 @@ einem Token, berechnet daraus mehrere Faktoren und gibt ein Urteil ab: **JA**
 vor dem Kauf in einen Sniper- oder Copy-Trading-Bot eingehängt wird, oder als
 Werkzeug, das neben einem fertigen Bot mitläuft.
 
+## Edge-Lab-Stand (2026-09-29)
+
+Dieses Werkzeug ist im Projekt Edge Lab eine **Call-Quelle unter Beobachtung**, kein Kaufsignal:
+Regel Edge-First, Paper-only, kein Trading-Code (es gibt keinen). Die Prüfung mit Ursachenanalyse,
+Umbau-Plan und Setup für Handy-Alarme steht in `docs/sniper_review.md` (Repo-Root). Änderungen
+in Version 0.3.1: Alarm-Records tragen Slot, Kurvenstand, Regelversion und Regel-Hash; `--tape`
+schreibt jeden gesehenen Trade eines Tokens mit Alarm mit (Nachrechnen ohne `getTransaction`);
+neuer Alarm **↩️ WIDERRUF**, wenn nach einem BLICK ein weiches Warnsignal auftaucht; Telegram
+läuft über eine Warteschlange mit Reihenfolge und Wiederholung bei 429; DAS-Holderdaten werden
+nur genutzt, wenn sie den Float abdecken (vorher falsche DEV-DUMP/RUG-Alarme durch verzögerte
+Indexierung); Holder-Rewards-Coins nutzen den Signer als Creator; das Papier-Trading handelt keine
+USDC-Kurven mehr und der Rückblick steigt zum Kurvenstand vor dem Einstieg ein (kein Look-ahead).
+
+Empfohlener Start für frühe Calls aufs Handy (wenig Lärm, Free-Tarif-verträglich):
+
+```bash
+python -m holder_scorer live --stufe 1 --tiers go,widerruf,rug --notify go,widerruf,rug --telegram \
+  --record live.jsonl --tape live_tape.jsonl --budget 1000 --paper papier.jsonl --paper-latency 30
+```
+
 Ehrlicher Hinweis vorab: Das Modul kann keine Zukunft vorhersagen. Es erkennt die
 bekannten Muster, mit denen Token scheitern (Bundles, Dev-Dumps, Serien-Deployer,
 Bump-Bots, eingeschlafener Handel), und misst, ob gerade organisch neue Käufer
@@ -143,6 +163,7 @@ und erzeugt höchstens drei Alarme:
 | 👀 BLICK | erste echte Käufer (nicht Dev, nicht Erstellungs-Block, keine Bots), kein Warnsignal, noch kein volles Urteil; nur in den ersten 60 s | Chart öffnen, selbst entscheiden |
 | 🟢 GO | das volle Urteil: Score, Mindestmengen, Zufluss gerade positiv und **keine offene Warnung** (kein Bundle über der Stufengrenze, kein DEV-GROSS, DEV-RAUS, BOTS, FRISCH, FUNDER, SCHNELL, SERIE, UNSICHTBAR); sonst bleibt es bei WARTE | der eigentliche Call |
 | 🔴 RUG / ⚫ TOT | ein Token mit BLICK oder GO ist gekippt: Dev-Dump, Bundle raus, Erstkäufer raus, Kurs −30 % vom 60-s-Hoch, MC −35 % seit dem GO, Stillstand | raus |
+| ↩️ WIDERRUF | nach einem BLICK kam ein weiches Warnsignal (DEV-GROSS, SCHNELL, FRISCH, FUNDER, UNSICHTBAR, Bundle über der Grenze …), das früher stumm blieb; ein GO ist nicht mehr zu erwarten | den 👀 vergessen |
 
 Ist der Erstellungs-Slot eines Tokens nur geschätzt (der erste Trade kam später
 als 1,5 s nach dem Launch an), wartet der Live-Modus bis zu 15 s auf die
@@ -158,7 +179,7 @@ Einstellungsfrage, sondern Mathematik:
 |---|---|---|---|---|---|
 | 1 vorsichtig | 8 Außen-Käufer, 1,0 SOL Zufluss | 90 s Alter, Score 65 | 12 Käufer, 8 Käufe/120 s, 1,0 SOL | 5 % | wenige, gute Calls |
 | 2 Standard | 5 Außen-Käufer, 0,5 SOL | 20 s, Score 65 | 6 Käufer, 5 Käufe, 0,5 SOL | 10 % | ausgewogen |
-| 3 aggressiv | 3 Außen-Käufer, 0,25 SOL | 15 s, Score 55 | 4 Käufer, 3 Käufe, 0,3 SOL | 15 % | viele Calls, viele Fehlalarme |
+| 3 aggressiv | 3 Außen-Käufer, 0,25 SOL | 15 s, Score 55 | 4 Käufer, 3 Käufe, 0,3 SOL | 15 % (nur BLICK; GO bleibt bei 10 %) | viele Calls, viele Fehlalarme |
 
 Was das in Nachrichten bedeutet, zeigt eine Simulation mit 400 synthetischen
 Launches (Mischung nach der öffentlichen Forschung: 45 % tot, 25 % schwach,
@@ -191,7 +212,14 @@ durchgehen kann. `--commitment processed` liefert Trades einen Tick früher,
 `confirmed` ist sicherer. Mit `--record` landen alle Alarme samt Merkmalen in
 der Datei, sodass `outcome` und `evaluate` je Alarmstufe zeigen, wie viele
 BLICK- und GO-Token danach wirklich gewachsen sind. Erst damit weißt du, ob
-Stufe 3 für dich mehr Treffer bringt oder nur mehr Lärm.
+Stufe 3 für dich mehr Treffer bringt oder nur mehr Lärm. Seit 0.3.1 enthält
+jeder Record zusätzlich Slot, Kurvenstand (virtuelle/reale Reserven),
+Creator, Regelversion und Regel-Hash sowie Datenqualitätsfelder
+(`create_slot_known`, `window_guessed`, `trades_seen`, `missing_open`); mit
+`--tape DATEI` wird für jeden Token mit Alarm jeder gesehene Trade (Slot,
+Reserven, Gebühr) angehängt. Damit lässt sich später jede Einstiegs-Latenz und
+jede Regel offline nachrechnen, ohne Transaktionen nachzuladen. `outcome`
+markiert seit 0.3.1 Prüfungen lange nach dem Horizont als `stale`.
 
 Die Stellschrauben, wenn dir die Mischung nicht passt:
 

@@ -179,23 +179,36 @@ def cmd_live(args: argparse.Namespace) -> int:
         config.blick_min_inflow_sol = args.blick_inflow
     if args.budget is not None:
         config.rpc_units_per_hour = args.budget
-    tiers = tuple(t.strip().upper() for t in (args.tiers or "blick,go,rug").split(",") if t.strip())
+    tiers = tuple(t.strip().upper() for t in (args.tiers or "blick,go,widerruf,rug").split(",") if t.strip())
     config.tiers = tiers
-    notify_words = {w.strip().upper() for w in (args.notify or "blick,go,rug").split(",") if w.strip()}
+    notify_words = {w.strip().upper() for w in (args.notify or "blick,go,widerruf,rug").split(",") if w.strip()}
     if args.telegram and not telegram_configured():
         print("Telegram nicht konfiguriert: TELEGRAM_BOT_TOKEN und TELEGRAM_CHAT_ID setzen", file=sys.stderr)
         return 2
 
-    def send_async(text: str) -> None:
-        import threading
+    sender = None
+    if args.telegram:
+        from .notify import TelegramSender
 
-        threading.Thread(target=send_telegram, args=(text,), daemon=True).start()
+        sender = TelegramSender()
+
+    def send_async(text: str) -> None:
+        # one background queue: alerts keep their order, 429/network errors are retried, losses are counted
+        if sender is not None:
+            sender.send(text)
+
+    from . import __version__
+    from .calibrate import alert_record_extra, rules_hash
+
+    rules = rules_hash(config, scoring, __version__)
+    config.tape_path = getattr(args, "tape", None)
+    print(f"Regelversion {__version__} · Regel-Hash {rules}" + (f" · Tape {config.tape_path}" if config.tape_path else ""))
 
     def on_alert(alert):
         print(f"\n{time.strftime('%H:%M:%S')}  {alert.tier}")
         print(alert.text)
         if args.record and alert.report.verdict is not None:
-            append_record(args.record, alert.report.verdict, {"tier": alert.tier, "word": alert.report.word, "flags": alert.report.flags, "stufe": args.stufe})
+            append_record(args.record, alert.report.verdict, alert_record_extra(alert, args.stufe, rules, __version__, config, scoring))
         if args.telegram and alert.tier in notify_words:
             send_async(alert.text)
 
@@ -223,6 +236,9 @@ def cmd_live(args: argparse.Namespace) -> int:
     live(rpc, config, scoring, on_alert, ws_url=args.ws, paper=paper)
     if paper is not None:
         print(paper.status_line())
+    if sender is not None:
+        sender.close()
+        print(sender.status_line())
     return 0
 
 
@@ -336,10 +352,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     lv = sub.add_parser("live", help="Live-Modus: Trades aus den Logs, Alarme BLICK/GO/RUG so früh wie möglich")
     lv.add_argument("--stufe", type=int, choices=(1, 2, 3), default=2, help="1 vorsichtig, 2 Standard, 3 aggressiv (mehr Calls, mehr Fehlalarme)")
-    lv.add_argument("--tiers", help="welche Alarme erzeugt werden, kommagetrennt (Standard blick,go,rug)")
+    lv.add_argument("--tiers", help="welche Alarme erzeugt werden, kommagetrennt (Standard blick,go,widerruf,rug)")
     lv.add_argument("--notify", help="welche Alarme per Telegram gehen (Standard blick,go,rug)")
     lv.add_argument("--telegram", action="store_true", help="Alarme per Telegram senden")
-    lv.add_argument("--record", help="Alarme samt Merkmalen an diese JSONL-Datei anhängen (für outcome/evaluate)")
+    lv.add_argument("--record", help="Alarme samt Merkmalen, Slot, Kurvenstand und Regelversion an diese JSONL-Datei anhängen (für outcome/evaluate)")
+    lv.add_argument("--tape", metavar="DATEI", help="jeden gesehenen Trade eines Tokens mit Alarm an diese JSONL-Datei anhängen (Nachrechnen ohne getTransaction)")
     lv.add_argument("--track", type=float, help="Sekunden, die ein Token beobachtet wird (Standard 240)")
     lv.add_argument("--commitment", choices=("processed", "confirmed"), default="confirmed", help="processed ist einen Tick schneller, confirmed sicherer")
     lv.add_argument("--ws", help="Websocket-URL des RPC (Standard: aus der RPC-URL abgeleitet)")
