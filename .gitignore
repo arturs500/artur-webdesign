@@ -4,3 +4,12 @@ index.alt.html
 .DS_Store
 *.command
 kontakt.php
+
+# Edge Lab (scripts/channel_discovery.py): Telegram-Sessions, Secrets, Python-Artefakte – niemals committen
+*.session
+*.session-journal
+.env
+.secrets/
+__pycache__/
+*.pyc
+.venv/
