@@ -213,6 +213,8 @@ werden (teuer: tausende `getTransaction` je Token, mit Helius-Kontingent für 20
 | `outcome` mit `horizon_s` und `stale` | Holder-Prüfungen weit nach dem Horizont sind erkennbar | – |
 | `sig_meta` im Live-Snapshot leer statt erfunden | `failed_after_30s_share` ist nicht mehr fälschlich 1,0 | Bestandstests |
 | Version 0.3.1 in Paket und `pyproject.toml`; `.gitignore` um `.venv/`, `*.jsonl`, `.env`, `.secrets/` | Aufzeichnungen und Umgebungen landen nicht im Repo | – |
+| `tape report` (Modul `replay.py`): Rendite-Label je Alarm aus Tape + Records, Latenz × Horizont, Kosten, Graduation zweifach, Kontrollgruppe, Wilson/Block-Bootstrap/Holm, Primärzeile vorab | Alarme sind als Call-Quelle objektiv prüfbar (Umbau P0.2/P0.3) | `tests/test_replay.py` (9 Tests) |
+| `--tape-sample ANTEIL`: deterministische Kontroll-Stichprobe aller beobachteten Token im Tape; Zähler `dropped_full` bei vollem Tracking | Kontrollgruppe ohne zusätzlichen RPC-Aufwand; Ausfälle sichtbar | `test_live_tape_sample_tapes_control_tokens_without_alert` |
 
 Bewusst **nicht** geändert: Gewichte und Schwellen des Scores (ohne Daten wäre das Raten), die Hypothese des
 Werkzeugs, das Vokabular der Kurznachricht. Kein Trading-Code, keine Bot-Anbindung.
@@ -226,10 +228,19 @@ Werkzeugs, das Vokabular der Kurznachricht. Kein Trading-Code, keine Bot-Anbindu
 1. Alarm = Datensatz mit Regelversion, Slot, Kurvenstand, gesehenem Band (Tape). Erledigt in 0.3.1.
 2. **Rendite-Label statt Holder-Wachstum:** Aus dem Tape per Kurvenmathematik (Konstantprodukt, Gebühr aus dem
    TradeEvent, eigener Impact, Priority-Fee-Szenarien wie in EXP002) die Netto-Rendite bei Einstieg **L ∈ {2, 10,
-   30, 60} s** nach dem Alarm und Ausstieg nach festen Regeln (+60/+300/+900 s, TP/SL) berechnen. Holder-Wachstum
-   nur noch beschreibend.
-3. **Kontrollgruppe:** zufällige Launches gleichen Alters und Kurvenfortschritts ohne Alarm, gleiche Simulation.
-   Edge = Differenz zur Kontrolle, nicht absoluter Mittelwert (Konstruktion wie die Baseline in EXP002).
+   30, 60} s** nach dem Alarm und Ausstieg nach festen Regeln (+60/+300/+900 s) berechnen. Holder-Wachstum nur noch
+   beschreibend. **Erledigt in 0.3.1 (`tape report`, Modul `replay.py`):** Einstieg zum Kurvenstand bei Alarm + L
+   (Worst-Case-Ordnung), Ausstieg auf den realen Kurvenstand plus eigenes Delta (Overlay; Replay der Folge-Trades
+   bleibt P1), Kosten (Basisgebühr, Priority-Szenario low/medium/high, Token-Account-Einlage mit Rückholung),
+   Graduation vor Ausstieg konservativ (0) und optimistisch, Trefferquote mit Wilson, Mittelwert mit Block-Bootstrap
+   nach Alarmstunde, Holm über die sekundären Kombinationen, Primärzeile GO/+30 s/+300 s vorab festgelegt. TP/SL-Regeln
+   sind bewusst nicht enthalten (Overfitting-Raster, siehe 2.9).
+3. **Kontrollgruppe:** zufällige Launches gleichen Alters ohne Alarm, gleiche Simulation. Edge = Differenz zur
+   Kontrolle, nicht absoluter Mittelwert (Konstruktion wie die Baseline in EXP002). **Erledigt in 0.3.1:**
+   `--tape-sample 0.1` schreibt einen deterministischen Anteil aller beobachteten Token ab dem ersten Trade mit
+   (Hash des Mints, unabhängig von Neustarts); `tape report` matcht je Alarm bis zu 5 Kontroll-Token mit Launch
+   innerhalb von 6 h im gleichen Alter und berichtet die gepaarte Differenz mit Bootstrap-Intervall. Matching nach
+   Kurvenfortschritt/Self-Buy wie in EXP002 ist noch offen.
 
 **P1 – Statistik, die Überanpassung nicht belohnt**
 
@@ -294,10 +305,10 @@ späteren Auswertung, keine Handlungsaufforderung.
 3. **Installation:** `cd tools/holder-scorer && python3 -m venv .venv && . .venv/bin/activate && pip install -e . websockets`
    (Python ≥ 3.10). Rauchtest ohne Netzlast: `python -m holder_scorer legend` und
    `python -c "from holder_scorer.notify import send_telegram; print(send_telegram('holder-scorer Test'))"` → `True`.
-4. **Start für frühe Calls mit wenig Lärm, Free-Tarif-verträglich:**
+4. **Start für frühe Calls mit wenig Lärm, Free-Tarif-verträglich, mit Kontrollgruppe:**
    ```bash
    python -m holder_scorer live --stufe 1 --tiers go,widerruf,rug --notify go,widerruf,rug --telegram \
-     --record live.jsonl --tape live_tape.jsonl --budget 1000 --paper papier.jsonl --paper-latency 30
+     --record live.jsonl --tape live_tape.jsonl --tape-sample 0.1 --budget 1000 --paper papier.jsonl --paper-latency 30
    ```
    Stufe 1 ≈ 20 GO je Stunde (Rechenmodell, kein Live-Test); `--budget 1000` ≈ 720 000 Einheiten je Monat plus
    Websocket bleibt unter 1 Mio.; `--paper-latency 30` misst, was ein Mensch realisieren kann; `--commitment`
@@ -307,10 +318,11 @@ späteren Auswertung, keine Handlungsaufforderung.
    Beobachtungsereignis, keine Kaufempfehlung; ↩️ WIDERRUF = BLICK vergessen; 🔴 RUG = Insider raus oder MC −35 %.
 6. **Betrieb:** Statuszeile alle 60 s (Log-Benachrichtigungen, RPC-Einheiten, Budget-Auslassungen) und den
    Credit-Stand im Helius-Dashboard vergleichen; die Telegram-Statuszeile beim Beenden zeigt verlorene Nachrichten.
-7. **Auswertung (wöchentlich):** `python -m holder_scorer outcome --file live.jsonl` (2 Aufrufe je Token) und
-   `python -m holder_scorer paper report papier.jsonl`. Bis P0/P1 umgesetzt sind: Trefferquoten als beschreibend
-   lesen (Holder-Label, Abschnitt 2.8), "beste Regel" ignorieren, nur die Holdout-Zeile beachten. Aufzeichnungen
-   nach `data/sniper/` legen (OQ-024), nicht committen, wenn sie Wallet-Adressen Dritter enthalten sollen.
+7. **Auswertung (wöchentlich):** zuerst `python -m holder_scorer tape report live.jsonl live_tape.jsonl` (Rendite-Label,
+   Kontrollgruppe, ohne RPC); die Primärzeile zählt, der Rest ist Hinweis. Ergänzend `python -m holder_scorer outcome
+   --file live.jsonl` (Holder-Label, nur beschreibend, Abschnitt 2.8) und `python -m holder_scorer paper report papier.jsonl`
+   ("beste Regel" ignorieren, nur die Holdout-Zeile beachten). Aufzeichnungen nach `data/sniper/` legen (OQ-024), nicht
+   committen, wenn sie Wallet-Adressen Dritter enthalten sollen.
 
 ---
 

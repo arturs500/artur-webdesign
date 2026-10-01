@@ -356,7 +356,12 @@ Status-Werte: `offen`, `entschieden`, `geschlossen`.
   Treffer zählen.
 - Frage: Soll "Sniper-Alarme als Call-Quelle" als EXP003 vorregistriert werden (Hypothese, Kontrollgruppe,
   Latenz 30 s, Rendite aus Tape und Kurvenmathematik, Wilson-/Bootstrap-CI, PASS/FAIL vorab)?
-- Default: Ja, nach zwei bis vier Wochen Aufzeichnung mit `--record`/`--tape`; bis dahin keine Kaufentscheidung
-  aus Alarmen ableiten.
+- Stand 2026-10-01: Der Rechenweg existiert (`tape report`, Modul `replay.py`: Rendite-Label, Kontrollgruppe über
+  `--tape-sample`, Block-Bootstrap, Holm, Primärzeile GO/+30 s/+300 s). Offen bleiben die Prereg selbst (Fenster,
+  Mindeststichprobe ≥ 200 Alarme aus ≥ 30 Stunden, PASS/FAIL-Text), das Matching nach Kurvenfortschritt/Self-Buy
+  und der Replay der Folge-Trades statt Overlay (P1). Die Token-Account-Einlage (2 039 280 Lamports) ist eine
+  Annahme und per RPC zu prüfen.
+- Default: Ja, nach zwei bis vier Wochen Aufzeichnung mit `--record`/`--tape --tape-sample 0.1`; bis dahin keine
+  Kaufentscheidung aus Alarmen ableiten.
 - Blockiert: keinen Freeze.
 - Status: `offen`.

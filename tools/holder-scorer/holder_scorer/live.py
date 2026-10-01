@@ -116,6 +116,7 @@ class LiveConfig:
     tiers: tuple[str, ...] = ("BLICK", "GO", "WIDERRUF", "RUG")
     max_tracked: int = 400
     tape_path: str | None = None  # append every seen trade of an alerted token here (JSONL), for offline replays
+    tape_sample: float = 0.0  # share of tracked tokens taped from their first seen trade regardless of alerts (control group)
 
     @classmethod
     def for_stufe(cls, stufe: int) -> tuple["LiveConfig", ScoringConfig]:
@@ -175,6 +176,7 @@ class TokenState:
     dirty: bool = True
     alert_failures: int = 0
     tape_started: bool = False
+    tape_control: bool = False  # taped as a random control token (tape_sample), not because of an alert
 
     @property
     def age(self) -> float:
@@ -182,6 +184,17 @@ class TokenState:
 
     def outside_trades(self) -> int:
         return sum(1 for t in self.trades if t.user != self.creator)
+
+
+def tape_sampled(mint: str, share: float) -> bool:
+    """Deterministic sampling by mint hash, so the control group does not depend on run order or restarts."""
+    import hashlib
+
+    if share <= 0:
+        return False
+    if share >= 1:
+        return True
+    return int(hashlib.sha256(mint.encode("utf-8")).hexdigest()[:8], 16) / 2**32 < share
 
 
 def _lamports(x: Any) -> int:
@@ -301,6 +314,7 @@ class LiveEngine:
             return None
         self.stats["launches"] += 1
         if len(self.tokens) >= self.cfg.max_tracked:
+            self.stats["dropped_full"] = self.stats.get("dropped_full", 0) + 1  # visible instead of silent
             return None
         creator = msg.get("traderPublicKey") or msg.get("creator") or ""
         curve_key = msg.get("bondingCurveKey") or derive_bonding_curve(mint)
@@ -419,8 +433,14 @@ class LiveEngine:
                     t.slot = state.create.slot
         state.trades.sort(key=lambda t: (t.slot, t.timestamp))
         state.last_trade_at = now
-        if state.tape_started and self.cfg.tape_path:
-            self._tape(state, tr, now)
+        if self.cfg.tape_path:
+            if not state.tape_started and self.cfg.tape_sample > 0 and tape_sampled(state.mint, self.cfg.tape_sample):
+                # control group: a deterministic random share of tokens is taped from the first seen trade on
+                state.tape_started, state.tape_control = True, True
+                for t in list(state.trades):
+                    self._tape(state, t, now, backfill=True)
+            elif state.tape_started:
+                self._tape(state, tr, now)
         state.dirty = True
         self.stats["trades"] += 1
         self._update_curve(state, tr)
@@ -673,6 +693,8 @@ class LiveEngine:
         row = {
             "mint": state.mint,
             "seen_at": round(now, 3),
+            "t0": round(state.created_at, 3),
+            "control": state.tape_control,
             "backfill": backfill,
             "slot": tr.slot,
             "ts": tr.timestamp,

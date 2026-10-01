@@ -19,11 +19,23 @@ nur genutzt, wenn sie den Float abdecken (vorher falsche DEV-DUMP/RUG-Alarme dur
 Indexierung); Holder-Rewards-Coins nutzen den Signer als Creator; das Papier-Trading handelt keine
 USDC-Kurven mehr und der Rückblick steigt zum Kurvenstand vor dem Einstieg ein (kein Look-ahead).
 
-Empfohlener Start für frühe Calls aufs Handy (wenig Lärm, Free-Tarif-verträglich):
+Empfohlener Start für frühe Calls aufs Handy (wenig Lärm, Free-Tarif-verträglich), mit
+Kontrollgruppe (`--tape-sample 0.1`: jeder zehnte beobachtete Token wird ab dem ersten Trade
+mitgeschrieben, auch ohne Alarm):
 
 ```bash
 python -m holder_scorer live --stufe 1 --tiers go,widerruf,rug --notify go,widerruf,rug --telegram \
-  --record live.jsonl --tape live_tape.jsonl --budget 1000 --paper papier.jsonl --paper-latency 30
+  --record live.jsonl --tape live_tape.jsonl --tape-sample 0.1 --budget 1000 --paper papier.jsonl --paper-latency 30
+```
+
+Auswertung nach ein paar Tagen, ohne RPC (Umbau P0 aus `docs/sniper_review.md`): Netto-Rendite je
+Alarm bei Einstieg 2/10/30/60 s nach dem Alarm und Ausstieg nach 60/300/900 s, mit Kurvengebühr aus
+dem Trade, Priority-Fee-Szenario, Token-Account-Einlage, Kontrollgruppe gleichen Alters, Wilson- und
+Block-Bootstrap-Intervallen; die Primärzeile (GO, +30 s, +300 s) ist vorab festgelegt:
+
+```bash
+python -m holder_scorer tape report live.jsonl live_tape.jsonl            # Text
+python -m holder_scorer tape report live.jsonl live_tape.jsonl --json replay.json --priority high
 ```
 
 Ehrlicher Hinweis vorab: Das Modul kann keine Zukunft vorhersagen. Es erkennt die

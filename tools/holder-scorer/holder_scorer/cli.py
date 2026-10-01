@@ -202,7 +202,15 @@ def cmd_live(args: argparse.Namespace) -> int:
 
     rules = rules_hash(config, scoring, __version__)
     config.tape_path = getattr(args, "tape", None)
-    print(f"Regelversion {__version__} · Regel-Hash {rules}" + (f" · Tape {config.tape_path}" if config.tape_path else ""))
+    config.tape_sample = float(getattr(args, "tape_sample", 0.0) or 0.0)
+    if config.tape_sample and not config.tape_path:
+        print("--tape-sample braucht --tape", file=sys.stderr)
+        return 2
+    print(
+        f"Regelversion {__version__} · Regel-Hash {rules}"
+        + (f" · Tape {config.tape_path}" if config.tape_path else "")
+        + (f" · Kontroll-Stichprobe {config.tape_sample:.0%}" if config.tape_sample else "")
+    )
 
     def on_alert(alert):
         print(f"\n{time.strftime('%H:%M:%S')}  {alert.tier}")
@@ -263,6 +271,35 @@ def cmd_paper(args: argparse.Namespace) -> int:
         print(_stats_line(rpc))
         return 0
     return 2
+
+
+def cmd_tape(args: argparse.Namespace) -> int:
+    from .replay import DEFAULT_HORIZONS, DEFAULT_LATENCIES, Costs, report_to_json, tape_report
+
+    def floats(text: str | None, default: tuple[float, ...]) -> tuple[float, ...]:
+        if not text:
+            return default
+        return tuple(float(x) for x in text.split(",") if x.strip())
+
+    costs = Costs.scenario(args.priority)
+    if args.ata_rent is not None:
+        costs = Costs(base_fee=costs.base_fee, cu_limit=costs.cu_limit, cu_price_micro=costs.cu_price_micro, ata_rent=args.ata_rent, close_account=costs.close_account)
+    text, report = tape_report(
+        args.records,
+        args.tape,
+        size_sol=args.einsatz,
+        latencies=floats(args.latenz, DEFAULT_LATENCIES),
+        horizons=floats(args.horizont, DEFAULT_HORIZONS),
+        costs=costs,
+        k_controls=args.kontrollen,
+        tiers=[t.strip() for t in args.tiers.split(",")] if args.tiers else None,
+    )
+    print(text)
+    if args.json:
+        with open(args.json, "w", encoding="utf-8") as fh:
+            fh.write(report_to_json(report))
+        print(f"JSON nach {args.json} geschrieben")
+    return 0
 
 
 def cmd_selftest(args: argparse.Namespace) -> int:
@@ -357,6 +394,7 @@ def build_parser() -> argparse.ArgumentParser:
     lv.add_argument("--telegram", action="store_true", help="Alarme per Telegram senden")
     lv.add_argument("--record", help="Alarme samt Merkmalen, Slot, Kurvenstand und Regelversion an diese JSONL-Datei anhängen (für outcome/evaluate)")
     lv.add_argument("--tape", metavar="DATEI", help="jeden gesehenen Trade eines Tokens mit Alarm an diese JSONL-Datei anhängen (Nachrechnen ohne getTransaction)")
+    lv.add_argument("--tape-sample", type=float, default=0.0, metavar="ANTEIL", help="zusätzlich diesen Anteil aller beobachteten Token (0–1, z. B. 0.1) ab dem ersten Trade mitschreiben: Kontrollgruppe für 'tape report'")
     lv.add_argument("--track", type=float, help="Sekunden, die ein Token beobachtet wird (Standard 240)")
     lv.add_argument("--commitment", choices=("processed", "confirmed"), default="confirmed", help="processed ist einen Tick schneller, confirmed sicherer")
     lv.add_argument("--ws", help="Websocket-URL des RPC (Standard: aus der RPC-URL abgeleitet)")
@@ -393,6 +431,21 @@ def build_parser() -> argparse.ArgumentParser:
     pb.add_argument("--horizont", type=float, default=900.0, help="Sekunden nach dem Call, die betrachtet werden (Standard 900)")
     _add_rpc_args(pb)
     pb.set_defaults(func=cmd_paper)
+
+    tp = sub.add_parser("tape", help="Alarme aus Records + Tape nachrechnen: Netto-Rendite je Latenz/Horizont, Kontrollgruppe, Bootstrap")
+    tps = tp.add_subparsers(dest="tape_cmd", required=True)
+    tr_ = tps.add_parser("report", help="Replay der Alarme (Paper-only): Einstieg L s nach Alarm, Ausstieg nach H s, Kosten, Kontrollgruppe")
+    tr_.add_argument("records", help="Record-Datei aus 'live --record' (ab 0.3.1)")
+    tr_.add_argument("tape", help="Tape-Datei aus 'live --tape' (mit --tape-sample für die Kontrollgruppe)")
+    tr_.add_argument("--einsatz", type=float, default=0.08, help="SOL je Trade (Standard 0,08)")
+    tr_.add_argument("--latenz", help="Einstiegs-Latenzen in Sekunden, kommagetrennt (Standard 2,10,30,60)")
+    tr_.add_argument("--horizont", help="Haltedauern in Sekunden, kommagetrennt (Standard 60,300,900)")
+    tr_.add_argument("--priority", choices=("low", "medium", "high"), default="medium", help="Priority-Fee-Szenario (Standard medium)")
+    tr_.add_argument("--ata-rent", type=int, help="Token-Account-Einlage in Lamports (Standard 2039280, NICHT VERIFIZIERT – per RPC prüfen)")
+    tr_.add_argument("--kontrollen", type=int, default=5, help="Kontroll-Token je Alarm (Standard 5)")
+    tr_.add_argument("--tiers", help="nur diese Alarmstufen, kommagetrennt (Standard alle)")
+    tr_.add_argument("--json", metavar="DATEI", help="vollständiges Ergebnis zusätzlich als JSON schreiben")
+    tr_.set_defaults(func=cmd_tape)
 
     t = sub.add_parser("selftest", help="Datensammlung an einem echten Token prüfen")
     t.add_argument("mint")
