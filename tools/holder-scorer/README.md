@@ -38,6 +38,32 @@ python -m holder_scorer tape report live.jsonl live_tape.jsonl            # Text
 python -m holder_scorer tape report live.jsonl live_tape.jsonl --json replay.json --priority high
 ```
 
+**Präzisions-Gate (0.3.2, Modul `profile.py`):** BLICK und GO verlangen zusätzlich, dass in den
+letzten 15 s neue Halter (ohne Dev) dazugekommen sind (Stufe 1: ≥ 3, sonst ≥ 2; `--holder-anstieg N`).
+Ein GO verlangt außerdem, wenn ein **Profil** geladen ist, dass der Start des Coins den gespeicherten
+guten Coins ähnelt: Zum gleichen Checkpoint nach dem ersten Trade (10/20/30/45 s) müssen mindestens
+70 % der Merkmale (gewichtet) im Band liegen, das die guten Coins aufgespannt haben (`--profil-min`).
+Kopfzeile der Nachricht: `Halter +4/15s · Profil 80 % (MC↑)`. Das kostet null zusätzliche
+RPC-Aufrufe: alles entsteht aus den ohnehin abonnierten Log-Trades. Das Profil baust du aus deinen
+Aufzeichnungen; Label ist dieselbe Kurvenmathematik wie `tape report` (gut = graduiert oder
+Netto-Rendite > 0 bei Einstieg t0+60 s, Ausstieg +180 s), die Checkpoints liegen alle vor dem
+Einstieg (kein Look-ahead). `--split 0.5` prüft auf der zeitlich späteren Hälfte, ob die Ähnlichkeit
+überhaupt Rendite trennt; ist das Intervall nicht > 0, ist der Filter Lärm und bleibt aus:
+
+```bash
+python -m holder_scorer profil bauen --tape live_tape.jsonl --records live.jsonl --papier papier.jsonl --out profil.json
+python -m holder_scorer profil zeigen profil.json
+python -m holder_scorer live --stufe 1 --tiers go,widerruf,rug --notify go,widerruf,rug --telegram \
+  --record live.jsonl --tape live_tape.jsonl --tape-sample 0.1 --budget 1000 --paper papier.jsonl --paper-latency 30 \
+  --profil profil.json
+```
+
+Liegen noch keine Aufzeichnungen vor, kann eine Mint-Liste (`<Mint> [gut|schlecht]` je Zeile, zum
+Beispiel graduierte Coins) die Historie per RPC nachladen: `profil bauen --mints mints.txt --rpc URL
+--out profil.json`, begrenzt durch `--max-mints 20` und `--max-pages 10`, Schätzung mit `--dry-run`.
+Mindestens 5 gute Coins je Checkpoint, sonst entsteht kein Profil. Ohne Profil gilt nur die
+Halter-Anstiegsregel; `--profil-pflicht` unterdrückt GO ganz, bis ein Profil geladen ist.
+
 Ehrlicher Hinweis vorab: Das Modul kann keine Zukunft vorhersagen. Es erkennt die
 bekannten Muster, mit denen Token scheitern (Bundles, Dev-Dumps, Serien-Deployer,
 Bump-Bots, eingeschlafener Handel), und misst, ob gerade organisch neue Käufer
@@ -173,7 +199,7 @@ und erzeugt höchstens drei Alarme:
 | Alarm | Wann | Was du damit machst |
 |---|---|---|
 | 👀 BLICK | erste echte Käufer (nicht Dev, nicht Erstellungs-Block, keine Bots), kein Warnsignal, noch kein volles Urteil; nur in den ersten 60 s | Chart öffnen, selbst entscheiden |
-| 🟢 GO | das volle Urteil: Score, Mindestmengen, Zufluss gerade positiv und **keine offene Warnung** (kein Bundle über der Stufengrenze, kein DEV-GROSS, DEV-RAUS, BOTS, FRISCH, FUNDER, SCHNELL, SERIE, UNSICHTBAR); sonst bleibt es bei WARTE | der eigentliche Call |
+| 🟢 GO | das volle Urteil: Score, Mindestmengen, Zufluss gerade positiv, **keine offene Warnung** (kein Bundle über der Stufengrenze, kein DEV-GROSS, DEV-RAUS, BOTS, FRISCH, FUNDER, SCHNELL, SERIE, UNSICHTBAR), neue Halter in den letzten 15 s und, mit `--profil`, Ähnlichkeit zu den gespeicherten guten Coins; sonst bleibt es bei WARTE | der eigentliche Call |
 | 🔴 RUG / ⚫ TOT | ein Token mit BLICK oder GO ist gekippt: Dev-Dump, Bundle raus, Erstkäufer raus, Kurs −30 % vom 60-s-Hoch, MC −35 % seit dem GO, Stillstand | raus |
 | ↩️ WIDERRUF | nach einem BLICK kam ein weiches Warnsignal (DEV-GROSS, SCHNELL, FRISCH, FUNDER, UNSICHTBAR, Bundle über der Grenze …), das früher stumm blieb; ein GO ist nicht mehr zu erwarten | den 👀 vergessen |
 

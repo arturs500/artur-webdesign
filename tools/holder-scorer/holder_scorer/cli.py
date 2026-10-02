@@ -200,16 +200,38 @@ def cmd_live(args: argparse.Namespace) -> int:
     from . import __version__
     from .calibrate import alert_record_extra, rules_hash
 
-    rules = rules_hash(config, scoring, __version__)
     config.tape_path = getattr(args, "tape", None)
     config.tape_sample = float(getattr(args, "tape_sample", 0.0) or 0.0)
     if config.tape_sample and not config.tape_path:
         print("--tape-sample braucht --tape", file=sys.stderr)
         return 2
+    # precision gate: holder rise in the last seconds, similarity to the saved good coins (profile.py)
+    if getattr(args, "holder_anstieg", None) is not None:
+        config.blick_min_holder_rise = config.go_min_holder_rise = args.holder_anstieg
+    if getattr(args, "profil_min", None) is not None:
+        config.profile_min_similarity = args.profil_min
+    config.profile_required = bool(getattr(args, "profil_pflicht", False))
+    profile_line = ""
+    if getattr(args, "profil", None):
+        from .profile import load_profile
+
+        try:
+            prof = load_profile(args.profil)
+        except (OSError, ValueError) as exc:
+            print(f"Profil nicht ladbar: {exc}", file=sys.stderr)
+            return 2
+        config.profile_path = args.profil
+        profile_line = f" · Profil {prof['hash']} ({len(prof.get('good') or [])} gut / {len(prof.get('bad') or [])} schlecht, Schwelle {config.profile_min_similarity:.2f})"
+    elif config.profile_required:
+        print("--profil-pflicht braucht --profil", file=sys.stderr)
+        return 2
+    rules = rules_hash(config, scoring, __version__)
     print(
         f"Regelversion {__version__} · Regel-Hash {rules}"
         + (f" · Tape {config.tape_path}" if config.tape_path else "")
         + (f" · Kontroll-Stichprobe {config.tape_sample:.0%}" if config.tape_sample else "")
+        + f" · Halter-Anstieg ≥ {config.go_min_holder_rise} in {config.holder_rise_window_s:.0f} s"
+        + profile_line
     )
 
     def on_alert(alert):
@@ -299,6 +321,55 @@ def cmd_tape(args: argparse.Namespace) -> int:
         with open(args.json, "w", encoding="utf-8") as fh:
             fh.write(report_to_json(report))
         print(f"JSON nach {args.json} geschrieben")
+    return 0
+
+
+def cmd_profil(args: argparse.Namespace) -> int:
+    from .profile import MIN_GOOD, build_profile, describe_profile, load_profile, parse_mints_file, profile_usable, save_profile
+    from .replay import Costs
+
+    if args.profil_cmd == "zeigen":
+        print(describe_profile(load_profile(args.file)))
+        return 0
+    if args.profil_cmd != "bauen":
+        return 2
+    mints = parse_mints_file(args.mints) if args.mints else []
+    if not (args.tape or args.records or args.papier or mints):
+        print("mindestens eine Quelle angeben: --tape, --records, --papier oder --mints", file=sys.stderr)
+        return 2
+    rpc = None
+    if mints:
+        todo = min(len(mints), args.max_mints)
+        # getSignaturesForAddress je Seite plus getTransaction je Trade im Fenster: Obergrenze vorab, Istwert danach
+        print(f"RPC-Schätzung für {todo} Mints: bis zu {todo * args.max_pages} Signatur-Seiten und einige hundert getTransaction je Mint (Obergrenze {todo * args.max_pages * 1000} Einheiten)")
+        if args.dry_run:
+            return 0
+        rpc = make_rpc(args.rpc, args.rps)
+    elif args.dry_run:
+        print("Trockenlauf ohne Mint-Liste: nur Dateien, keine RPC-Aufrufe nötig")
+    profile, text = build_profile(
+        tape_path=args.tape,
+        records_path=args.records,
+        paper_path=args.papier,
+        mints=mints,
+        rpc=rpc,
+        entry_age_s=args.einstieg,
+        horizon_s=args.horizont,
+        size_sol=args.einsatz,
+        costs=Costs.scenario(args.priority),
+        quantile=args.quantil,
+        split=args.split,
+        max_mints=args.max_mints,
+        max_pages=args.max_pages,
+    )
+    print(text)
+    if rpc is not None:
+        print(_stats_line(rpc))
+    if not profile_usable(profile):
+        print(f"Kein Profil geschrieben (weniger als {MIN_GOOD} gute Coins mit Vektor).", file=sys.stderr)
+        return 1
+    save_profile(profile, args.out)
+    print(f"Profil nach {args.out} geschrieben (Hash {profile['hash']}). Start: live --profil {args.out}")
     return 0
 
 
@@ -406,6 +477,10 @@ def build_parser() -> argparse.ArgumentParser:
     lv.add_argument("--blick-buyers", type=int, help="Außen-Käufer, ab denen BLICK kommt (Stufe: 8 / 5 / 3)")
     lv.add_argument("--blick-inflow", type=float, help="organischer Zufluss in SOL, ab dem BLICK kommt (Stufe: 1,0 / 0,5 / 0,25)")
     lv.add_argument("--budget", type=float, help="RPC-Einheiten pro Stunde für Hintergrundabfragen (Standard 4000, etwa 100.000 Helius-Credits am Tag)")
+    lv.add_argument("--profil", metavar="DATEI", help="Referenzprofil guter Coins aus 'profil bauen': GO nur bei Ähnlichkeit ≥ --profil-min (null zusätzliche RPC-Aufrufe)")
+    lv.add_argument("--profil-min", type=float, help="Mindest-Ähnlichkeit 0–1 für GO (Standard 0,7)")
+    lv.add_argument("--profil-pflicht", action="store_true", help="ohne nutzbares Profil kein GO")
+    lv.add_argument("--holder-anstieg", type=int, help="neue Halter (ohne Dev) in den letzten 15 s, die BLICK und GO brauchen (Stufe 1: 3, sonst 2)")
     lv.add_argument("--paper", metavar="DATEI", help="Papier-Trading: alle Strategien handeln jeden Call ohne Geld, jede Entscheidung landet in dieser JSONL-Datei")
     lv.add_argument("--paper-size", type=float, default=0.08, help="SOL je Papier-Trade (Standard 0,08)")
     lv.add_argument("--paper-latency", type=float, default=2.0, help="Sekunden zwischen Entscheidung und Ausführung (Standard 2)")
@@ -446,6 +521,29 @@ def build_parser() -> argparse.ArgumentParser:
     tr_.add_argument("--tiers", help="nur diese Alarmstufen, kommagetrennt (Standard alle)")
     tr_.add_argument("--json", metavar="DATEI", help="vollständiges Ergebnis zusätzlich als JSON schreiben")
     tr_.set_defaults(func=cmd_tape)
+
+    pf = sub.add_parser("profil", help="Referenzprofil guter Coins: bauen aus Tape/Records/Papier/Mints, zeigen")
+    pfs = pf.add_subparsers(dest="profil_cmd", required=True)
+    pb_ = pfs.add_parser("bauen", help="Frühvektoren und Rendite-Labels aus gespeicherten Coins, Bänder je Checkpoint, Zeitsplit-Prüfung")
+    pb_.add_argument("--tape", metavar="DATEI", help="Tape aus 'live --tape' (beste Quelle: Vektor und Label aus denselben Trades)")
+    pb_.add_argument("--records", metavar="DATEI", help="Records aus 'live --record' (ab 0.3.2 mit Vektoren)")
+    pb_.add_argument("--papier", metavar="DATEI", help="Papier-Datei aus 'live --paper' (Label aus dem Papier-Ergebnis, wenn kein Tape-Label existiert)")
+    pb_.add_argument("--mints", metavar="DATEI", help="Mint-Liste '<Mint> [gut|schlecht]' je Zeile; Historie per RPC (begrenzt durch --max-mints/--max-pages)")
+    pb_.add_argument("--out", required=True, metavar="DATEI", help="Zieldatei des Profils (JSON), für 'live --profil'")
+    pb_.add_argument("--einstieg", type=float, default=60.0, help="Label: Einstieg in Sekunden nach dem ersten Trade (Standard 60; Checkpoints davor zählen)")
+    pb_.add_argument("--horizont", type=float, default=180.0, help="Label: Haltedauer in Sekunden (Standard 180 = Ende des 240-s-Fensters)")
+    pb_.add_argument("--einsatz", type=float, default=0.08, help="Label: SOL je Trade (Standard 0,08)")
+    pb_.add_argument("--priority", choices=("low", "medium", "high"), default="medium", help="Label: Priority-Fee-Szenario (Standard medium)")
+    pb_.add_argument("--quantil", type=float, default=0.10, help="Bandbreite: Perzentil q bis 1−q der guten Coins (Standard 0,10)")
+    pb_.add_argument("--split", type=float, default=0.5, help="Zeitsplit-Prüfung: Anteil früher Coins zum Bauen, Rest zum Testen (Standard 0,5; 0 = aus)")
+    pb_.add_argument("--max-mints", type=int, default=20, help="höchstens so viele Mints per RPC laden (Standard 20)")
+    pb_.add_argument("--max-pages", type=int, default=10, help="höchstens so viele Signatur-Seiten je Mint (Standard 10 = 10 000 Signaturen)")
+    pb_.add_argument("--dry-run", action="store_true", help="nur die RPC-Schätzung ausgeben, nichts laden")
+    _add_rpc_args(pb_)
+    pb_.set_defaults(func=cmd_profil)
+    pz = pfs.add_parser("zeigen", help="ein Profil lesbar ausgeben (Bänder, Gewichte, Prüfung)")
+    pz.add_argument("file")
+    pz.set_defaults(func=cmd_profil)
 
     t = sub.add_parser("selftest", help="Datensammlung an einem echten Token prüfen")
     t.add_argument("mint")

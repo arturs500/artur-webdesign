@@ -280,6 +280,7 @@ def alert_record_extra(alert: Any, stufe: int, rules: str, version: str, live_co
         "missing_open": len(st.missing_sigs),
         "side_checks_done": sorted(st.done),
         "tiers_sent_before": sorted(st.tiers_sent),
+        "profil": getattr(st, "profil", None),  # holder rise, similarity, checkpoint vectors (profile.py); input for `profil bauen`
         "history_note": "nur ab Abonnement gesehene Trades; Käufe im Create-Slot können fehlen (UNSICHTBAR)",
     }
 

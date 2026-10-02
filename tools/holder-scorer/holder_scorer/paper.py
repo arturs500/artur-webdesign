@@ -288,6 +288,7 @@ class PaperTrader:
             "socials": getattr(feats, "socials_count", None),
             "name": state.create.name or None,
             "symbol": state.create.symbol or None,
+            "profil": getattr(state, "profil", None),  # holder rise, similarity, checkpoint vectors: `profil bauen --papier` reads them
         }
         return info
 

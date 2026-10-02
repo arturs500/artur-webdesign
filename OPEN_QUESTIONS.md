@@ -365,3 +365,29 @@ Status-Werte: `offen`, `entschieden`, `geschlossen`.
   Kaufentscheidung aus Alarmen ableiten.
 - Blockiert: keinen Freeze.
 - Status: `offen`.
+
+## OQ-027 – Sniper: Präzisions-Gate (Halter-Anstieg, Profil-Ähnlichkeit) – Schwellen und Label ohne Daten gesetzt
+
+- Datum: 2026-10-02
+- Kontext: `tools/holder-scorer/holder_scorer/profile.py`, `docs/sniper_review.md` Abschnitt 4.1; Nutzerwunsch
+  "Coins, die in Sekunden steigende Halterzahlen haben und den gespeicherten guten Coins gleichen".
+- Befund: Es liegen keine Aufzeichnungen vor (OQ-024), also auch keine gespeicherten guten Coins. Das Gate ist
+  deshalb als Mechanismus gebaut, der aus den eigenen Dateien lernt (`profil bauen`), und mit Startwerten belegt,
+  die nicht aus Daten stammen: Halter-Anstieg ≥ 2 (Stufe 1: ≥ 3) je 15 s; Ähnlichkeit ≥ 0,7; Band 10.–90.
+  Perzentil; Label "gut = graduiert oder Netto-Rendite > 0 bei Einstieg t0+60 s, Ausstieg +180 s, 0,08 SOL,
+  Priority medium"; Checkpoints 10/20/30/45 s; mindestens 5 gute Coins je Checkpoint.
+- Fragen: (a) Welche Halter-Anstiegsschwelle trennt Rendite bei gleichem Momentum (Test wie Umbau-Plan Punkt 14)?
+  (b) Ist "graduiert" als gut zu zählen, obwohl `tape report` eine Graduation vor dem Ausstieg konservativ als 0
+  rechnet (kein PumpSwap-Kurs im Tape)? (c) Wie mit korrelierten Merkmalen umgehen (Zufluss, Zufluss der letzten
+  15 s, Kaufgröße zählen dreifach)? (d) Soll ein nach BLICK vom Profil blockiertes GO einen WIDERRUF auslösen?
+  (e) Mint-Liste per RPC: welche Coins gelten als Referenz (nur graduierte? aus welchem Zeitraum?), und wie hoch
+  ist der reale Credit-Verbrauch je Coin (Schätzung: Signatur-Seiten + getTransaction je Trade im Fenster;
+  NICHT VERIFIZIERT)?
+- Optionen: Profil erst nutzen, wenn `--split 0.5` ein Bootstrap-Intervall > 0 zeigt (Pro: keine Lärmfilter;
+  Contra: dauert Tage) vs. sofort mit Startwerten (Pro: weniger Nachrichten; Contra: ungeprüft, kann gute Coins
+  ausschließen).
+- Default: Halter-Anstiegsregel sofort aktiv (sie folgt direkt aus Abschnitt 2.1 der Prüfung); Profil erst nach
+  bestandener Zeitsplit-Prüfung laden; Schwellen bis dahin unverändert, Änderungen nur mit Datum und Begründung
+  hier eintragen; Mint-Liste nur mit `--dry-run`-Schätzung und `--max-mints` ≤ 20.
+- Blockiert: keinen Freeze.
+- Status: `offen`.

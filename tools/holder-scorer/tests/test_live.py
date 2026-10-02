@@ -278,7 +278,8 @@ def test_alert_callback_failure_is_retried_then_given_up():
     engine = LiveEngine(None, cfg, scoring, flaky)
     mint, creator = key(), key()
     engine.on_launch(launch_msg(mint, creator), now=T0)
-    feed_buyers(engine, mint, creator, 9, T0 + 3, 1.0, sol=0.15)
+    # buyers keep arriving: a retry is only attempted while the token still qualifies (holder rise in the last 15 s)
+    feed_buyers(engine, mint, creator, 30, T0 + 3, 1.0, sol=0.15)
     state = engine.tokens[b58encode(mint)]
     for i in range(5):
         engine.tick(T0 + 13 + i * 6)

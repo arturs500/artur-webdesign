@@ -199,10 +199,13 @@ werden (teuer: tausende `getTransaction` je Token, mit Helius-Kontingent für 20
 
 ---
 
-## 4. Was in Version 0.3.1 geändert wurde
+## 4. Was in Version 0.3.1 und 0.3.2 geändert wurde
 
 | Änderung | Wirkung | Test |
 |---|---|---|
+| **0.3.2** Präzisions-Gate (`profile.py`): BLICK/GO nur bei neuen Haltern in den letzten 15 s (Stufe 1 ≥ 3, sonst ≥ 2); GO mit `--profil` nur bei Ähnlichkeit ≥ 0,7 zum Profil gespeicherter guter Coins am gleichen Checkpoint (10/20/30/45 s); Kopfzeile `Halter +4/15s · Profil 80 % (MC↑)`; Zähler `go_profil` | weniger GO auf Coins, die gerade keine neuen Halter gewinnen oder nicht wie die gespeicherten guten starten; null zusätzliche RPC-Aufrufe | `test_live_gate_needs_holder_rise_and_profile_similarity` |
+| **0.3.2** `profil bauen` aus Tape/Records/Papier (ohne RPC) oder Mint-Liste (RPC, gedeckelt): Frühvektoren je Checkpoint, Rendite-Label wie `tape report`, Bänder 10.–90. Perzentil der guten Coins, Gewichte aus der Trennung zu schlechten Coins, Zeitsplit-Prüfung mit Wilson und Block-Bootstrap; `profil zeigen` | der Ähnlichkeitsfilter ist aus eigenen Daten gebaut und auf späteren Daten geprüft statt geglaubt | `test_build_profile_from_tape_labels_saves_loads_and_checks`, `test_label_from_rows_…`, `test_fetch_ticks_…` |
+| **0.3.2** Records, Papier-Kontext und Tape tragen die Frühvektoren bzw. den Dev (`profil`, `dev`) | jeder künftige Alarm liefert Material für das nächste Profil | `test_live_gate_…` (Record), `test_early_vector_…` |
 | Alarm-Records mit Version, Regel-Hash, Slot, Kurvenstand, Creator, Datenqualität (`calibrate.alert_record_extra`, `rules_hash`) | Calls sind nachrechenbar und Regelstände trennbar | `test_alert_record_extra_carries_slot_curve_and_rule_version` |
 | `--tape DATEI`: jeder gesehene Trade eines Tokens mit Alarm, rückwirkend ab dem ersten Alarm | Offline-Replay jeder Latenz und Regel ohne `getTransaction` | `test_tape_backfills_at_first_alert_and_streams_afterwards` |
 | ↩️ WIDERRUF nach BLICK bei weichem Veto | kein veralteter 👀 auf dem Handy | `test_widerruf_after_blick_when_a_soft_veto_appears`, `…_not_sent_without_tier_or_after_go` |
@@ -218,6 +221,41 @@ werden (teuer: tausende `getTransaction` je Token, mit Helius-Kontingent für 20
 
 Bewusst **nicht** geändert: Gewichte und Schwellen des Scores (ohne Daten wäre das Raten), die Hypothese des
 Werkzeugs, das Vokabular der Kurznachricht. Kein Trading-Code, keine Bot-Anbindung.
+
+### 4.1 Präzisions-Gate 0.3.2: warum so und nicht anders
+
+Auftrag: GO nur für Coins, die **innerhalb von Sekunden steigende Halterzahlen** zeigen und den im Papier-Sniper
+**gespeicherten guten Coins gleichen**; sparsam mit dem Nutzungsvolumen, aber normal nutzen.
+
+1. **Halter-Anstieg statt Halterzahl.** Die Zahl der Halter wächst mit dem Alter (Abschnitt 2.1); kausal für
+   künftigen Zufluss ist, ob *jetzt* noch neue Wallets kaufen. Deshalb misst das Gate die Differenz der Halter
+   (ohne Dev, Bestand über 1 000 Token) zwischen jetzt und 15 s davor, aus den abonnierten Log-Trades
+   (`early_vector`). Ein Wallet, das kauft und sofort wieder verkauft, zählt nicht. Schwelle ohne Daten gesetzt
+   (OQ-027), per `--holder-anstieg` änderbar.
+2. **Ähnlichkeit zum gleichen Zeitpunkt, nicht zum Endzustand.** Gespeicherte gute Coins sehen am Ende anders aus
+   als am Anfang; vergleichbar ist nur der Start. Darum liegen die Vektoren an festen Checkpoints nach dem ersten
+   Trade (10/20/30/45 s), und der Live-Coin wird mit dem Band des größten Checkpoints ≤ seinem Alter verglichen.
+   Alle Checkpoints liegen vor dem Einstieg des Labels (t0+60 s), damit kein Merkmal die Zukunft des Labels sieht.
+3. **Was "gut" heißt, legt die Kurvenmathematik fest, nicht ein Gefühl.** Label wie in `tape report`: Einstieg
+   t0+60 s zum Kurvenstand nach allen Trades dieser Sekunde, Ausstieg +180 s (Ende des 240-s-Fensters), Gebühr aus
+   dem Trade, Kosten medium; gut = graduiert oder Netto-Rendite > 0. Papier-Ergebnisse (`pnl_pct`) zählen nur, wenn
+   kein Tape-Label existiert; eine Mint-Liste kann Labels vorgeben (`gut`/`schlecht`).
+4. **Bänder statt Modell.** Mit wenigen Dutzend Coins wäre ein Klassifikator Überanpassung mit Zahlen hinter dem
+   Komma. Ein Band (10.–90. Perzentil der guten Coins) je Merkmal ist erklärbar ("MC↑" steht in der Nachricht), und
+   das Gewicht eines Merkmals ist der Anteil schlechter Coins, den sein Band ausschließt (0,5 bis 1,0): Merkmale,
+   die gute und schlechte Coins nicht trennen, zählen halb.
+5. **Prüfung vor Glauben.** `--split 0.5` baut das Profil aus der früheren Hälfte der Coins und misst auf der
+   späteren Hälfte Trefferquote (Wilson) und Renditedifferenz (Block-Bootstrap nach Stunde) zwischen "ähnlich" und
+   "nicht ähnlich". Liegt das Intervall nicht über 0, trennt die Ähnlichkeit nichts; dann das Profil nicht laden.
+6. **Nutzungsvolumen.** Live: keine neuen RPC-Aufrufe, nur Rechenzeit (Vektoren je Checkpoint werden gecacht).
+   `profil bauen` aus Dateien: kein RPC. Nur `--mints` lädt Historie (Signatur-Seiten + getTransaction je Trade im
+   Fenster), gedeckelt durch `--max-mints 20`/`--max-pages 10`, Schätzung mit `--dry-run`, Istwert in der Statuszeile.
+
+Grenzen (OQ-027): Die Schwellen 2/3 Halter je 15 s, 0,7 Ähnlichkeit, 10 %-Quantil und das Label (60 s/180 s) sind
+Startwerte ohne Daten. Das Profil lernt aus Coins, die der Sniper schon beobachtet hat (Alarme plus
+Kontroll-Stichprobe): Es beschreibt, was *unter diesen* Coins gut lief, nicht alle Launches. Korrelierte Merkmale
+(Zufluss, Zufluss der letzten 15 s, Kaufgröße) zählen mehrfach. Ein Band aus fünf Coins ist grob; mehr Aufzeichnung
+ist der einzige Weg zu schärferen Bändern.
 
 ---
 
@@ -310,10 +348,13 @@ späteren Auswertung, keine Handlungsaufforderung.
    python -m holder_scorer live --stufe 1 --tiers go,widerruf,rug --notify go,widerruf,rug --telegram \
      --record live.jsonl --tape live_tape.jsonl --tape-sample 0.1 --budget 1000 --paper papier.jsonl --paper-latency 30
    ```
-   Stufe 1 ≈ 20 GO je Stunde (Rechenmodell, kein Live-Test); `--budget 1000` ≈ 720 000 Einheiten je Monat plus
-   Websocket bleibt unter 1 Mio.; `--paper-latency 30` misst, was ein Mensch realisieren kann; `--commitment`
-   auf `confirmed` lassen. Alternativ `--no-side` für null HTTP-Last (dann fehlen SERIE/SCHNELL/FRISCH/FUNDER und
-   die Slot-Korrektur dauerhaft).
+   Stufe 1 ≈ 20 GO je Stunde (Rechenmodell, kein Live-Test; mit dem Halter-Anstiegs-Gate aus 0.3.2 weniger);
+   `--budget 1000` ≈ 720 000 Einheiten je Monat plus Websocket bleibt unter 1 Mio.; `--paper-latency 30` misst,
+   was ein Mensch realisieren kann; `--commitment` auf `confirmed` lassen. Alternativ `--no-side` für null
+   HTTP-Last (dann fehlen SERIE/SCHNELL/FRISCH/FUNDER und die Slot-Korrektur dauerhaft). Nach ein paar Tagen
+   Aufzeichnung: `python -m holder_scorer profil bauen --tape live_tape.jsonl --records live.jsonl --papier
+   papier.jsonl --out profil.json` (ohne RPC) und, wenn die Zeitsplit-Prüfung "trennt" meldet, den Start um
+   `--profil profil.json` ergänzen (Abschnitt 4.1).
 5. **Lesen der Nachricht:** 🟢 GO = "keine bekannte Warnung, genug fremde Käufer, gerade Zulauf" – ein
    Beobachtungsereignis, keine Kaufempfehlung; ↩️ WIDERRUF = BLICK vergessen; 🔴 RUG = Insider raus oder MC −35 %.
 6. **Betrieb:** Statuszeile alle 60 s (Log-Benachrichtigungen, RPC-Einheiten, Budget-Auslassungen) und den

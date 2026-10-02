@@ -51,6 +51,19 @@ from .encoding import BorshError
 from .features import CREATION_WINDOW_SLOTS, compute_features
 from .market import sol_usd
 from .narrative import NameRegistry
+from .profile import (
+    CHECKPOINTS,
+    DEFAULT_ENTRY_AGE_S,
+    checkpoint_for,
+    checkpoints_before,
+    cp_key,
+    early_vector,
+    load_profile,
+    profile_checkpoints,
+    profile_suffix,
+    similarity,
+    ticks_from_trades,
+)
 from .pump import (
     COMPLETE_EVENT_DISC,
     CREATE_EVENT_DISC,
@@ -117,11 +130,18 @@ class LiveConfig:
     max_tracked: int = 400
     tape_path: str | None = None  # append every seen trade of an alerted token here (JSONL), for offline replays
     tape_sample: float = 0.0  # share of tracked tokens taped from their first seen trade regardless of alerts (control group)
+    # precision gate (profile.py): new holders in the last seconds, similarity to the saved good coins
+    profile_path: str | None = None  # reference profile from `profil bauen`; without it only the holder-rise rule applies
+    profile_min_similarity: float = 0.7  # GO needs at least this share of features inside the bands of good coins
+    profile_required: bool = False  # True: no GO at all while no usable profile is loaded
+    blick_min_holder_rise: int = 2  # new non-dev holders within holder_rise_window_s needed for BLICK ...
+    go_min_holder_rise: int = 2  # ... and for GO
+    holder_rise_window_s: float = 15.0
 
     @classmethod
     def for_stufe(cls, stufe: int) -> tuple["LiveConfig", ScoringConfig]:
         if stufe <= 1:
-            return cls(stufe=1, blick_min_outside_buyers=8, blick_min_inflow_sol=1.0, max_bundle_share=0.05, creator_scan_min_buyers=8), ScoringConfig()
+            return cls(stufe=1, blick_min_outside_buyers=8, blick_min_inflow_sol=1.0, max_bundle_share=0.05, creator_scan_min_buyers=8, blick_min_holder_rise=3, go_min_holder_rise=3), ScoringConfig()
         if stufe >= 3:
             scoring = ScoringConfig.early()
             scoring.min_age_s = 15.0
@@ -177,6 +197,9 @@ class TokenState:
     alert_failures: int = 0
     tape_started: bool = False
     tape_control: bool = False  # taped as a random control token (tape_sample), not because of an alert
+    profil: dict[str, Any] | None = None  # last precision check: holder rise, similarity, checkpoint vectors (see profile.py)
+    profil_blockiert: bool = False  # a GO was held back by the holder-rise/profile gate at least once
+    profil_cache: dict[str, tuple[int, dict[str, Any]]] = field(default_factory=dict)  # checkpoint -> (ticks up to it, vector)
 
     @property
     def age(self) -> float:
@@ -291,6 +314,14 @@ class LiveEngine:
         self._budget_window_start = 0.0
         self._budget_units_start = 0
         self._lock = threading.Lock()
+        self.profile: dict[str, Any] | None = None
+        if config.profile_path:
+            try:
+                self.profile = load_profile(config.profile_path)
+            except (OSError, ValueError) as exc:
+                print(f"Profil {config.profile_path} nicht ladbar: {exc}")
+                if config.profile_required:
+                    raise
 
     # --- budget ---------------------------------------------------------------------------------
     def rpc_budget_ok(self, now: float | None = None) -> bool:
@@ -703,6 +734,7 @@ class LiveEngine:
             "user": tr.user,
             "sol": tr.sol_amount,
             "tok": tr.token_amount,
+            "dev": state.creator or None,
             "vS": tr.virtual_sol_reserves,
             "vT": tr.virtual_token_reserves,
             "rS": tr.real_sol_reserves,
@@ -716,6 +748,56 @@ class LiveEngine:
         except OSError as exc:
             print(f"[{state.mint[:8]}] Tape nicht schreibbar: {exc!r}")
 
+    def _profile_check(self, state: TokenState, now: float) -> dict[str, Any]:
+        """Holder rise over the last seconds and similarity to the saved good coins, from the seen trades only.
+
+        Checkpoint vectors are cached per (checkpoint, number of trades up to it): late-arriving trades
+        refresh them, otherwise every evaluation costs one pass over the trades for the rise.
+        """
+        cfg = self.cfg
+        out: dict[str, Any] = {
+            "anstieg": 0,
+            "fenster_s": cfg.holder_rise_window_s,
+            "aehnlich": None,
+            "checkpoint": None,
+            "ausserhalb": [],
+            "vektoren": {},
+            "hash": self.profile.get("hash") if self.profile else None,
+        }
+        ticks = ticks_from_trades(state.trades)
+        if not ticks:
+            state.profil = out
+            return out
+        dev = state.creator or None
+        vec_now = early_vector(ticks, now, dev, cfg.holder_rise_window_s)
+        if vec_now is not None:
+            out["anstieg"] = int(vec_now["holders_rise"])
+            out["halter"] = int(vec_now["holders"])
+        t0 = ticks[0].ts
+        age = now - t0
+        # vectors are recorded even without a profile: that is what a later `profil bauen` learns from
+        cps = profile_checkpoints(self.profile) if self.profile else list(checkpoints_before(DEFAULT_ENTRY_AGE_S, CHECKPOINTS))
+        for cp in cps:
+            if cp > age:
+                continue
+            n_upto = sum(1 for t in ticks if t.ts <= t0 + cp)
+            cached = state.profil_cache.get(cp_key(cp))
+            if cached is None or cached[0] != n_upto:
+                vec = early_vector(ticks, t0 + cp, dev, cfg.holder_rise_window_s)
+                if vec is None:
+                    continue
+                cached = (n_upto, vec)
+                state.profil_cache[cp_key(cp)] = cached
+            out["vektoren"][cp_key(cp)] = cached[1]
+        if self.profile:
+            cp = checkpoint_for(age, cps)
+            vec = out["vektoren"].get(cp_key(cp)) if cp is not None else None
+            sim = similarity(self.profile, vec, cp) if vec is not None else None
+            if sim is not None:
+                out["aehnlich"], out["checkpoint"], out["ausserhalb"] = sim["aehnlich"], cp, sim["ausserhalb"]
+        state.profil = out
+        return out
+
     def _alerts(self, state: TokenState, report: QuickReport, feats, now: float) -> None:
         if state.final:
             return
@@ -728,6 +810,15 @@ class LiveEngine:
         # a creation slot inferred from a late trade may hide a bundle: wait a little for the real one
         window_uncertain = state.window_guessed and not state.create_slot_known and cfg.fetch_create_tx and age < cfg.guessed_window_grace_s
         veto = any(f.split(" ")[0] in BLICK_VETO_FLAGS for f in report.flags)
+        # precision gate: are new holders still arriving right now, and does the start look like the saved good coins?
+        prof = self._profile_check(state, now)
+        rise_blick = prof["anstieg"] >= cfg.blick_min_holder_rise
+        rise_go = prof["anstieg"] >= cfg.go_min_holder_rise
+        if self.profile is None:
+            sim_ok = not cfg.profile_required
+        else:
+            sim_ok = prof["aehnlich"] is not None and prof["aehnlich"] >= cfg.profile_min_similarity
+        gate_text = profile_suffix(prof, self.profile is not None)
         if (
             "BLICK" in cfg.tiers
             and "BLICK" not in sent
@@ -737,12 +828,13 @@ class LiveEngine:
             and not veto
             and bundle_ok
             and not window_uncertain
+            and rise_blick
             and feats.unique_outside_buyers >= cfg.blick_min_outside_buyers
             and (feats.organic_net_flow_120s_sol or 0.0) >= cfg.blick_min_inflow_sol
         ):
             blick = QuickReport(**{**report.__dict__})
             blick.word = "BLICK"
-            self._emit(state, "BLICK", blick, None, now)
+            self._emit(state, "BLICK", blick, gate_text, now)
         go_ok = (
             word == "GO"
             and not veto
@@ -752,8 +844,14 @@ class LiveEngine:
             and (feats.organic_net_flow_120s_sol is None or feats.organic_net_flow_120s_sol > 0)
         )
         if "GO" in cfg.tiers and go_ok and "GO" not in sent:
-            state.go_mc_sol = feats.mc_sol
-            self._emit(state, "GO", report, "nach BLICK" if "BLICK" in sent else None, now)
+            if rise_go and sim_ok:
+                state.go_mc_sol = feats.mc_sol
+                suffix = " · ".join(x for x in (("nach BLICK" if "BLICK" in sent else None), gate_text) if x) or None
+                self._emit(state, "GO", report, suffix, now)
+            elif not state.profil_blockiert:
+                # the scorer said GO, the gate did not: counted once per token, visible in the status line
+                state.profil_blockiert = True
+                self.stats["go_profil"] = self.stats.get("go_profil", 0) + 1
         bad = word in ("RUG", "TOT")
         # a soft veto after BLICK (SCHNELL, FRISCH, FUNDER, UNSICHTBAR, bundle over the limit, ...) used to stay
         # silent: the phone kept a stale BLICK while the engine had already ruled the token out. Say so once.
