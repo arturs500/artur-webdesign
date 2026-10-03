@@ -75,7 +75,8 @@ ohne zusätzliche RPC-Aufrufe und ohne Filterwirkung: Ob Wellen-Erste besser ren
 zeigt erst `tape report` nach genug Alarmen. `--beobachte TIFFANY,…` schickt sofort 👁️ **WATCH**, wenn ein
 Launch den Begriff in Name, Symbol oder Beschreibung trägt, unabhängig von `--tiers`/`--notify`. Der
 `tape report` zeigt zusätzlich die Latenz Empfang minus Blockzeit der live gesehenen Trades; liegt der
-Median über zwei Sekunden, ist jeder Follower-Call strukturell spät.
+Median über zwei Sekunden, ist jeder Follower-Call strukturell spät. Dazu die Creator-Fee je beobachtetem
+Coin als Untergrenze dessen, was ein Launch in seinen ersten Minuten an Gebühr abwirft (OQ-029).
 
 ```bash
 python -m holder_scorer live --stufe 1 --tiers go,widerruf,rug --notify go,widerruf,rug --telegram \
