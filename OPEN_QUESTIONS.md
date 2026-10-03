@@ -10,7 +10,9 @@ Legende Kennzeichnung von Fakten in allen Edge-Lab-Dokumenten:
   wegen der Netzwerk-Policy der Arbeitsumgebung nicht abrufbar (siehe OQ-007).
 - **NICHT VERIFIZIERT** – auf keiner abrufbaren Quelle bestätigt.
 
-Status-Werte: `offen`, `entschieden`, `geschlossen`.
+Status-Werte: `offen`, `entschieden`, `entschieden (Experte)`, `geschlossen`. Seit 2026-10-03 entscheidet
+der Experte (`docs/experte.md`) offene Punkte außerhalb seiner Eskalationsliste selbst; jede Entscheidung
+steht hier mit Datum und im Outcome-Register des Experten mit Prüftermin.
 
 ---
 
@@ -345,7 +347,8 @@ Status-Werte: `offen`, `entschieden`, `geschlossen`.
   frühestens 45–100 s nach dem Launch handeln könnte, nicht 2 s.
 - Default: (a) Stufe 1, (b) Budget 1000, (c) Latenz 30 s – wie im README-Startbefehl.
 - Blockiert: keinen Freeze.
-- Status: `offen`.
+- Status: `entschieden (Experte)` am 2026-10-03, E-003 in `docs/experte.md`: Default gilt. Revision, wenn die
+  Statuszeile mehr als 1 000 Einheiten je Stunde zeigt oder weniger als 5 GO am Tag kommen.
 
 ## OQ-026 – Sniper: Erfolgsmaß und Vorregistrierung (EXP003-Kandidat)
 
@@ -364,7 +367,9 @@ Status-Werte: `offen`, `entschieden`, `geschlossen`.
 - Default: Ja, nach zwei bis vier Wochen Aufzeichnung mit `--record`/`--tape --tape-sample 0.1`; bis dahin keine
   Kaufentscheidung aus Alarmen ableiten.
 - Blockiert: keinen Freeze.
-- Status: `offen`.
+- Status: `entschieden (Experte)` am 2026-10-03, E-004: Prereg-Entwurf EXP003 wird geschrieben, sobald 200 Alarme
+  aus mindestens 30 Stunden vorliegen; bis dahin keine Regeländerung aus Papier-Reports (kein Tuning auf dem
+  Prüfdatensatz). Der Freeze selbst bleibt beim Nutzer.
 
 ## OQ-027 – Sniper: Präzisions-Gate (Halter-Anstieg, Profil-Ähnlichkeit) – Schwellen und Label ohne Daten gesetzt
 
@@ -390,4 +395,30 @@ Status-Werte: `offen`, `entschieden`, `geschlossen`.
   bestandener Zeitsplit-Prüfung laden; Schwellen bis dahin unverändert, Änderungen nur mit Datum und Begründung
   hier eintragen; Mint-Liste nur mit `--dry-run`-Schätzung und `--max-mints` ≤ 20.
 - Blockiert: keinen Freeze.
-- Status: `offen`.
+- Status: `entschieden (Experte)` am 2026-10-03, E-002: Default gilt (Halter-Anstieg aktiv, Profil erst nach
+  bestandener Zeitsplit-Prüfung, Schwellen unverändert bis 200 Alarme). Fragen (a)–(e) bleiben als Prüfpunkte
+  für den ersten `tape report` mit mindestens 100 GO.
+
+## OQ-028 – Sniper: Narrativ-Welle aus dem Launch-Strom (Thema, Rang, Quelle) – record-only
+
+- Datum: 2026-10-03
+- Kontext: `docs/sniper_review.md` Abschnitt 4.2, Modul `narrative.py` (`ThemeRegistry`), Nutzerwunsch „früher
+  Infos über ein starkes Narrativ".
+- Befund: Die früheste Narrativ-Information im eigenen Datenstrom ist die Launch-Welle eines Themas (mehrere
+  Launches mit demselben Begriff von verschiedenen Devs in wenigen Minuten). Sie wurde bisher nur negativ genutzt
+  (KOPIE). Ab 0.3.3 zählt das Themen-Register je Begriff Launches und Devs im 10-Minuten-Fenster gegen die
+  Grundrate der letzten 6 Stunden, bestimmt den Rang eines Coins in seiner Welle nach Außen-Zufluss und erkennt
+  gemeinsame Quellen in den Metadaten (gleicher Tweet, gleicher Telegram-Link). Alles ohne zusätzliche RPC-Last.
+- Parameter ohne Daten gesetzt: Fenster 10 min, Historie 6 h, Welle ab 4 Launches von 3 Devs und mindestens dem
+  Vierfachen der Grundrate (Mindestgrundrate 0,5 je Fenster), Quelle ab 2 Launches von 2 Devs in 30 min,
+  Begriffe ab 3 Zeichen ohne Füllwörter, Beschreibung auf 200 Zeichen gekürzt.
+- Fragen: (a) Trennt Wellen-Rang 1 Rendite gegen Kontrollen (Test wie Umbau-Plan Punkt 14)? (b) Welche Schwellen
+  (Launches, Devs, Verhältnis) markieren Wellen, die Geld anziehen, statt Bot-Serien eines Deployers?
+  (c) Zweiter IPFS-Gateway als Rückfall: welcher ist frei, stabil und dokumentiert? Kandidaten sind NICHT
+  VERIFIZIERT (Netzwerk-Policy, OQ-007). (d) Soll die Zeile `Them` auch bei WIDERRUF/RUG erscheinen?
+- Entscheidung (Experte, E-001 in `docs/experte.md`): record-only bauen, Zeile `Them …` in BLICK/GO, Feld
+  `narrativ` in Record und Papier-Kontext, kein Gate. Revisionsauslöser: Nach 200 Alarmen keine Differenz
+  zwischen Rang 1 und Kontrollen → bleibt Information; Differenz vorhanden → Gate mit Zeitsplit-Prüfung wie beim
+  Profil (OQ-027).
+- Blockiert: keinen Freeze.
+- Status: `entschieden (Experte)` am 2026-10-03; Fragen (a)–(d) offen als Prüfpunkte.
