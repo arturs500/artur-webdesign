@@ -64,6 +64,25 @@ Beispiel graduierte Coins) die Historie per RPC nachladen: `profil bauen --mints
 Mindestens 5 gute Coins je Checkpoint, sonst entsteht kein Profil. Ohne Profil gilt nur die
 Halter-Anstiegsregel; `--profil-pflicht` unterdrückt GO ganz, bis ein Profil geladen ist.
 
+**Narrativ-Welle und Beobachtungsliste (0.3.3, OQ-028, Entscheidung E-001 in `docs/experte.md`):**
+Die früheste Narrativ-Information im eigenen Datenstrom ist die Launch-Welle eines Themas: mehrere
+Launches mit demselben Begriff von verschiedenen Devs in wenigen Minuten. Das Themen-Register zählt je
+Begriff aus Name, Symbol und Beschreibung die Launches und Devs im 10-Minuten-Fenster gegen die Grundrate
+der letzten 6 Stunden und bestimmt den Rang jedes Coins in seiner Welle nach Außen-Zufluss. Gleiche
+Social-Link-Ziele mehrerer Launches (derselbe Tweet, derselbe Telegram-Link) erscheinen als `Quelle ×n`.
+Das steht als Zeile `Them …` in BLICK und GO und als Feld `narrativ` im Record und im Papier-Kontext,
+ohne zusätzliche RPC-Aufrufe und ohne Filterwirkung: Ob Wellen-Erste besser rentieren als Kontrollen,
+zeigt erst `tape report` nach genug Alarmen. `--beobachte TIFFANY,…` schickt sofort 👁️ **WATCH**, wenn ein
+Launch den Begriff in Name, Symbol oder Beschreibung trägt, unabhängig von `--tiers`/`--notify`. Der
+`tape report` zeigt zusätzlich die Latenz Empfang minus Blockzeit der live gesehenen Trades; liegt der
+Median über zwei Sekunden, ist jeder Follower-Call strukturell spät.
+
+```bash
+python -m holder_scorer live --stufe 1 --tiers go,widerruf,rug --notify go,widerruf,rug --telegram \
+  --record live.jsonl --tape live_tape.jsonl --tape-sample 0.1 --budget 1000 --paper papier.jsonl --paper-latency 30 \
+  --beobachte TIFFANY
+```
+
 Ehrlicher Hinweis vorab: Das Modul kann keine Zukunft vorhersagen. Es erkennt die
 bekannten Muster, mit denen Token scheitern (Bundles, Dev-Dumps, Serien-Deployer,
 Bump-Bots, eingeschlafener Handel), und misst, ob gerade organisch neue Käufer
@@ -202,6 +221,7 @@ und erzeugt höchstens drei Alarme:
 | 🟢 GO | das volle Urteil: Score, Mindestmengen, Zufluss gerade positiv, **keine offene Warnung** (kein Bundle über der Stufengrenze, kein DEV-GROSS, DEV-RAUS, BOTS, FRISCH, FUNDER, SCHNELL, SERIE, UNSICHTBAR), neue Halter in den letzten 15 s und, mit `--profil`, Ähnlichkeit zu den gespeicherten guten Coins; sonst bleibt es bei WARTE | der eigentliche Call |
 | 🔴 RUG / ⚫ TOT | ein Token mit BLICK oder GO ist gekippt: Dev-Dump, Bundle raus, Erstkäufer raus, Kurs −30 % vom 60-s-Hoch, MC −35 % seit dem GO, Stillstand | raus |
 | ↩️ WIDERRUF | nach einem BLICK kam ein weiches Warnsignal (DEV-GROSS, SCHNELL, FRISCH, FUNDER, UNSICHTBAR, Bundle über der Grenze …), das früher stumm blieb; ein GO ist nicht mehr zu erwarten | den 👀 vergessen |
+| 👁️ WATCH | ein Launch trägt einen Begriff der Beobachtungsliste (`--beobachte`) in Name, Symbol oder Beschreibung; sofort, noch ohne Urteil, einmal je Token | selbst hinsehen, die normalen Alarme folgen |
 
 Ist der Erstellungs-Slot eines Tokens nur geschätzt (der erste Trade kam später
 als 1,5 s nach dem Launch an), wartet der Live-Modus bis zu 15 s auf die

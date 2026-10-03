@@ -21,6 +21,7 @@ WORDS = {
     "BLICK": ("👀", "Frühalarm im Live-Modus: erste echte Käufer, kein Warnsignal, noch kein volles Urteil"),
     "GO": ("🟢", "kaufbar: kein Warnsignal, genug echte Käufer, gerade Zulauf"),
     "WIDERRUF": ("↩️", "Warnsignal nach BLICK: der Frühalarm gilt nicht mehr, kein GO zu erwarten"),
+    "WATCH": ("👁️", "Launch mit einem Begriff von der Beobachtungsliste (--beobachte), noch kein Urteil"),
     "WARTE": ("🟡", "unklar oder Mindestmengen fehlen: nochmal prüfen, nicht kaufen"),
     "FRÜH": ("⏳", "zu jung für ein Urteil (unter dem Mindestalter)"),
     "NEIN": ("⚪", "schwach: Score zu niedrig, aber kein Rug-Muster"),
@@ -66,6 +67,7 @@ LINES = {
     "Dev": "Dev-Kaufanteil und ob er hält, dahinter Bundle-Anteil",
     "Crea": "Creator: frühere Token, graduiert, tot",
     "Soc": "Social-Links (X = Twitter, TG = Telegram, WWW = Website) und Bot-Anteil der Käufe",
+    "Them": "Narrativ-Welle: Begriff, Launches im 10-Minuten-Fenster, verschiedene Devs, WELLE bei ≥ 4 Launches von ≥ 3 Devs über dem Vierfachen der Grundrate, Rang des Coins nach Außen-Zufluss, Quelle ×n = gleicher Social-Link bei n Launches (nur Information, kein Filter)",
 }
 
 
@@ -151,6 +153,8 @@ def format_short(r: "QuickReport", suffix: str | None = None, link: bool = False
     if r.bots_share is not None:
         soc += f" · Bots {fmt_pct(r.bots_share)}"
     lines.append(f"Soc  {soc}")
+    if r.theme:
+        lines.append(f"Them {r.theme}")
     lines.append("⚠️   " + (" · ".join(r.flags) if r.flags else "–"))
     if link:
         lines.append(f"pump.fun/coin/{r.mint}")

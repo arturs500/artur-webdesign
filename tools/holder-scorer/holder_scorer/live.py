@@ -50,7 +50,8 @@ from .collect import (
 from .encoding import BorshError
 from .features import CREATION_WINDOW_SLOTS, compute_features
 from .market import sol_usd
-from .narrative import NameRegistry
+from .narrative import NameRegistry, ThemeRegistry, link_anchors, normalize, theme_line
+from .narrative import terms as text_terms
 from .profile import (
     CHECKPOINTS,
     DEFAULT_ENTRY_AGE_S,
@@ -137,6 +138,7 @@ class LiveConfig:
     blick_min_holder_rise: int = 2  # new non-dev holders within holder_rise_window_s needed for BLICK ...
     go_min_holder_rise: int = 2  # ... and for GO
     holder_rise_window_s: float = 15.0
+    watch_terms: tuple[str, ...] = ()  # --beobachte: a launch whose name, symbol or description carries one of these sends 👁️ WATCH at once
 
     @classmethod
     def for_stufe(cls, stufe: int) -> tuple["LiveConfig", ScoringConfig]:
@@ -200,6 +202,8 @@ class TokenState:
     profil: dict[str, Any] | None = None  # last precision check: holder rise, similarity, checkpoint vectors (see profile.py)
     profil_blockiert: bool = False  # a GO was held back by the holder-rise/profile gate at least once
     profil_cache: dict[str, tuple[int, dict[str, Any]]] = field(default_factory=dict)  # checkpoint -> (ticks up to it, vector)
+    narrativ: dict[str, Any] | None = None  # theme wave of the launch stream: term, launches, devs, rank by inflow, shared source (OQ-028)
+    welle_gezaehlt: bool = False
 
     @property
     def age(self) -> float:
@@ -306,10 +310,12 @@ class LiveEngine:
         self.on_evaluate = on_evaluate  # (state, report, features, now) after every evaluation, e.g. the paper trader
         self.keep_alive = keep_alive  # (mint, now) -> True keeps a token subscribed beyond track_seconds
         self.names = NameRegistry()  # recent launch names, to spot copycats
+        self.themes = ThemeRegistry()  # terms of all launches: a theme wave is the earliest narrative signal we receive
+        self.anchors = ThemeRegistry(window_s=1800.0, min_launches=2, min_devs=2, min_ratio=1.0)  # shared social-link targets
         self.tokens: dict[str, TokenState] = {}
         self.stats = {
             "launches": 0, "tracked": 0, "trades": 0, "missing": 0, "dropped_missing": 0, "alerts": 0,
-            "blick": 0, "go": 0, "rug": 0, "expired": 0, "side_tasks": 0, "side_skipped_budget": 0,
+            "blick": 0, "go": 0, "rug": 0, "expired": 0, "side_tasks": 0, "side_skipped_budget": 0, "in_welle": 0, "watch": 0,
         }
         self._budget_window_start = 0.0
         self._budget_units_start = 0
@@ -400,7 +406,12 @@ class LiveEngine:
         self.tokens[mint] = state
         self.stats["tracked"] = len(self.tokens)
         self.names.register(mint, create.name, create.symbol, now)
+        self.themes.register(mint, creator, [create.name, create.symbol], now)
         self._schedule_metadata(state)
+        hits = self.watch_hits(create.name, create.symbol)
+        if hits:
+            self.themes.register(mint, creator, hits, now, raw=True)  # a watched term inside a longer name still counts for its wave
+            self._watch_alert(state, hits, "Name", now)
         return state
 
     # --- trades -----------------------------------------------------------------------------
@@ -588,10 +599,76 @@ class LiveEngine:
             return
 
         def apply(st: TokenState, data: Any) -> None:
-            if isinstance(data, dict):
-                st.metadata, st.metadata_ok = data, True
+            self.apply_metadata(st, data)
 
         self._spawn(state, "metadata", lambda: _fetch_json(state.create.uri), apply, group="http")
+
+    # --- theme wave and watch list (0.3.3, OQ-028) -----------------------------------------------------------
+    def apply_metadata(self, state: TokenState, data: Any, now: float | None = None) -> None:
+        """Take over fetched metadata and feed its terms and link targets into the theme and source registries."""
+        if not isinstance(data, dict):
+            return
+        now = now if now is not None else time.time()
+        state.metadata, state.metadata_ok = data, True
+        desc = str(data.get("description") or "")[:200]
+        self.themes.register(state.mint, state.creator, [desc], now)
+        self.anchors.register(state.mint, state.creator, link_anchors(data), now, raw=True)
+        hits = self.watch_hits(desc)
+        if hits:
+            self.themes.register(state.mint, state.creator, hits, now, raw=True)
+            self._watch_alert(state, hits, "Beschreibung", now)
+
+    def watch_hits(self, *texts: str | None) -> set[str]:
+        """Watched terms (``--beobachte``) found in name, symbol or description: as a word, or inside the name."""
+        watch = {w for w in (normalize(t) for t in self.cfg.watch_terms) if len(w) >= 3}
+        if not watch:
+            return set()
+        words = text_terms(*texts, max_terms=50)
+        blob = "".join(normalize(t) for t in texts if t)
+        return {w for w in watch if w in words or (len(w) >= 4 and w in blob)}
+
+    def _watch_alert(self, state: TokenState, hits: set[str], where: str, now: float) -> None:
+        if "WATCH" in state.tiers_sent:
+            return
+        curve = state.curve
+        mc = None
+        if curve is not None and curve.virtual_token_reserves > 0:
+            mc = curve.virtual_quote_reserves / curve.virtual_token_reserves * TOKEN_TOTAL_SUPPLY / LAMPORTS_PER_SOL
+        report = QuickReport(
+            mint=state.mint, word="WATCH", phase="curve", name=state.create.name or None, symbol=state.create.symbol or None,
+            age_s=max(0.0, now - state.created_at), mc_sol=mc,
+        )
+        report.theme = theme_line(self._theme_check(state, now))
+        self._emit(state, "WATCH", report, f"Beobachtungsliste: {', '.join(sorted(hits))} ({where})", now)
+
+    @staticmethod
+    def _outside_inflow_sol(state: TokenState) -> float:
+        return sum((t.quote_lamports if t.is_buy else -t.quote_lamports) for t in state.trades if t.user != state.creator) / LAMPORTS_PER_SOL
+
+    def _theme_check(self, state: TokenState, now: float) -> dict[str, Any] | None:
+        """Theme of this coin in the launch stream: wave, rank by outside inflow among its theme, shared source. Information only."""
+        st = self.themes.theme_for(state.mint, now)
+        quelle = None
+        for anchor in self.anchors.terms_of(state.mint):
+            s = self.anchors.stats(anchor, now, state.mint)
+            if s is not None and s.n_recent >= 2 and (quelle is None or s.n_recent > quelle["n"]):
+                quelle = {"anker": anchor, "n": s.n_recent, "devs": s.devs_recent}
+        if st is None and quelle is None:
+            state.narrativ = None
+            return None
+        out: dict[str, Any] = {"thema": None, "quelle": quelle, "fenster_s": self.themes.window_s}
+        if st is not None:
+            inflows = sorted(((m, self._outside_inflow_sol(self.tokens[m])) for m in st.mints if m in self.tokens), key=lambda x: -x[1])
+            rank = next((i + 1 for i, (m, _) in enumerate(inflows) if m == state.mint), None)
+            out.update(
+                thema=st.term, n=st.n_recent, devs=st.devs_recent, grundrate=st.baseline, verhaeltnis=st.ratio, welle=st.wave,
+                position=st.position, rang=rank, beobachtet=len(inflows), zufluss_thema_sol=round(sum(v for _, v in inflows), 3),
+            )
+            if st.wave and not state.welle_gezaehlt:
+                state.welle_gezaehlt = True
+                self.stats["in_welle"] = self.stats.get("in_welle", 0) + 1
+        state.narrativ = out
+        return out
 
     def _schedule_create_tx(self, state: TokenState) -> None:
         if self.rpc is None:
@@ -680,6 +757,7 @@ class LiveEngine:
         verdict = score_features(feats, self.scoring)
         price = self.price_hint() if self.price_hint else None
         report = report_from_features(state.mint, feats, verdict, self.scoring, None, price, state.create.name or None, state.create.symbol or None, "curve")
+        report.theme = theme_line(self._theme_check(state, now))
         state.last_eval = now
         state.dirty = False
         state.last_word = report.word

@@ -411,9 +411,34 @@ def evaluate(
         "controls_available": len(controls),
         "rules_hashes": sorted({h for h in first_per_token.values() if h}),
         "skipped": skipped,
+        "latency": latency_stats(tape),
         "summary": summary,
         "outcomes": outcomes,
     }
+
+
+def latency_stats(tape: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
+    """Empfangszeit minus Blockzeit der live gesehenen Trades (Backfill-Zeilen tragen die Alarmzeit, nicht die Empfangszeit).
+
+    Blockzeiten sind ganze Sekunden, die Werte also auf etwa ±0,5 s genau. Liegt der Median über 1–2 s, ist jeder
+    Follower-Call strukturell spät (docs/sniper_review.md, Umbau-Plan Punkt 13).
+    """
+    lat = sorted(
+        float(r["seen_at"]) - int(r["ts"])
+        for rows in tape.values()
+        for r in rows
+        if r.get("seen_at") is not None and r.get("ts") and not r.get("backfill")
+    )
+    if not lat:
+        return {"n": 0, "median_s": None, "p90_s": None}
+    return {"n": len(lat), "median_s": round(statistics.median(lat), 3), "p90_s": round(lat[int(0.9 * (len(lat) - 1))], 3)}
+
+
+def _latency_line(lat: dict[str, Any] | None) -> str:
+    if not lat or not lat.get("n"):
+        return "Latenz Empfang − Blockzeit: keine live gesehenen Trades im Tape."
+    verdict = "Follower-Calls sind strukturell spät (Umbau-Plan Punkt 13)" if lat["median_s"] > 2.0 else "im Rahmen"
+    return f"Latenz Empfang − Blockzeit (live gesehene Trades, ±0,5 s): Median {lat['median_s']:.1f} s, p90 {lat['p90_s']:.1f} s, n = {lat['n']} → {verdict}."
 
 
 def format_report(report: dict[str, Any], legacy: int = 0) -> str:
@@ -431,6 +456,7 @@ def format_report(report: dict[str, Any], legacy: int = 0) -> str:
         f"übersprungen: {', '.join(f'{k} {v}' for k, v in report['skipped'].items())}; Records ohne Slot (vor 0.3.1): {legacy}.",
         f"Kontroll-Token im Tape: {report['controls_available']} (Launch innerhalb von 6 h, gleiches Alter, bis zu {p['k_controls']} je Alarm). "
         f"Regel-Hashes der Alarme: {', '.join(report['rules_hashes']) or '–'}.",
+        _latency_line(report.get("latency")),
         "",
         "Primär: GO · Einstieg +30 s · Ausstieg +300 s (vorab festgelegt). Rendite = Netto in SOL nach Gebühren, Priority-Fees, Einlage; "
         "Graduation vor Ausstieg konservativ = Position 0 (optimistischer Wert daneben). p-Werte der sekundären Zeilen Holm-korrigiert.",

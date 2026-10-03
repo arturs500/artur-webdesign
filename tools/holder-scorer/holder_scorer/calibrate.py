@@ -281,6 +281,7 @@ def alert_record_extra(alert: Any, stufe: int, rules: str, version: str, live_co
         "side_checks_done": sorted(st.done),
         "tiers_sent_before": sorted(st.tiers_sent),
         "profil": getattr(st, "profil", None),  # holder rise, similarity, checkpoint vectors (profile.py); input for `profil bauen`
+        "narrativ": getattr(st, "narrativ", None),  # theme wave: term, launches, devs, baseline, rank by inflow, shared source (OQ-028)
         "history_note": "nur ab Abonnement gesehene Trades; Käufe im Create-Slot können fehlen (UNSICHTBAR)",
     }
 

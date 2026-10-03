@@ -206,6 +206,9 @@ werden (teuer: tausende `getTransaction` je Token, mit Helius-Kontingent für 20
 | **0.3.2** Präzisions-Gate (`profile.py`): BLICK/GO nur bei neuen Haltern in den letzten 15 s (Stufe 1 ≥ 3, sonst ≥ 2); GO mit `--profil` nur bei Ähnlichkeit ≥ 0,7 zum Profil gespeicherter guter Coins am gleichen Checkpoint (10/20/30/45 s); Kopfzeile `Halter +4/15s · Profil 80 % (MC↑)`; Zähler `go_profil` | weniger GO auf Coins, die gerade keine neuen Halter gewinnen oder nicht wie die gespeicherten guten starten; null zusätzliche RPC-Aufrufe | `test_live_gate_needs_holder_rise_and_profile_similarity` |
 | **0.3.2** `profil bauen` aus Tape/Records/Papier (ohne RPC) oder Mint-Liste (RPC, gedeckelt): Frühvektoren je Checkpoint, Rendite-Label wie `tape report`, Bänder 10.–90. Perzentil der guten Coins, Gewichte aus der Trennung zu schlechten Coins, Zeitsplit-Prüfung mit Wilson und Block-Bootstrap; `profil zeigen` | der Ähnlichkeitsfilter ist aus eigenen Daten gebaut und auf späteren Daten geprüft statt geglaubt | `test_build_profile_from_tape_labels_saves_loads_and_checks`, `test_label_from_rows_…`, `test_fetch_ticks_…` |
 | **0.3.2** Records, Papier-Kontext und Tape tragen die Frühvektoren bzw. den Dev (`profil`, `dev`) | jeder künftige Alarm liefert Material für das nächste Profil | `test_live_gate_…` (Record), `test_early_vector_…` |
+| **0.3.3** Themen-Register (`narrative.ThemeRegistry`): Begriffe aller Launches aus Name, Symbol, Beschreibung; Welle ab 4 Launches von 3 Devs über dem Vierfachen der Grundrate; Rang nach Außen-Zufluss; gemeinsame Social-Link-Ziele als `Quelle ×n`; Zeile `Them …` in BLICK/GO, Feld `narrativ` in Record und Papier-Kontext | früheste Narrativ-Information im eigenen Datenstrom wird genutzt statt verworfen; record-only, kein Gate (E-001, OQ-028) | `tests/test_narrative_wave.py` |
+| **0.3.3** `--beobachte BEGRIFFE`: 👁️ WATCH sofort beim Launch oder bei der Beschreibung, unabhängig von `--tiers`/`--notify`, einmal je Token | Nutzerwunsch „halte Ausschau nach TIFFANY" läuft im Sniper statt im Kopf | `test_watch_list_alerts_…` |
+| **0.3.3** `tape report`: Latenz Empfang − Blockzeit (Median, p90) der live gesehenen Trades | Umbau-Plan Punkt 13 messbar: über 2 s ist jeder Follower-Call strukturell spät | `test_latency_stats_…` |
 | Alarm-Records mit Version, Regel-Hash, Slot, Kurvenstand, Creator, Datenqualität (`calibrate.alert_record_extra`, `rules_hash`) | Calls sind nachrechenbar und Regelstände trennbar | `test_alert_record_extra_carries_slot_curve_and_rule_version` |
 | `--tape DATEI`: jeder gesehene Trade eines Tokens mit Alarm, rückwirkend ab dem ersten Alarm | Offline-Replay jeder Latenz und Regel ohne `getTransaction` | `test_tape_backfills_at_first_alert_and_streams_afterwards` |
 | ↩️ WIDERRUF nach BLICK bei weichem Veto | kein veralteter 👀 auf dem Handy | `test_widerruf_after_blick_when_a_soft_veto_appears`, `…_not_sent_without_tier_or_after_go` |
@@ -256,6 +259,42 @@ Startwerte ohne Daten. Das Profil lernt aus Coins, die der Sniper schon beobacht
 Kontroll-Stichprobe): Es beschreibt, was *unter diesen* Coins gut lief, nicht alle Launches. Korrelierte Merkmale
 (Zufluss, Zufluss der letzten 15 s, Kaufgröße) zählen mehrfach. Ein Band aus fünf Coins ist grob; mehr Aufzeichnung
 ist der einzige Weg zu schärferen Bändern.
+
+### 4.2 Narrativ-Welle 0.3.3: früher an ein starkes Narrativ kommen (E-001, OQ-028)
+
+Frage des Nutzers: Was können wir bei uns ändern, damit wir früher Informationen über ein starkes Narrativ haben?
+
+Befund: Der bisherige Narrativ-Score war statisch (Social-Links, Beschreibungslänge, Bild, Wortliste des Nutzers)
+und steckte nur in zwei Papier-Strategien. Eine Wortliste ist immer zu spät, weil ein Mensch sie pflegt. Das
+Namensregister sah alle Launches, nutzte sie aber nur negativ (KOPIE). Die Welle selbst, viele Launches zum gleichen
+Begriff von verschiedenen Devs in wenigen Minuten, ist das früheste On-Chain-Zeichen für Aufmerksamkeit:
+Copycat-Deployer reagieren in Sekunden auf einen Auslöser, ihre Welle verrät das Thema, bevor ein einzelner Coin
+Handelsdaten hat. Die Metadaten holten wir schon beim Launch, lasen aber nur, ob Links existieren, nicht wohin sie
+zeigen.
+
+Geändert (alles aus Daten, die wir ohnehin empfangen, null zusätzliche RPC-Aufrufe):
+
+1. **Themen-Register** über alle Launches: Begriffe aus Name, Symbol und (nach dem Abruf) Beschreibung; je Begriff
+   Launches und Devs im 10-Minuten-Fenster gegen die Grundrate der letzten 6 Stunden. Welle ab 4 Launches von 3 Devs
+   und dem Vierfachen der Grundrate; häufige Begriffe brauchen entsprechend mehr. Kausal zählt der **Rang** eines
+   Coins in seiner Welle nach Außen-Zufluss, nicht die Mitgliedschaft: Aufmerksamkeit fließt in den Gewinner, die
+   Kopien verlieren.
+2. **Quelle**: normalisierte Social-Link-Ziele (Tweet, Telegram-Gruppe, Domain) über Launches gezählt; derselbe
+   Tweet bei mehreren Devs ist ein spezifischer Anker.
+3. **Zeile `Them …`** in BLICK und GO, Feld `narrativ` im Record und im Papier-Kontext. Kein Gate: ob Wellen-Erste
+   besser rentieren als gleich alte Kontrollen, prüft `tape report` nach mindestens 200 Alarmen (Revisionsauslöser
+   in E-001).
+4. **Beobachtungsliste** `--beobachte`: sofortige 👁️ WATCH-Nachricht, wenn ein Launch einen beobachteten Begriff
+   trägt. Das ersetzt das Ausschauhalten von Hand.
+5. **Latenz** Empfang − Blockzeit im `tape report`: über 2 s Median ist jeder Follower-Call strukturell spät, dann
+   hilft keine frühere Narrativ-Erkennung für die erste Welle, sondern nur die Auswahl in der zweiten.
+
+Zurückgestellt: Themen-Zufluss über alle Coins eines Begriffs und „Wanderer" (Wallets, die mehrere Coins eines
+Themas kaufen) als nächster Schritt; externe Quellen nach E-005 (Telegram erst nach EXP001-Freeze und nur
+aufzeichnend, DexScreener erst nach direkter Prüfung, X-API nicht). Grenzen: Jede Welle sieht jeder Bot gleichzeitig;
+der mögliche Vorteil liegt in der Auswahl, nicht im Tempo. Eine Welle ist erst nach mehreren Launches erkennbar,
+also ein bis fünf Minuten nach dem Auslöser. Wellen sind häufig und meist wertlos; nur die Messung gegen Kontrollen
+entscheidet.
 
 ---
 

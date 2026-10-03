@@ -180,8 +180,14 @@ def cmd_live(args: argparse.Namespace) -> int:
     if args.budget is not None:
         config.rpc_units_per_hour = args.budget
     tiers = tuple(t.strip().upper() for t in (args.tiers or "blick,go,widerruf,rug").split(",") if t.strip())
-    config.tiers = tiers
     notify_words = {w.strip().upper() for w in (args.notify or "blick,go,widerruf,rug").split(",") if w.strip()}
+    watch = tuple(w.strip() for w in (getattr(args, "beobachte", None) or "").split(",") if w.strip())
+    config.watch_terms = watch
+    if watch:
+        # an explicit watch list always alerts and always notifies, whatever the tier selection says
+        tiers = tiers if "WATCH" in tiers else tiers + ("WATCH",)
+        notify_words.add("WATCH")
+    config.tiers = tiers
     if args.telegram and not telegram_configured():
         print("Telegram nicht konfiguriert: TELEGRAM_BOT_TOKEN und TELEGRAM_CHAT_ID setzen", file=sys.stderr)
         return 2
@@ -232,6 +238,7 @@ def cmd_live(args: argparse.Namespace) -> int:
         + (f" · Kontroll-Stichprobe {config.tape_sample:.0%}" if config.tape_sample else "")
         + f" · Halter-Anstieg ≥ {config.go_min_holder_rise} in {config.holder_rise_window_s:.0f} s"
         + profile_line
+        + (f" · Beobachtungsliste: {', '.join(watch)}" if watch else "")
     )
 
     def on_alert(alert):
@@ -481,6 +488,7 @@ def build_parser() -> argparse.ArgumentParser:
     lv.add_argument("--profil-min", type=float, help="Mindest-Ähnlichkeit 0–1 für GO (Standard 0,7)")
     lv.add_argument("--profil-pflicht", action="store_true", help="ohne nutzbares Profil kein GO")
     lv.add_argument("--holder-anstieg", type=int, help="neue Halter (ohne Dev) in den letzten 15 s, die BLICK und GO brauchen (Stufe 1: 3, sonst 2)")
+    lv.add_argument("--beobachte", metavar="BEGRIFFE", help="Beobachtungsliste, kommagetrennt (z. B. TIFFANY): sofort 👁️ WATCH, wenn Name, Symbol oder Beschreibung eines Launches den Begriff enthält; unabhängig von --tiers/--notify")
     lv.add_argument("--paper", metavar="DATEI", help="Papier-Trading: alle Strategien handeln jeden Call ohne Geld, jede Entscheidung landet in dieser JSONL-Datei")
     lv.add_argument("--paper-size", type=float, default=0.08, help="SOL je Papier-Trade (Standard 0,08)")
     lv.add_argument("--paper-latency", type=float, default=2.0, help="Sekunden zwischen Entscheidung und Ausführung (Standard 2)")
