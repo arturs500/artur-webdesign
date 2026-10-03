@@ -128,6 +128,7 @@ geöffnet und die Entscheidung mit Datum revidiert.
 | E-006 | 2026-10-03 | Birdeye: vor jedem Kauf ein Free-Tier-Pilot mit ~20 Events zur Abdeckungsprüfung der Pump.fun-Kurve (OQ-005/006) | Kaufentscheidung erst mit geprüfter Abdeckung und gemessenen CU/Call | nach dem Pilot | – | – |
 | E-007 | 2026-10-03 | EXP002-Draft-Parameter (OQ-009 bis OQ-017) gelten als Entscheidung für v0.1.1; Fixierung beim Freeze bleibt Nutzer | Draft ist freeze-fähig ohne weitere Rückfragen | beim Freeze | – | – |
 | E-008 | 2026-10-03 | Creator-Fee je beobachtetem Coin im `tape report` (Untergrenze aus den protokollierten Gebührenfeldern) als Datengrundlage für OQ-029 | vor jeder Launch-Entscheidung liegt die Verteilung vor, was Launches in ihren ersten Minuten an Gebühr abwerfen | erster `tape report` mit ≥ 100 Coins | – | – |
+| E-009 | 2026-10-03 | DexScreener-Bezahlsignale record-only messen (`dex beobachten`/`dex report`), keine Boosts kaufen (OQ-030) | Follower-Rendite nach Boost/„Dex paid" liegt mit Intervall vor; Erwartung aus der Evidenz: ≤ 0 | ≥ 200 Ereignisse aus ≥ 30 Stunden | – | – |
 
 ---
 
@@ -169,6 +170,14 @@ Recht). Was der Experte entscheiden kann: Bevor Kapital fließt, liefert das eig
 Creator-Fee je Coin in den ersten Minuten (Feld `creator_fee` jedes Trades, R2, R5). Erwartung aus der Mechanik:
 Bei 0,30 % des Kurvenvolumens und einer Graduation-Rate um 1 % verdient die große Mehrheit der Launches auf der
 Kurve nahezu nichts; Gebühren nach der Graduation (PumpSwap) sind im Tape nicht enthalten.
+
+**E-009 DexScreener-Bezahlsignale (OQ-030).** Frage: Wie kann Edge Lab von Boosts und „Dex paid" profitieren?
+Optionen: Boosts als Creator kaufen (Geld, und ohne Verkauf des eigenen Bestands in die Käufer nie tragfähig, siehe
+`docs/dexscreener_paid.md` Abschnitt 5); Signale als Follower handeln (ungeprüft, einzige Studie negativ);
+Signale messen (kostenlos, ohne Schlüssel, R2); nichts tun. Entscheidung: messen. Die Feeds sind öffentlich, die
+Preise frei abrufbar, der Aufwand liegt bei einer Anfrage je Minute. Revisionsauslöser: Bootstrap-Intervall der
+Follower-Rendite bei ≥ 200 Ereignissen; unter 0 → Signal wird als Warnhinweis in den Sniper aufgenommen (nach
+eigener Zeitsplit-Prüfung), über 0 → Prereg EXP004.
 
 Nicht entscheidbar (bleiben `offen`, Eskalation): OQ-001 (Datei fehlt), OQ-002 (Abgleich mit dem Prereg-Text
 braucht die Datei), OQ-008 (Veröffentlichung im Pages-Repo = Eskalationspunkt 5), OQ-020 (Kauf), OQ-021

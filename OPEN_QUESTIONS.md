@@ -446,3 +446,23 @@ steht hier mit Datum und im Outcome-Register des Experten mit Prüftermin.
 - Default, wenn keine Antwort: (a).
 - Blockiert: keinen Freeze.
 - Status: `offen` (Eskalation, Entscheidung beim Nutzer).
+
+## OQ-030 – DexScreener-Bezahlsignale (Boosts, „Dex paid") als Call-Quelle: EXP004-Kandidat, record-only
+
+- Datum: 2026-10-03
+- Kontext: Nutzerfrage „wie funktioniert dieses paid dex, damit wir daraus profitieren können";
+  `docs/dexscreener_paid.md`; Modul `tools/holder-scorer/holder_scorer/dexpaid.py` (`dex beobachten`, `dex report`).
+- Befund: Boosts heben 12–24 h den Trending-Score [Snippet, offizielle Doku], Preise 99–3 999 USD je Paket
+  [Snippet, Drittanbieter, NICHT VERIFIZIERT]; Enhanced Token Info („Dex paid") ab 299 USD [Snippet, Marktplatz].
+  Beides ist öffentlich und ohne Schlüssel abfragbar (60/300 Anfragen je Minute, Referenz-Spiegel [direkt geprüft]).
+  Einzige bekannte Wirkungsmessung (dethective, 2024): geboostete Token im Mittel −48 %, Methodik unbekannt.
+- Fragen: (a) Verdient ein Follower nach Boost/Profil netto (Horizonte 5/15/60 min) oder liefert er die
+  Exit-Liquidität? (b) Welche Kontrollgruppe (nicht bezahlte Token gleicher Größe und Alters) ist aus der freien
+  API bildbar? (c) Erlauben die API-Nutzungsbedingungen den Dauerbetrieb (Seite gesperrt, nicht gelesen)?
+  (d) Höchstzahl Adressen je Tokens-Aufruf (30?) – NICHT VERIFIZIERT. (e) Wie oft bekommen unsere eigenen
+  Alarm-Coins später ein Bezahlsignal, und sagt das Frühprofil es voraus?
+- Entscheidung (Experte, E-009): record-only messen; keine Boosts kaufen, kein Creator-Weg (OQ-029); Ergebnis
+  erst mit ≥ 200 Ereignissen aus ≥ 30 Stunden und Kontrollgruppe als Hinweis lesen; Gebühr-Annahme 50 bps je Seite.
+- Default, wenn keine Antwort: so belassen.
+- Blockiert: keinen Freeze.
+- Status: `entschieden (Experte)` am 2026-10-03; (b)–(e) offen als Prüfpunkte.

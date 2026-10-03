@@ -78,6 +78,19 @@ Launch den Begriff in Name, Symbol oder Beschreibung trägt, unabhängig von `--
 Median über zwei Sekunden, ist jeder Follower-Call strukturell spät. Dazu die Creator-Fee je beobachtetem
 Coin als Untergrenze dessen, was ein Launch in seinen ersten Minuten an Gebühr abwirft (OQ-029).
 
+**DexScreener-Bezahlsignale messen (0.3.3, OQ-030, `docs/dexscreener_paid.md`):** Boosts und Enhanced
+Token Info („Dex paid") sind öffentliche, bezahlte, zeitgestempelte Ereignisse. `dex beobachten` fragt die
+freien Feeds ohne Schlüssel ab (unter 60 bzw. 300 Anfragen je Minute), schreibt jeden Boost-Kauf und jedes
+neue Profil mit Preis-Schnappschüssen bei +0/+5/+15/+60 min; `dex report` rechnet die Follower-Rendite je
+Horizont mit Wilson und Block-Bootstrap, getrennt nach Boost-Paket, und zeigt, welche eigenen Alarm-Coins
+später zahlten. Kein Kauf, keine Boosts; die einzige bekannte Studie misst für geboostete Token im Mittel
+−48 Prozent.
+
+```bash
+python -m holder_scorer dex beobachten --out dex.jsonl
+python -m holder_scorer dex report dex.jsonl --records live.jsonl
+```
+
 ```bash
 python -m holder_scorer live --stufe 1 --tiers go,widerruf,rug --notify go,widerruf,rug --telegram \
   --record live.jsonl --tape live_tape.jsonl --tape-sample 0.1 --budget 1000 --paper papier.jsonl --paper-latency 30 \

@@ -380,6 +380,26 @@ def cmd_profil(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_dex(args: argparse.Namespace) -> int:
+    from .dexpaid import DexWatcher, dex_report
+
+    if args.dex_cmd == "beobachten":
+        watcher = DexWatcher(out_path=args.out, chain=args.kette, poll_s=args.intervall)
+        print(f"DexScreener-Beobachter (record-only, kein Kauf): Feeds alle {args.intervall:.0f} s, Preise bei +0/+5/+15/+60 min, Ausgabe {args.out}")
+        watcher.run(duration_s=args.dauer)
+        print(watcher.status_line())
+        return 0
+    if args.dex_cmd == "report":
+        text, report = dex_report(args.file, records_path=args.records, fee_bps=args.gebuehr_bps)
+        print(text)
+        if args.json:
+            with open(args.json, "w", encoding="utf-8") as fh:
+                json.dump(report, fh, ensure_ascii=False, indent=1)
+            print(f"JSON nach {args.json} geschrieben")
+        return 0
+    return 2
+
+
 def cmd_selftest(args: argparse.Namespace) -> int:
     rpc = make_rpc(args.rpc, args.rps)
     try:
@@ -552,6 +572,21 @@ def build_parser() -> argparse.ArgumentParser:
     pz = pfs.add_parser("zeigen", help="ein Profil lesbar ausgeben (Bänder, Gewichte, Prüfung)")
     pz.add_argument("file")
     pz.set_defaults(func=cmd_profil)
+
+    dx = sub.add_parser("dex", help="DexScreener-Bezahlsignale (Boosts, Enhanced Token Info) beobachten und als Call-Quelle messen (paper-only)")
+    dxs = dx.add_subparsers(dest="dex_cmd", required=True)
+    db = dxs.add_parser("beobachten", help="Feeds abfragen, Ereignisse und Preis-Schnappschüsse als JSONL schreiben (kein Schlüssel, 60/300 Anfragen je Minute)")
+    db.add_argument("--out", required=True, metavar="DATEI", help="JSONL-Ausgabe (Ereignisse und Preise)")
+    db.add_argument("--kette", default="solana", help="chainId (Standard solana)")
+    db.add_argument("--intervall", type=float, default=60.0, help="Sekunden zwischen Feed-Abfragen (Standard 60)")
+    db.add_argument("--dauer", type=float, help="nach so vielen Sekunden beenden (Standard: bis Strg+C)")
+    db.set_defaults(func=cmd_dex)
+    dr = dxs.add_parser("report", help="Follower-Rendite je Horizont aus der Beobachtungsdatei, Wilson/Bootstrap, Verknüpfung mit eigenen Records")
+    dr.add_argument("file")
+    dr.add_argument("--records", metavar="DATEI", help="Record-Datei aus 'live --record': welche eigenen Alarm-Coins zahlten später")
+    dr.add_argument("--gebuehr-bps", type=int, default=50, help="Gebühr je Seite in Basispunkten (Standard 50, Annahme)")
+    dr.add_argument("--json", metavar="DATEI", help="Ergebnis zusätzlich als JSON")
+    dr.set_defaults(func=cmd_dex)
 
     t = sub.add_parser("selftest", help="Datensammlung an einem echten Token prüfen")
     t.add_argument("mint")
