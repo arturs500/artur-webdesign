@@ -412,9 +412,48 @@ def evaluate(
         "rules_hashes": sorted({h for h in first_per_token.values() if h}),
         "skipped": skipped,
         "latency": latency_stats(tape),
+        "creator_fees": creator_fee_stats(tape),
         "summary": summary,
         "outcomes": outcomes,
     }
+
+
+def creator_fee_stats(tape: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
+    """Creator-Fee je getapetem Coin: Summe der protokollierten ``creator_fee``-Felder (Lamports) im beobachteten Fenster.
+
+    Untergrenze für die Creator-Seite (OQ-029): das Tape endet mit dem Beobachtungsfenster (Standard 240 s) und enthält
+    keinen PumpSwap-Handel nach einer Graduation. Es zeigt, was ein Launch in seinen ersten Minuten an Gebühr abwirft.
+    """
+    per_mint: list[tuple[float, float, int]] = []
+    for rows in tape.values():
+        fees = [int(r["creator_fee"]) for r in rows if r.get("creator_fee") is not None]
+        if not fees:
+            continue
+        volume = sum(int(r.get("sol") or 0) for r in rows) / LAMPORTS_PER_SOL
+        ts = [int(r["ts"]) for r in rows if r.get("ts")]
+        per_mint.append((sum(fees) / LAMPORTS_PER_SOL, volume, (max(ts) - min(ts)) if ts else 0))
+    if not per_mint:
+        return {"n": 0}
+    fees_sorted = sorted(f for f, _, _ in per_mint)
+    return {
+        "n": len(per_mint),
+        "median_sol": round(statistics.median(fees_sorted), 4),
+        "p90_sol": round(fees_sorted[int(0.9 * (len(fees_sorted) - 1))], 4),
+        "max_sol": round(fees_sorted[-1], 4),
+        "share_over_0_1_sol": round(sum(1 for f in fees_sorted if f >= 0.1) / len(fees_sorted), 3),
+        "median_volume_sol": round(statistics.median(v for _, v, _ in per_mint), 3),
+        "median_window_s": int(statistics.median(s for _, _, s in per_mint)),
+    }
+
+
+def _creator_fee_line(cf: dict[str, Any] | None) -> str:
+    if not cf or not cf.get("n"):
+        return "Creator-Fee je Coin: keine Gebührenfelder im Tape."
+    return (
+        f"Creator-Fee je beobachtetem Coin (Untergrenze: nur Kurve, Beobachtungsfenster median {cf['median_window_s']} s, kein PumpSwap nach Graduation): "
+        f"Median {cf['median_sol']:.4f} SOL, p90 {cf['p90_sol']:.4f} SOL, max {cf['max_sol']:.4f} SOL, Anteil ≥ 0,1 SOL {cf['share_over_0_1_sol'] * 100:.0f} %, "
+        f"Median-Volumen {cf['median_volume_sol']:.2f} SOL, n = {cf['n']}."
+    )
 
 
 def latency_stats(tape: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
@@ -457,6 +496,7 @@ def format_report(report: dict[str, Any], legacy: int = 0) -> str:
         f"Kontroll-Token im Tape: {report['controls_available']} (Launch innerhalb von 6 h, gleiches Alter, bis zu {p['k_controls']} je Alarm). "
         f"Regel-Hashes der Alarme: {', '.join(report['rules_hashes']) or '–'}.",
         _latency_line(report.get("latency")),
+        _creator_fee_line(report.get("creator_fees")),
         "",
         "Primär: GO · Einstieg +30 s · Ausstieg +300 s (vorab festgelegt). Rendite = Netto in SOL nach Gebühren, Priority-Fees, Einlage; "
         "Graduation vor Ausstieg konservativ = Position 0 (optimistischer Wert daneben). p-Werte der sekundären Zeilen Holm-korrigiert.",

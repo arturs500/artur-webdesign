@@ -150,6 +150,19 @@ def test_tape_report_end_to_end_with_files(tmp_path):
     assert args.func is cmd_tape and cmd_tape(args) == 0 and (tmp_path / "out.json").exists()
 
 
+def test_creator_fee_stats_are_a_lower_bound_from_the_tape():
+    from holder_scorer.replay import creator_fee_stats
+
+    rows_a = [row(100, 10, sol=1_000_000_000), row(160, 20, sol=2_000_000_000)]  # creator_fee = 0,30 % → 0.009 SOL
+    rows_b = [row(100, 10, sol=50_000_000_000, mint="B" * 44)]  # 0.15 SOL
+    stats = creator_fee_stats({"A" * 44: rows_a, "B" * 44: rows_b})
+    assert stats["n"] == 2 and stats["median_sol"] == 0.0795 and stats["p90_sol"] == 0.009 and stats["max_sol"] == 0.15
+    assert stats["share_over_0_1_sol"] == 0.5 and stats["median_volume_sol"] == 26.5 and stats["median_window_s"] == 30
+    report = evaluate([], {"A" * 44: rows_a, "B" * 44: rows_b})
+    assert report["creator_fees"] == stats and "Creator-Fee je beobachtetem Coin" in replay.format_report(report)
+    assert creator_fee_stats({}) == {"n": 0} and "keine Gebührenfelder" in replay.format_report({**report, "creator_fees": creator_fee_stats({})})
+
+
 def test_live_tape_sample_tapes_control_tokens_without_alert(tmp_path):
     engine, alerts = make_engine(stufe=1)
     engine.cfg.tape_path = str(tmp_path / "tape.jsonl")

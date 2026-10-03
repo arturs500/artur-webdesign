@@ -422,3 +422,27 @@ steht hier mit Datum und im Outcome-Register des Experten mit Prüftermin.
   Profil (OQ-027).
 - Blockiert: keinen Freeze.
 - Status: `entschieden (Experte)` am 2026-10-03; Fragen (a)–(d) offen als Prüfpunkte.
+
+## OQ-029 – Eigener Coin-Launch zum Profit (mit DEX-Boost): Eskalation an den Nutzer
+
+- Datum: 2026-10-03
+- Kontext: Frage des Nutzers „was wenn ich selbst einen guten Coin launche und den auf DEX booste?";
+  `docs/experte.md` Eskalationspunkte 1 (Geld), 3 (Live-Kapital) und 7 (Rechtsrisiko); widerspricht der Regel
+  Edge-First („kein Live-Kapital, keine Käufe/Abos"), die der Nutzer selbst gesetzt hat.
+- Befund (Mechanik, Evidenzstufe 5, Zahlen aus den geprüften Quellen): Einnahmen eines Creators auf der Kurve sind
+  die Creator-Fee von 0,30 % des Volumens [direkt geprüft, fees.png, Stand 2025-08-29; seit 2025-09-01 dynamisch];
+  bei Holder-Rewards-Coins ist der Creator eine PDA, die Fee fließt an die Halter [direkt geprüft, pump-public-docs,
+  2026-09-29]. Graduation-Basisrate 0,2 % bis 2,7 % [Snippet, OQ-019]. Preise und Wirkung von DexScreener-Boosts:
+  NICHT VERIFIZIERT (Host in der Arbeitsumgebung gesperrt). Steuer und Recht (EU-MiCA, deutsche Besteuerung
+  privater Veräußerungen, Betrugstatbestände bei irreführender Werbung): NICHT VERIFIZIERT, nur mit Berater.
+- Frage: Soll Kapital in einen eigenen Launch (Create-Transaktion, Dev-Kauf, Boosts) fließen?
+- Optionen: (a) nichts tun, Edge-First weiterführen; (b) transparenter Launch ohne bezahlte Werbung, Einnahmen
+  nur aus der Creator-Fee, Dev-Bestand offengelegt und nicht in die Nachfrage verkauft, kleiner fester Betrag mit
+  vorab festgelegtem Erfolgskriterium (Creator-Fee ≥ Kosten) und Steuer-/Rechtsprüfung davor; (c) Launch mit
+  bezahlter Werbung und Verkauf des eigenen Bestands in die angelockte Nachfrage – das ist das Muster, das der
+  Sniper als DEV-DUMP/RUG markiert; es schadet den Käufern, ist rechtlich riskant und wird hier nicht unterstützt.
+- Empfehlung des Experten: (a) jetzt; (b) frühestens nach der Messung E-008 (Creator-Fee-Verteilung aus dem
+  eigenen Tape) und nach der Beratung; (c) nein.
+- Default, wenn keine Antwort: (a).
+- Blockiert: keinen Freeze.
+- Status: `offen` (Eskalation, Entscheidung beim Nutzer).
