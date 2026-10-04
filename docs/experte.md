@@ -132,6 +132,7 @@ geöffnet und die Entscheidung mit Datum revidiert.
 | E-010 | 2026-10-04 | Launch-Rechner (`launch rechner`) und Fair-Launch-Anleitung (`docs/fair_launch.md`) als Wissensgrundlage für OQ-029; die Kapitalentscheidung bleibt Eskalation | der Nutzer entscheidet mit Zahlen (Dev-Anteil, Fremdzufluss, Teilverkauf, Impact) statt mit Gefühl | bei einer Launch-Entscheidung des Nutzers | – | – |
 | E-011 | 2026-10-04 | Fairness-Gate (fair.py) auf Anweisung des Nutzers sofort aktiv; messbar über GESPERRT-Records (OQ-031) | weniger GO auf unfaire Launches; `tape report` GO vs. GESPERRT zeigt den Effekt | erster `tape report` mit ≥ 100 GO und ≥ 100 GESPERRT | – | – |
 | E-012 | 2026-10-04 | Abstimmung 0.3.5: Dev-Faktor monoton, WIDERRUF nach GO, Papier-Filter, Gate-Prüfung GO/GESPERRT, Startbefehl mit gesperrt (OQ-032) | keine Regel belohnt, was eine andere sperrt; Verschärfung ist mit `tape report` prüfbar | erster `tape report` mit ≥ 100 GO und ≥ 100 GESPERRT | – | – |
+| E-013 | 2026-10-04 | Außenquellen 0.3.6 record-only: PumpPortal-Migrationsfeed als externe Labels und Referenz-Coins, DexScreener-Nachlauf (+1 h/+24 h), Rugcheck opt-in; kein Gate (OQ-033) | externe Graduation- und Überlebensrate je Tier und für Kontrollen liegt mit Intervall vor; Profil aus Coins, die der Sniper nie gerufen hat; Kontroll-Stichprobe gegen die Grundrate 0,26–1,4 % geprüft | erster `tape report --extern` mit ≥ 100 GO und 24 h Feed-Reife | – | – |
 
 ---
 
@@ -195,6 +196,18 @@ Knickpunkte in der Konfiguration und damit im Regel-Hash); ein Prinzip gilt nach
 GO); der Papier-Handel misst nur, was der Sniper ruft; die Verschärfung wird mit GO gegen GESPERRT geprüft, dafür
 gehört `gesperrt` in jeden Startbefehl. Revisionsauslöser: Gate-Prüfung „Sperre unnötig" → Schwellen des Fair-Gates
 lockern; „Sperre richtig" → beibehalten.
+
+**E-013 Außenquellen (OQ-033).** Auftrag „Informationen nicht nur aus unserem Paper-Trade-Test holen, sondern auch
+woanders". Outcome-Maß: externe Graduation- und Überlebensrate je Tier gegen Kontrollen, Profil aus Coins, die der
+Sniper nie gerufen hat. Optionen: nichts tun; bezahlte Datenquellen (Birdeye, Bitquery: Eskalationspunkt 1); Telegram/X
+(Eskalationspunkte 2 und 7, E-005); kostenlose, schlüssellose Quellen record-only. Evidenz: Stufe 5 (Mechanik: der
+Migrationsfeed ist das exakte Label, der Nachlauf verlängert den Horizont über die 300 s des Tapes hinaus, Rugcheck ist
+eine unabhängige Prüfung ähnlicher Merkmale); Belege nur [Snippet], weil alle Hosts gesperrt waren, darum Rohdaten in
+jeder Zeile. Entscheidung: die drei kostenlosen Quellen bauen, kein Gate, Reihenfolge Migrationsfeed → Nachlauf →
+Rugcheck (Nutzen je Aufwand, null RPC). E-005 bleibt für Narrativ-Quellen bestehen; die Nutzeranweisung präzisiert sie
+für Outcome-Quellen. Revisionsauslöser: Feed liefert nach 30 Minuten Betrieb keine Graduierung oder der Nachlauf zeigt bei
+Kurven-Coins nur `fehlt` → Prüfpunkte (a)/(e) in OQ-033, GeckoTerminal als Ersatz; Rugcheck trennt bei ≥ 20 GO je Hälfte →
+Zeitsplit-Prüfung vor jedem Gate.
 
 Nicht entscheidbar (bleiben `offen`, Eskalation): OQ-001 (Datei fehlt), OQ-002 (Abgleich mit dem Prereg-Text
 braucht die Datei), OQ-008 (Veröffentlichung im Pages-Repo = Eskalationspunkt 5), OQ-020 (Kauf), OQ-021

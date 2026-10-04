@@ -213,6 +213,7 @@ werden (teuer: tausende `getTransaction` je Token, mit Helius-Kontingent für 20
 | **0.3.4** Fairness-Gate (`fair.py`): Prinzipien aus `docs/fair_launch.md` als Bedingung – Dev-Anteil, Dev-Verkauf, Bundle-Anteil und -Wallets, Kopie, unsichtbarer Float, Bots für BLICK/GO; Creator-Historie und Metadaten für GO; Unbekannt zählt nicht als sauber; ⛔ GESPERRT statt GO als Aufzeichnung, WIDERRUF mit Prinzip; Zeile `Fair`, Feld `fair` | der Sniper setzt durch, was er bisher nur beschrieb; Verschärfung bleibt messbar über GO gegen GESPERRT (OQ-031, E-011) | `tests/test_fair.py` |
 | **0.3.5** Abstimmung: Dev-Faktor monoton (`scoring._dev`, Knickpunkte `dev_small_buy`/`dev_big_hold`); WIDERRUF auch nach GO bei neu verletztem schnellen Prinzip; Zähler `go_wartet` und erweiterte Statuszeile; gerichtete Kopie-Prüfung (das Original einer Welle wird nicht rückwirkend zur Kopie) | Score, Gates und Meldungen widersprechen sich nicht mehr; ein stiller Sniper ist erklärbar | `tests/test_tuning.py` |
 | **0.3.5** Papier-Handel folgt dem Fairness-Gate (`PaperTrader(fair_filter=True)`, `--paper-ohne-fair`); `tape report` Gate-Prüfung GO gegen GESPERRT (`replay.gate_check`, `diff_bootstrap`); Startbefehle mit `gesperrt` in `--tiers` | Papier-Statistik misst die Coins, die der Sniper ruft; die Verschärfung ist auswertbar | `test_paper_filter_…`, `test_gate_check_…`, `test_readme_start_commands_…` |
+| **0.3.6** Außenquellen (`extern.py`, OQ-033): PumpPortal `subscribeMigration` auf derselben Verbindung → Zeile `graduierung` je Migration mit Alarm-Markierung (`--extern`); `quellen nachlauf` holt DexScreener-Schnappschüsse der Alarm- und Kontroll-Coins nach 1 h/24 h (kein RPC); Rugcheck je GO/GESPERRT opt-in (`--rugcheck`, HTTP-Gruppe, direkt über `run_side_task`); `tape report --extern` mit Graduation von außen (Reifefenster, Nenner „beurteilbar"), Überleben, Rugcheck-Trennung, Grundrate; `profil bauen --extern` mit graduierten Coins der ganzen Plattform; `fetch_ticks` paginiert über die Bonding-Curve-Adresse; `rules_hash` ohne Dateinamen. | Informationen nicht nur aus dem eigenen Papier-Test (Nutzerauftrag); exakte externe Labels ohne RPC, Horizont über 300 s hinaus, Zweitmeinung messbar statt geglaubt (R2, R5). |
 | **0.3.3** `dex beobachten` / `dex report` (Modul `dexpaid.py`): DexScreener-Boosts und Enhanced Token Info als zeitgestempelte Ereignisse mit Preis-Schnappschüssen, Follower-Rendite mit Wilson/Bootstrap, Verknüpfung mit eigenen Records | Bezahlsignale werden gemessen statt gekauft (OQ-030, E-009); keine Keys, 60/300 Anfragen je Minute | `tests/test_dexpaid.py` |
 | Alarm-Records mit Version, Regel-Hash, Slot, Kurvenstand, Creator, Datenqualität (`calibrate.alert_record_extra`, `rules_hash`) | Calls sind nachrechenbar und Regelstände trennbar | `test_alert_record_extra_carries_slot_curve_and_rule_version` |
 | `--tape DATEI`: jeder gesehene Trade eines Tokens mit Alarm, rückwirkend ab dem ersten Alarm | Offline-Replay jeder Latenz und Regel ohne `getTransaction` | `test_tape_backfills_at_first_alert_and_streams_afterwards` |
@@ -295,8 +296,8 @@ Geändert (alles aus Daten, die wir ohnehin empfangen, null zusätzliche RPC-Auf
    hilft keine frühere Narrativ-Erkennung für die erste Welle, sondern nur die Auswahl in der zweiten.
 
 Zurückgestellt: Themen-Zufluss über alle Coins eines Begriffs und „Wanderer" (Wallets, die mehrere Coins eines
-Themas kaufen) als nächster Schritt; externe Quellen nach E-005 (Telegram erst nach EXP001-Freeze und nur
-aufzeichnend, DexScreener erst nach direkter Prüfung, X-API nicht). Grenzen: Jede Welle sieht jeder Bot gleichzeitig;
+Themas kaufen) als nächster Schritt. Externe Quellen seit 0.3.6 (`docs/quellen_extern.md`, OQ-033): Graduierungen aus dem
+PumpPortal-Migrationsfeed, DexScreener-Nachlauf und Rugcheck record-only; Telegram und X bleiben nach E-005 zurückgestellt. Grenzen: Jede Welle sieht jeder Bot gleichzeitig;
 der mögliche Vorteil liegt in der Auswahl, nicht im Tempo. Eine Welle ist erst nach mehreren Launches erkennbar,
 also ein bis fünf Minuten nach dem Auslöser. Wellen sind häufig und meist wertlos; nur die Messung gegen Kontrollen
 entscheidet.
@@ -389,7 +390,7 @@ späteren Auswertung, keine Handlungsaufforderung.
    `python -c "from holder_scorer.notify import send_telegram; print(send_telegram('holder-scorer Test'))"` → `True`.
 4. **Start für frühe Calls mit wenig Lärm, Free-Tarif-verträglich, mit Kontrollgruppe:**
    ```bash
-   python -m holder_scorer live --stufe 1 --tiers go,widerruf,rug,gesperrt --notify go,widerruf,rug --telegram \
+   python -m holder_scorer live --stufe 1 --tiers go,widerruf,rug,gesperrt --notify go,widerruf,rug --telegram --extern aussen.jsonl \
      --record live.jsonl --tape live_tape.jsonl --tape-sample 0.1 --budget 1000 --paper papier.jsonl --paper-latency 30
    ```
    Stufe 1 ≈ 20 GO je Stunde (Rechenmodell, kein Live-Test; mit dem Halter-Anstiegs-Gate aus 0.3.2 weniger);

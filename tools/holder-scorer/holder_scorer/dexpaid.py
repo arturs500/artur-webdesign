@@ -79,6 +79,12 @@ def best_pair(pairs: Iterable[dict[str, Any]], mint: str, chain: str) -> dict[st
     return best
 
 
+def pairs_from(data: Any) -> list[dict[str, Any]]:
+    """Paarliste aus einer ``/latest/dex/tokens``-Antwort (``{"pairs": [...]}`` oder nackte Liste), tolerant gelesen."""
+    pairs = data.get("pairs") if isinstance(data, dict) else data
+    return [p for p in (pairs or []) if isinstance(p, dict)]
+
+
 def _num(x: Any) -> float | None:
     try:
         return None if x is None else float(x)
@@ -240,9 +246,9 @@ class DexWatcher:
         data = self._get(TOKENS + ",".join(mints), now, "pairs")
         if data is None:
             return  # Budget oder Fehler: beim nächsten Tick erneut
-        pairs = data.get("pairs") if isinstance(data, dict) else data
+        pairs = pairs_from(data)
         for d in batch:
-            pair = best_pair(pairs or [], d.mint, self.chain)
+            pair = best_pair(pairs, d.mint, self.chain)
             row = snapshot_row(pair, d.mint, now, d.event_id, d.after_s)
             row["geplant_nach_s"] = d.after_s
             row["verzug_s"] = round(now - d.at, 1)

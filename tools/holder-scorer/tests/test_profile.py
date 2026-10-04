@@ -200,7 +200,7 @@ class HistoryRpc:
         self.stats = {"requests": 0, "posts": 0, "retries": 0, "by_method": {}}
 
     def get_signatures(self, address, limit=1000, before=None):
-        assert address == self.mint
+        assert address == pf.derive_bonding_curve(self.mint)  # 0.3.6: Historie über die Kurvenadresse, nicht den Mint
         self.stats["requests"] += 1
         return list(self.sigs) if before is None else []
 

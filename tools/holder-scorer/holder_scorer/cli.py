@@ -196,6 +196,12 @@ def cmd_live(args: argparse.Namespace) -> int:
         tiers = tiers if "WATCH" in tiers else tiers + ("WATCH",)
         notify_words.add("WATCH")
     config.tiers = tiers
+    # Außenquellen (extern.py, 0.3.6): Migrationsfeed immer abonniert, protokolliert nur mit --extern; Rugcheck opt-in
+    config.extern_path = getattr(args, "extern", None)
+    config.rugcheck = bool(getattr(args, "rugcheck", False))
+    if config.rugcheck and not config.extern_path:
+        print("--rugcheck braucht --extern", file=sys.stderr)
+        return 2
     if args.telegram and not telegram_configured():
         print("Telegram nicht konfiguriert: TELEGRAM_BOT_TOKEN und TELEGRAM_CHAT_ID setzen", file=sys.stderr)
         return 2
@@ -248,6 +254,7 @@ def cmd_live(args: argparse.Namespace) -> int:
         + profile_line
         + (f" · Beobachtungsliste: {', '.join(watch)}" if watch else "")
         + f" · Fair-Gate: {config.fair.summary()}"
+        + (f" · Außenquellen {config.extern_path}" + (" + Rugcheck" if config.rugcheck else "") if config.extern_path else "")
     )
 
     def on_alert(alert):
@@ -323,6 +330,11 @@ def cmd_tape(args: argparse.Namespace) -> int:
     costs = Costs.scenario(args.priority)
     if args.ata_rent is not None:
         costs = Costs(base_fee=costs.base_fee, cu_limit=costs.cu_limit, cu_price_micro=costs.cu_price_micro, ata_rent=args.ata_rent, close_account=costs.close_account)
+    extern = None
+    if getattr(args, "extern", None):
+        from .extern import load_extern
+
+        extern = load_extern(args.extern)
     text, report = tape_report(
         args.records,
         args.tape,
@@ -332,6 +344,7 @@ def cmd_tape(args: argparse.Namespace) -> int:
         costs=costs,
         k_controls=args.kontrollen,
         tiers=[t.strip() for t in args.tiers.split(",")] if args.tiers else None,
+        extern=extern,
     )
     print(text)
     if args.json:
@@ -351,14 +364,23 @@ def cmd_profil(args: argparse.Namespace) -> int:
     if args.profil_cmd != "bauen":
         return 2
     mints = parse_mints_file(args.mints) if args.mints else []
-    if not (args.tape or args.records or args.papier or mints):
-        print("mindestens eine Quelle angeben: --tape, --records, --papier oder --mints", file=sys.stderr)
+    extern_path = getattr(args, "extern", None)
+    extern_count = 0
+    if extern_path:
+        from .extern import load_extern
+
+        extern_count = len(load_extern(extern_path).graduiert)
+    if not (args.tape or args.records or args.papier or mints or extern_path):
+        print("mindestens eine Quelle angeben: --tape, --records, --papier, --mints oder --extern", file=sys.stderr)
         return 2
     rpc = None
-    if mints:
-        todo = min(len(mints), args.max_mints)
+    if mints or extern_count:
+        todo = min(len(mints) + extern_count, args.max_mints)
         # getSignaturesForAddress je Seite plus getTransaction je Trade im Fenster: Obergrenze vorab, Istwert danach
-        print(f"RPC-Schätzung für {todo} Mints: bis zu {todo * args.max_pages} Signatur-Seiten und einige hundert getTransaction je Mint (Obergrenze {todo * args.max_pages * 1000} Einheiten)")
+        print(
+            f"RPC-Schätzung für {todo} Mints ({len(mints)} aus --mints, {extern_count} Graduierungen aus --extern, höchstens --max-mints {args.max_mints}): "
+            f"bis zu {todo * args.max_pages} Signatur-Seiten und einige hundert getTransaction je Mint (Obergrenze {todo * args.max_pages * 1000} Einheiten)"
+        )
         if args.dry_run:
             return 0
         rpc = make_rpc(args.rpc, args.rps)
@@ -378,6 +400,7 @@ def cmd_profil(args: argparse.Namespace) -> int:
         split=args.split,
         max_mints=args.max_mints,
         max_pages=args.max_pages,
+        extern_path=extern_path,
     )
     print(text)
     if rpc is not None:
@@ -406,6 +429,22 @@ def cmd_dex(args: argparse.Namespace) -> int:
             with open(args.json, "w", encoding="utf-8") as fh:
                 json.dump(report, fh, ensure_ascii=False, indent=1)
             print(f"JSON nach {args.json} geschrieben")
+        return 0
+    return 2
+
+
+def cmd_quellen(args: argparse.Namespace) -> int:
+    from .extern import describe_extern, format_nachlauf_stats, load_extern, nachlauf_fetch
+
+    if args.quellen_cmd == "zeigen":
+        print(describe_extern(load_extern(args.file)))
+        return 0
+    if args.quellen_cmd == "nachlauf":
+        kwargs = {}
+        if args.horizonte:
+            kwargs["horizons"] = tuple(float(x) for x in args.horizonte.split(",") if x.strip())
+        stats = nachlauf_fetch(args.records, args.extern, tape_path=args.tape, max_mints=args.max, per_min=args.je_minute, dry_run=args.dry_run, **kwargs)
+        print(format_nachlauf_stats(stats, dry_run=args.dry_run))
         return 0
     return 2
 
@@ -545,6 +584,8 @@ def build_parser() -> argparse.ArgumentParser:
     lv.add_argument("--paper-telegram", help="Papier-Käufe und -Verkäufe dieser Strategien per Telegram melden (kommagetrennt)")
     lv.add_argument("--narratives", metavar="DATEI", help="Trend-Wörter für den Narrativ-Score, eines je Zeile")
     lv.add_argument("--paper-ohne-fair", action="store_true", help="Papier-Strategien dürfen auch Coins kaufen, die das Fairness-Gate sperrt (nur zum Vergleich)")
+    lv.add_argument("--extern", metavar="DATEI", help="Außenquellen-Protokoll (JSONL, record-only): Graduierungen der ganzen Plattform aus dem PumpPortal-Migrationsfeed (kostenlos, kein RPC) und Rugcheck-Zeilen; für 'tape report --extern', 'profil bauen --extern', 'quellen nachlauf'")
+    lv.add_argument("--rugcheck", action="store_true", help="je GO/GESPERRT eine Rugcheck-Abfrage (HTTP, kein Schlüssel, kein RPC) in die --extern-Datei schreiben; kein Gate")
     _add_rpc_args(lv)
     lv.set_defaults(func=cmd_live)
 
@@ -577,6 +618,7 @@ def build_parser() -> argparse.ArgumentParser:
     tr_.add_argument("--ata-rent", type=int, help="Token-Account-Einlage in Lamports (Standard 2039280, NICHT VERIFIZIERT – per RPC prüfen)")
     tr_.add_argument("--kontrollen", type=int, default=5, help="Kontroll-Token je Alarm (Standard 5)")
     tr_.add_argument("--tiers", help="nur diese Alarmstufen, kommagetrennt (Standard alle)")
+    tr_.add_argument("--extern", metavar="DATEI", help="Außenquellen-Datei aus 'live --extern' und 'quellen nachlauf': Graduation von außen, Überleben nach 1 h/24 h, Rugcheck je Gruppe")
     tr_.add_argument("--json", metavar="DATEI", help="vollständiges Ergebnis zusätzlich als JSON schreiben")
     tr_.set_defaults(func=cmd_tape)
 
@@ -587,6 +629,7 @@ def build_parser() -> argparse.ArgumentParser:
     pb_.add_argument("--records", metavar="DATEI", help="Records aus 'live --record' (ab 0.3.2 mit Vektoren)")
     pb_.add_argument("--papier", metavar="DATEI", help="Papier-Datei aus 'live --paper' (Label aus dem Papier-Ergebnis, wenn kein Tape-Label existiert)")
     pb_.add_argument("--mints", metavar="DATEI", help="Mint-Liste '<Mint> [gut|schlecht]' je Zeile; Historie per RPC (begrenzt durch --max-mints/--max-pages)")
+    pb_.add_argument("--extern", metavar="DATEI", help="Außenquellen-Datei aus 'live --extern': graduierte Coins der ganzen Plattform als gute Referenz (Historie per RPC über die Bonding-Curve-Adresse, zusammen mit --mints durch --max-mints begrenzt)")
     pb_.add_argument("--out", required=True, metavar="DATEI", help="Zieldatei des Profils (JSON), für 'live --profil'")
     pb_.add_argument("--einstieg", type=float, default=60.0, help="Label: Einstieg in Sekunden nach dem ersten Trade (Standard 60; Checkpoints davor zählen)")
     pb_.add_argument("--horizont", type=float, default=180.0, help="Label: Haltedauer in Sekunden (Standard 180 = Ende des 240-s-Fensters)")
@@ -617,6 +660,21 @@ def build_parser() -> argparse.ArgumentParser:
     dr.add_argument("--gebuehr-bps", type=int, default=50, help="Gebühr je Seite in Basispunkten (Standard 50, Annahme)")
     dr.add_argument("--json", metavar="DATEI", help="Ergebnis zusätzlich als JSON")
     dr.set_defaults(func=cmd_dex)
+
+    qu = sub.add_parser("quellen", help="Außenquellen (0.3.6, record-only, kein RPC): Nachlauf der eigenen Coins von DexScreener holen, Protokoll anzeigen")
+    qus = qu.add_subparsers(dest="quellen_cmd", required=True)
+    qn = qus.add_parser("nachlauf", help="fällige Schnappschüsse (+1 h, +24 h) für Alarm- und Kontroll-Coins von DexScreener holen und an die Außenquellen-Datei anhängen")
+    qn.add_argument("records", help="Record-Datei aus 'live --record'")
+    qn.add_argument("--extern", required=True, metavar="DATEI", help="Außenquellen-Datei (wird angelegt oder ergänzt; eine Zeile je Coin und Horizont)")
+    qn.add_argument("--tape", metavar="DATEI", help="Tape aus 'live --tape --tape-sample': Kontroll-Coins mitmessen")
+    qn.add_argument("--horizonte", help="Sekunden nach dem Alarm, kommagetrennt (Standard 3600,86400)")
+    qn.add_argument("--max", type=int, default=3000, help="höchstens so viele Schnappschüsse je Lauf (Standard 3000)")
+    qn.add_argument("--je-minute", type=int, default=250, help="DexScreener-Anfragen je Minute (Standard 250, Limit 300 laut Referenz)")
+    qn.add_argument("--dry-run", action="store_true", help="nur zählen, nichts abrufen")
+    qn.set_defaults(func=cmd_quellen)
+    qz = qus.add_parser("zeigen", help="Zähler, Feed-Laufzeit und Trennungen, letzte Graduierungen mit Alarm-Markierung, Rugcheck-Abdeckung")
+    qz.add_argument("file")
+    qz.set_defaults(func=cmd_quellen)
 
     la = sub.add_parser("launch", help="Launch-Rechner: Dev-Anteil, nötiger Fremdzufluss, Wert bei Graduation, Teilverkauf und Kursimpact (Kurvenmathematik, kein Kauf)")
     las = la.add_subparsers(dest="launch_cmd", required=True)

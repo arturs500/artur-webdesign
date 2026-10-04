@@ -24,7 +24,7 @@ Kontrollgruppe (`--tape-sample 0.1`: jeder zehnte beobachtete Token wird ab dem 
 mitgeschrieben, auch ohne Alarm):
 
 ```bash
-python -m holder_scorer live --stufe 1 --tiers go,widerruf,rug,gesperrt --notify go,widerruf,rug --telegram \
+python -m holder_scorer live --stufe 1 --tiers go,widerruf,rug,gesperrt --notify go,widerruf,rug --telegram --extern aussen.jsonl \
   --record live.jsonl --tape live_tape.jsonl --tape-sample 0.1 --budget 1000 --paper papier.jsonl --paper-latency 30
 ```
 
@@ -53,7 +53,7 @@ Einstieg (kein Look-ahead). `--split 0.5` prüft auf der zeitlich späteren Häl
 ```bash
 python -m holder_scorer profil bauen --tape live_tape.jsonl --records live.jsonl --papier papier.jsonl --out profil.json
 python -m holder_scorer profil zeigen profil.json
-python -m holder_scorer live --stufe 1 --tiers go,widerruf,rug,gesperrt --notify go,widerruf,rug --telegram \
+python -m holder_scorer live --stufe 1 --tiers go,widerruf,rug,gesperrt --notify go,widerruf,rug --telegram --extern aussen.jsonl \
   --record live.jsonl --tape live_tape.jsonl --tape-sample 0.1 --budget 1000 --paper papier.jsonl --paper-latency 30 \
   --profil profil.json
 ```
@@ -111,13 +111,29 @@ Vergleich). `tape report` enthält die Gate-Prüfung: Rendite der GO-Coins gegen
 Block-Bootstrap, Lesart „Sperre richtig", „Sperre unnötig" oder „offen". Dafür muss `gesperrt` in `--tiers` stehen,
 wie in den Startbefehlen oben. Die Statuszeile zeigt WIDERRUF, GESPERRT, wartende und durch Profil gesperrte GO.
 
+**Außenquellen (0.3.6, OQ-033):** Informationen kommen nicht mehr nur aus dem eigenen Papier-Test. `--extern aussen.jsonl`
+protokolliert jede Graduation der ganzen Plattform aus dem PumpPortal-Migrationsfeed (`subscribeMigration`, kostenlos, null
+RPC) mit der Markierung, ob der Coin einen eigenen Alarm hatte; `--rugcheck` holt je GO/GESPERRT einen externen Risikoscore
+(HTTP, kein Schlüssel, opt-in). `quellen nachlauf` fragt DexScreener nach 1 h und 24 h, ob Alarm- und Kontroll-Coins noch
+leben (Paar, DEX, Liquidität, MC). `tape report --extern` zeigt Graduation von außen, Überleben und Rugcheck-Trennung je
+Gruppe gegen die Grundrate aller Launches; `profil bauen --extern` baut das Profil aus graduierten Coins, die der Sniper nie
+gerufen hat (Historie über die Bonding-Curve-Adresse, begrenzt durch `--max-mints`). Kein Gate: erst messen (R2). Quellen,
+Belege und Lesarten in `docs/quellen_extern.md`.
+
+```bash
+python -m holder_scorer quellen zeigen aussen.jsonl
+python -m holder_scorer quellen nachlauf live.jsonl --extern aussen.jsonl --tape live_tape.jsonl
+python -m holder_scorer tape report live.jsonl live_tape.jsonl --extern aussen.jsonl
+python -m holder_scorer profil bauen --tape live_tape.jsonl --extern aussen.jsonl --rpc URL --max-mints 20 --out profil.json
+```
+
 **Launch-Rechner (OQ-029, `docs/fair_launch.md`):** `python -m holder_scorer launch rechner` zeigt aus der
 geprüften Kurvenmathematik, welchen Supply-Anteil ein Dev-Kauf ergibt, wie viel Fremdzufluss bis zur Graduation
 fehlt, was die Dev-Position dann wert ist, was ein Teilverkauf netto bringt und wie stark er den Kurs drückt,
 plus die Creator-Fee bis dahin und die Sniper-Warnungen, die der Plan auslösen würde. Kein Kauf, keine Empfehlung.
 
 ```bash
-python -m holder_scorer live --stufe 1 --tiers go,widerruf,rug,gesperrt --notify go,widerruf,rug --telegram \
+python -m holder_scorer live --stufe 1 --tiers go,widerruf,rug,gesperrt --notify go,widerruf,rug --telegram --extern aussen.jsonl \
   --record live.jsonl --tape live_tape.jsonl --tape-sample 0.1 --budget 1000 --paper papier.jsonl --paper-latency 30 \
   --beobachte TIFFANY
 ```

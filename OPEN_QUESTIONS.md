@@ -522,3 +522,37 @@ steht hier mit Datum und im Outcome-Register des Experten mit Prüftermin.
   keinen zweiten WIDERRUF (einmal je Token); (d) Gate-Prüfung braucht ≥ 2 Alarmstunden je Gruppe für ein Intervall.
 - Blockiert: keinen Freeze.
 - Status: `entschieden (Experte)` am 2026-10-04 auf Nutzerauftrag; Prüfpunkte offen.
+
+## OQ-033 – Sniper 0.3.6 „Außenquellen": Informationen nicht nur aus dem eigenen Papier-Test
+
+- Datum: 2026-10-04
+- Kontext: Nutzerauftrag „Informationen nicht nur aus unserem Paper-Trade-Test holen, sondern auch woanders"; Plan und
+  Gegenprüfung (Plan-Agent) am 2026-10-04; `docs/quellen_extern.md`, `docs/experte.md` E-013. Alle Anbieter-Hosts in der
+  Arbeitsumgebung gesperrt, Belege [Snippet] oder NICHT VERIFIZIERT; der Code hebt Rohdaten auf.
+- Entschieden (Experte, record-only, R2/R4/R5): (1) PumpPortal `subscribeMigration` auf der bestehenden WebSocket-Verbindung
+  (kostenlos, null RPC): Zeile `graduierung` je Migration mit `alarm` aus dem Alarm-Gedächtnis (höchster Tier je Mint,
+  5 000 Einträge) und `roh`; Dispatch nach `txType`, nicht nach dem Rückgabewert von `on_launch`. (2) `quellen nachlauf`:
+  DexScreener `/latest/dex/tokens` (30 Mints je Anfrage, 250 je Minute) für Alarm- und Kontroll-Coins nach 1 h und 24 h,
+  eine Zeile je Coin und Horizont, Alarme vor Kontrollen, idempotent, kein RPC. (3) Rugcheck-Kurzbericht je GO/GESPERRT nur
+  mit `--rugcheck`, direkt über `run_side_task` in der HTTP-Gruppe (nicht `_spawn`, das finale oder entfernte Token
+  ausließe), einmal je Token, Zeile in jedem Fall. (4) `tape report --extern`: Graduation extern je Tier und Kontrollen
+  (Nenner nur Alarme im Reifefenster `erster_t ≤ alert_at ≤ letzter_t − 24 h`, Rest „offen"; zweiter Marker: Nachlauf-Paar
+  außerhalb `pumpfun`), Überleben (Paar mit Liquidität ≥ 1 000 USD), Rugcheck-Trennung am Median (Lesart ab 20 je Hälfte),
+  Grundrate 0,26–1,4 % als Plausibilitätsband für die Kontrollen. (5) `profil bauen --extern`: Graduierungen neueste zuerst
+  als gute Referenz, zusammen mit `--mints` durch `--max-mints` begrenzt; Coins im Tape bekommen das Außen-Label ohne RPC
+  (Graduation ist die spätere Wahrheit, wie `label_from_rows`). (6) `fetch_ticks` paginiert über die Bonding-Curve-Adresse
+  statt über den Mint (nach der Graduation sammelt der Mint alle PumpSwap-Trades, die Kurve nicht). (7) `rules_hash` ohne
+  Dateinamen und record-only-Schalter (`tape_path`, `tape_sample`, `extern_path`, `rugcheck`).
+- Prüfpunkte: (a) Feldnamen des Migrationsereignisses (`mint`, `txType`, `pool`, `signature`) NICHT VERIFIZIERT – erste
+  `roh`-Zeilen auf dem Rechner des Nutzers lesen und hier nachtragen; (b) Rugcheck: Antwortform und Rate-Limit NICHT
+  VERIFIZIERT (`roh` bei unerwarteter Form), Abdeckung frischer Coins unbekannt; (c) Überlebens-Schwelle 1 000 USD ist
+  Annahme; (d) Feed-Reife 24 h ist Annahme (Graduationen nach Tag 1 zählen nicht); (e) ob DexScreener Coins auf der Kurve
+  (`dexId pumpfun`) listet, ist ungeprüft – viele `fehlt`-Zeilen bei Kurven-Coins wären kein Sterben, sondern fehlende
+  Abdeckung; dann GeckoTerminal-OHLCV (30 Aufrufe je Minute [Snippet]) als Nachlauf-Alternative; (f) Kurven-Adresse als
+  Signaturquelle: `bonding_curve` steht in den Konten von create, create_v2, buy, sell und migrate [direkt geprüft: IDL pump.json via
+  raw.githubusercontent.com/pump-fun/pump-public-docs, 2026-10-04]; die Kurvenhistorie ist damit vollständig und endet mit der Migration; (g) externe Narrativ-
+  Quellen (Telegram, X) bleiben Eskalation (E-005), Birdeye bleibt Pilot (E-006).
+- Default: so belassen bis zum ersten `tape report --extern` mit ≥ 100 GO und 24 h Feed-Reife; kein Gate aus Außenquellen vor
+  einer Zeitsplit-Prüfung.
+- Blockiert: keinen Freeze.
+- Status: `entschieden (Experte)` am 2026-10-04 auf Nutzerauftrag; Prüfpunkte (a)–(g) offen.

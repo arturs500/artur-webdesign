@@ -367,6 +367,7 @@ def evaluate(
     costs: Costs | None = None,
     k_controls: int = 5,
     tiers: Iterable[str] | None = None,
+    extern: Any = None,
 ) -> dict[str, Any]:
     costs = costs or Costs()
     size_lamports = int(round(size_sol * LAMPORTS_PER_SOL))
@@ -480,7 +481,13 @@ def evaluate(
         "impact_model": "overlay",
     }
     params_hash = hashlib.sha256(json.dumps(params, sort_keys=True).encode("utf-8")).hexdigest()[:12]
+    extern_summary = None
+    if extern is not None:
+        from .extern import extern_summary as _extern_summary  # Außenquellen (0.3.6): Graduation von außen, Nachlauf, Rugcheck
+
+        extern_summary = _extern_summary(alerts, {m: t0 for m, (t0, _) in control_launch.items()}, outcomes, extern, PRIMARY)
     return {
+        "extern": extern_summary,
         "params": params,
         "params_hash": params_hash,
         "alerts_total": len(alerts),
@@ -598,6 +605,10 @@ def format_report(report: dict[str, Any], legacy: int = 0) -> str:
     gate = _gate_line(report.get("gate_check"))
     if gate:
         lines += ["", gate]
+    if report.get("extern"):
+        from .extern import extern_lines
+
+        lines += [""] + extern_lines(report["extern"])
     lines += [
         "",
         "Lesart: Ein Edge liegt erst vor, wenn in der Primärzeile sowohl das Bootstrap-Intervall des Mittelwerts als auch das der Differenz zur "

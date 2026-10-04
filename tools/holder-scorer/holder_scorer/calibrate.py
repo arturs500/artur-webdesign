@@ -221,6 +221,9 @@ def update_outcomes(path: str, rpc: SolanaRpc, horizon_s: float = 900.0, growth_
     return checked
 
 
+RECORD_ONLY_FIELDS = ("tape_path", "tape_sample", "extern_path", "rugcheck")  # file names and record-only switches change no rule
+
+
 def rules_hash(live_config: Any, scoring: Any, version: str) -> str:
     """Short hash over every threshold in play, so alerts from different rule sets never get mixed up later."""
     import dataclasses
@@ -228,7 +231,10 @@ def rules_hash(live_config: Any, scoring: Any, version: str) -> str:
 
     def plain(obj: Any) -> Any:
         if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
-            return dataclasses.asdict(obj)
+            d = dataclasses.asdict(obj)
+            for key in RECORD_ONLY_FIELDS:
+                d.pop(key, None)
+            return d
         return getattr(obj, "__dict__", str(obj))
 
     payload = {"version": version, "live": plain(live_config), "scoring": plain(scoring)}

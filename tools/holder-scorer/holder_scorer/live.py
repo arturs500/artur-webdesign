@@ -33,6 +33,7 @@ import base64
 import json
 import threading
 import time
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
@@ -48,6 +49,7 @@ from .collect import (
     derive_balances,
 )
 from .encoding import BorshError
+from .extern import RECENT_ALERTS_MAX, TIER_RANK, append_row, feed_row, parse_migration, rugcheck_fetch
 from .fair import FairConfig, FairResult, fair_check, fair_line
 from .features import CREATION_WINDOW_SLOTS, compute_features
 from .market import sol_usd
@@ -141,6 +143,9 @@ class LiveConfig:
     go_min_holder_rise: int = 2  # ... and for GO
     holder_rise_window_s: float = 15.0
     watch_terms: tuple[str, ...] = ()  # --beobachte: a launch whose name, symbol or description carries one of these sends 👁️ WATCH at once
+    # Außenquellen (extern.py, 0.3.6): record-only, no RPC
+    extern_path: str | None = None  # --extern: graduations of the whole platform from the PumpPortal migration feed, Rugcheck rows
+    rugcheck: bool = False  # one Rugcheck query per GO/GESPERRT into the extern file (HTTP group, outside the RPC budget)
 
     @classmethod
     def for_stufe(cls, stufe: int) -> tuple["LiveConfig", ScoringConfig]:
@@ -323,7 +328,10 @@ class LiveEngine:
         self.stats = {
             "launches": 0, "tracked": 0, "trades": 0, "missing": 0, "dropped_missing": 0, "alerts": 0,
             "blick": 0, "go": 0, "rug": 0, "expired": 0, "side_tasks": 0, "side_skipped_budget": 0, "in_welle": 0, "watch": 0, "gesperrt": 0, "go_wartet": 0,
+            "graduierungen": 0, "graduierungen_alarm": 0,
         }
+        self.recent_alerts: "OrderedDict[str, str]" = OrderedDict()  # mint -> highest tier sent; joins migration events to our calls
+        self.rugcheck_fetch: Callable[[str], dict[str, Any]] = rugcheck_fetch  # replaceable in tests (no network)
         self._budget_window_start = 0.0
         self._budget_units_start = 0
         self._lock = threading.Lock()
@@ -422,6 +430,65 @@ class LiveEngine:
         return state
 
     # --- trades -----------------------------------------------------------------------------
+    # --- Außenquellen (0.3.6, OQ-033): Migrationsfeed und Rugcheck, record-only ----------------------------------
+    def _extern_write(self, row: dict[str, Any]) -> None:
+        if not self.cfg.extern_path:
+            return
+        try:
+            append_row(self.cfg.extern_path, row)
+        except OSError as exc:
+            print(f"Außenquellen-Datei nicht schreibbar: {exc!r}")
+
+    def on_feed(self, ereignis: str, now: float | None = None) -> None:
+        """Verbindungsereignis des Migrationsfeeds protokollieren (Lücken sind später Rechtszensur im Report)."""
+        self._extern_write(feed_row(ereignis, now if now is not None else time.time()))
+
+    def _remember_alert(self, mint: str, tier: str) -> None:
+        if tier not in TIER_RANK:
+            return
+        prev = self.recent_alerts.get(mint)
+        if prev is None or TIER_RANK[tier] > TIER_RANK[prev]:
+            self.recent_alerts[mint] = tier
+            self.recent_alerts.move_to_end(mint)
+        while len(self.recent_alerts) > RECENT_ALERTS_MAX:
+            self.recent_alerts.popitem(last=False)
+
+    def on_migration(self, msg: dict[str, Any], now: float | None = None) -> bool:
+        """Eine Graduation vom PumpPortal-Migrationsfeed zählen und protokollieren. Ändert keinen Alarm.
+
+        Der Token ist zu diesem Zeitpunkt längst nicht mehr im Blick (COMPLETE-Event, dann entfernt ihn ``tick``),
+        darum läuft die Verknüpfung mit den eigenen Calls nur über das Alarm-Gedächtnis ``recent_alerts``.
+        """
+        now = now if now is not None else time.time()
+        row = parse_migration(msg, now)
+        if row is None:
+            return False
+        self.stats["graduierungen"] += 1
+        alarm = self.recent_alerts.get(row["mint"])
+        row["alarm"] = alarm
+        if alarm:
+            self.stats["graduierungen_alarm"] += 1
+        self._extern_write(row)
+        return True
+
+    def _schedule_rugcheck(self, state: TokenState, tier: str) -> None:
+        """Eine Rugcheck-Abfrage je Token, direkt über ``run_side_task``: ``_spawn`` lässt finale oder schon entfernte
+        Token aus, also genau die interessanten Fälle. Mint und Tier by value; die Zeile wird in jedem Fall geschrieben."""
+        if not (self.cfg.rugcheck and self.cfg.extern_path and self.run_side_task is not None) or "rugcheck" in state.done:
+            return
+        state.done.add("rugcheck")
+        self.stats["side_tasks"] += 1
+        mint = state.mint
+
+        def done(row: Any) -> None:
+            if not isinstance(row, dict):
+                row = {"typ": "risiko", "t": round(time.time(), 3), "mint": mint, "quelle": "rugcheck", "status": 0, "fehlt": True}
+            row["alarm"] = tier
+            self._extern_write(row)
+
+        fetcher = self.rugcheck_fetch
+        self.run_side_task("rugcheck", lambda: fetcher(mint), done, 0.0, "http")
+
     def on_logs(self, mint: str, slot: int, signature: str, err: Any, logs: list[str], now: float | None = None) -> int:
         """Apply one logsNotification. Returns the number of trades added."""
         now = now if now is not None else time.time()
@@ -796,6 +863,9 @@ class LiveEngine:
         state.tiers_sent[tier] = now
         self.stats["alerts"] += 1
         self.stats[tier.lower()] = self.stats.get(tier.lower(), 0) + 1
+        self._remember_alert(state.mint, tier)
+        if tier in ("GO", "GESPERRT"):
+            self._schedule_rugcheck(state, tier)
         if self.cfg.tape_path and not state.tape_started:
             # first alert: back-fill everything seen so far, then stream every further trade (see _add_trade)
             state.tape_started = True
@@ -1266,8 +1336,10 @@ async def run_live(
             try:
                 async with websockets.connect(PUMPPORTAL_WS, ping_interval=20) as ws:
                     await ws.send(json.dumps({"method": "subscribeNewToken"}))
+                    await ws.send(json.dumps({"method": "subscribeMigration"}))  # graduations of the whole platform, free (0.3.6)
                     backoff = 5.0
-                    print(f"Live-Modus Stufe {config.stufe}: Launches von PumpPortal, Trades aus den Logs von {stream.url.split('?')[0]}")
+                    engine.on_feed("verbunden")
+                    print(f"Live-Modus Stufe {config.stufe}: Launches und Graduierungen von PumpPortal, Trades aus den Logs von {stream.url.split('?')[0]}")
                     async for raw in ws:
                         try:
                             msg = json.loads(raw)
@@ -1275,14 +1347,19 @@ async def run_live(
                             continue
                         if not isinstance(msg, dict):
                             continue
-                        state = engine.on_launch(msg)
-                        if state is not None:
-                            await stream.subscribe(state.mint)
+                        # dispatch by message type, not by on_launch's return value (None also means duplicate or list full)
+                        if msg.get("txType", "create") == "create" and (msg.get("pool") or "pump") == "pump":
+                            state = engine.on_launch(msg)
+                            if state is not None:
+                                await stream.subscribe(state.mint)
+                        else:
+                            engine.on_migration(msg)
                         if stop.is_set():
                             break
             except asyncio.CancelledError:
                 raise
             except Exception as exc:  # noqa: BLE001
+                engine.on_feed("getrennt")
                 print(f"PumpPortal getrennt ({exc!r}), neuer Versuch in {backoff:.0f} s")
                 await asyncio.sleep(backoff)
                 backoff = min(60.0, backoff * 2)
@@ -1328,7 +1405,8 @@ async def run_live(
                 print(
                     f"Status: {s['tracked']} Token im Blick, {s['launches']} Launches, {s['trades']} Trades, "
                     f"Alarme BLICK {s['blick']} / GO {s['go']} / WIDERRUF {s.get('widerruf', 0)} / RUG {s['rug']} / GESPERRT {s.get('gesperrt', 0)}, "
-                    f"GO wartet auf Historie/Metadaten {s.get('go_wartet', 0)}, GO durch Profil/Halter-Anstieg gesperrt {s.get('go_profil', 0)}, Hintergrundabfragen {s['side_tasks']} "
+                    f"GO wartet auf Historie/Metadaten {s.get('go_wartet', 0)}, GO durch Profil/Halter-Anstieg gesperrt {s.get('go_profil', 0)}, "
+                    f"Graduierungen (PumpPortal) {s.get('graduierungen', 0)} (davon mit Alarm {s.get('graduierungen_alarm', 0)}), Hintergrundabfragen {s['side_tasks']} "
                     f"(wegen Budget ausgelassen {s['side_skipped_budget']}), nachgeladen {s['missing']}, "
                     f"Log-Benachrichtigungen {stream.stats['notifications']} ({stream.stats['bytes'] / 1e6:.1f} MB, "
                     f"bei Helius etwa {stream.stats['bytes'] / 1e6 * 20:.0f} Credits), RPC-Einheiten {rpc.stats['requests']}"

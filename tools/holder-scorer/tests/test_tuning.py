@@ -117,3 +117,4 @@ def test_readme_start_commands_record_gesperrt():
     text = (pathlib.Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
     cmds = [line for line in text.splitlines() if "python -m holder_scorer live" in line and "--tiers " in line]
     assert cmds and all("gesperrt" in line for line in cmds)
+    assert all("--extern " in line for line in cmds)  # 0.3.6: Außenquellen-Protokoll gehört zu jedem Startbefehl

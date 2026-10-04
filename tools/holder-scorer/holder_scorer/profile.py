@@ -35,7 +35,7 @@ from dataclasses import dataclass
 from typing import Any, Iterable
 
 from .features import DUST_TOKENS
-from .pump import LAMPORTS_PER_SOL, TOKEN_TOTAL_SUPPLY, TradeEvent
+from .pump import LAMPORTS_PER_SOL, TOKEN_TOTAL_SUPPLY, TradeEvent, derive_bonding_curve
 
 PROFILE_VERSION = 1
 CHECKPOINTS = (10.0, 20.0, 30.0, 45.0, 60.0, 90.0)
@@ -436,17 +436,23 @@ def parse_mints_file(path: str) -> list[tuple[str, bool | None]]:
     return out
 
 
-def fetch_ticks(rpc: Any, mint: str, seconds: float, max_pages: int = 10) -> tuple[list[Tick], dict[str, Any]]:
-    """Die ersten ``seconds`` eines Coins aus der Kette: Signaturen des Mints rückwärts bis zur ältesten Seite,
-    dann getTransaction nur für das Fenster. Bricht ab, wenn ``max_pages`` Seiten nicht bis zum Anfang reichen."""
+def fetch_ticks(rpc: Any, mint: str, seconds: float, max_pages: int = 10, address: str | None = None) -> tuple[list[Tick], dict[str, Any]]:
+    """Die ersten ``seconds`` eines Coins aus der Kette: Signaturen rückwärts bis zur ältesten Seite, dann
+    getTransaction nur für das Fenster. Bricht ab, wenn ``max_pages`` Seiten nicht bis zum Anfang reichen.
+
+    Paginiert wird über die Bonding-Curve-Adresse (0.3.6), nicht über den Mint: jeder Kurven-Trade referenziert
+    beide Konten, aber nach der Graduation sammelt der Mint alle PumpSwap-Trades, die Kurve nicht. So bleibt die
+    Historie graduierter Coins (``profil bauen --extern``) endlich und die ersten Minuten sind mit wenigen Seiten erreichbar.
+    """
     from .pump import parse_transaction
 
+    address = address or derive_bonding_curve(mint)
     sigs: list[dict[str, Any]] = []
     before = None
     pages = 0
     reached_start = False
     while pages < max_pages:
-        page = rpc.get_signatures(mint, limit=1000, before=before)
+        page = rpc.get_signatures(address, limit=1000, before=before)
         pages += 1
         if not page:
             reached_start = True
@@ -593,8 +599,15 @@ def build_profile(
     split: float = 0.0,
     max_mints: int = 20,
     max_pages: int = 10,
+    extern_path: str | None = None,
 ) -> tuple[dict[str, Any], str]:
-    """Referenzprofil aus gespeicherten Coins. Returns (Profil, Bericht). Das Profil kann leer sein (keine Checkpoints)."""
+    """Referenzprofil aus gespeicherten Coins. Returns (Profil, Bericht). Das Profil kann leer sein (keine Checkpoints).
+
+    ``extern_path`` (0.3.6): Graduierungen der ganzen Plattform aus ``live --extern`` als gute Referenz-Coins, neueste
+    zuerst, nach den ausdrücklichen ``mints`` und zusammen mit ihnen durch ``max_mints`` begrenzt. Steht ein graduierter
+    Coin schon im Tape, kommt der Vektor von dort und das Label wird auf gut gesetzt (die Graduation ist die spätere
+    Wahrheit, dieselbe Regel wie ``label_from_rows``: gut = graduiert oder Rendite > 0).
+    """
     from .replay import Costs, load_jsonl, load_tape
 
     costs = costs or Costs()
@@ -611,12 +624,40 @@ def build_profile(
         if vecs:
             vectors.setdefault(mint, {}).update({k: v for k, v in vecs.items() if k in {cp_key(c) for c in cps}})
 
-    def add_label(mint: str, label: dict[str, Any], source: str) -> None:
+    def add_label(mint: str, label: dict[str, Any], source: str, force: bool = False) -> None:
         if label.get("gut") is None:
             return
-        if mint in labels and labels[mint]["quelle"] == "tape":
-            return  # das einheitliche Tape-Label geht vor
+        if not force and mint in labels and labels[mint]["quelle"] == "tape":
+            return  # das einheitliche Tape-Label geht vor (Ausnahme: eine Graduation von außen, force)
         labels[mint] = {**label, "quelle": source}
+
+    def load_mints(todo: list[tuple[str, bool | None]], source: str) -> None:
+        """Historie per RPC laden, Vektoren rechnen, Label aus der Angabe oder aus der Historie (Quelle ``source``)."""
+        window = entry_age_s + horizon_s + CENSOR_SLACK_S
+        for mint, given in todo:
+            try:
+                ticks, info = fetch_ticks(rpc, mint, window, max_pages=max_pages)
+            except Exception as exc:  # noqa: BLE001 - ein Mint darf den Aufbau nicht beenden
+                bump(f"{source}_fehler")
+                notes.append(f"{mint[:8]}…: Historie nicht ladbar ({exc})")
+                continue
+            if info.get("abgebrochen"):
+                bump(f"{source}_zu_gross")
+                notes.append(f"{mint[:8]}…: mehr als {max_pages * 1000} Signaturen, Anfang nicht erreicht (--max-pages)")
+                continue
+            if not ticks:
+                bump(f"{source}_leer")
+                continue
+            bump(f"{source}_geladen")
+            add_vectors(mint, vectors_at_checkpoints(ticks, None, cps))
+            if given is not None:
+                add_label(mint, {"gut": given, "t0": ticks[0].ts}, source, force=source == "extern")
+            else:
+                lab = label_from_rows(rows_from_ticks(mint, ticks), entry_age_s, horizon_s, size_sol, costs)
+                if lab.get("handelbar"):
+                    add_label(mint, lab, source)
+                else:
+                    bump(f"{source}_ohne_label")
 
     # 1. Tape: Vektoren aus den Trades, Label aus derselben Kurvenmathematik wie `tape report`
     if tape_path:
@@ -657,37 +698,39 @@ def build_profile(
             t0 = min((v.get("t0") for v in vectors.get(mint, {}).values() if v.get("t0")), default=None)
             add_label(mint, {"gut": sum(pnls) / len(pnls) > 0, "t0": t0, "pnl_pct": round(sum(pnls) / len(pnls), 2)}, "papier")
     # 4. Mint-Liste per RPC (begrenzt): Historie laden, Vektoren rechnen, Label aus der Datei oder aus der Historie
+    used_rpc = 0
     if mints:
         if rpc is None:
             raise ValueError("--mints braucht einen RPC (--rpc)")
         todo = mints[:max_mints]
+        used_rpc = len(todo)
         if len(mints) > max_mints:
             notes.append(f"{len(mints) - max_mints} Mints wegen --max-mints {max_mints} nicht geladen")
-        window = entry_age_s + horizon_s + CENSOR_SLACK_S
-        for mint, given in todo:
-            try:
-                ticks, info = fetch_ticks(rpc, mint, window, max_pages=max_pages)
-            except Exception as exc:  # noqa: BLE001 - ein Mint darf den Aufbau nicht beenden
-                bump("mints_fehler")
-                notes.append(f"{mint[:8]}…: Historie nicht ladbar ({exc})")
-                continue
-            if info.get("abgebrochen"):
-                bump("mints_zu_gross")
-                notes.append(f"{mint[:8]}…: mehr als {max_pages * 1000} Signaturen, Anfang nicht erreicht (--max-pages)")
-                continue
-            if not ticks:
-                bump("mints_leer")
-                continue
-            bump("mints_geladen")
-            add_vectors(mint, vectors_at_checkpoints(ticks, None, cps))
-            if given is not None:
-                add_label(mint, {"gut": given, "t0": ticks[0].ts}, "mints")
+        load_mints(todo, "mints")
+    # 5. Außenquellen (0.3.6, OQ-033): Graduierungen der ganzen Plattform als gute Referenz-Coins, neueste zuerst
+    if extern_path:
+        from .extern import load_extern
+
+        ex = load_extern(extern_path)
+        given_mints = {m for m, _ in (mints or [])}
+        ext_mints = [m for m, _ in sorted(ex.graduiert.items(), key=lambda kv: -kv[1]) if m not in given_mints]
+        bump("extern_graduierungen", len(ext_mints))
+        need_rpc: list[str] = []
+        for m in ext_mints:
+            if m in vectors:
+                t0 = min((v.get("t0") for v in vectors[m].values() if v.get("t0")), default=None)
+                add_label(m, {"gut": True, "t0": t0, "graduiert": True}, "extern", force=True)
+                bump("extern_im_tape")
             else:
-                lab = label_from_rows(rows_from_ticks(mint, ticks), entry_age_s, horizon_s, size_sol, costs)
-                if lab.get("handelbar"):
-                    add_label(mint, lab, "mints")
-                else:
-                    bump("mints_ohne_label")
+                need_rpc.append(m)
+        room = max(0, max_mints - used_rpc)
+        todo_ext = need_rpc[:room]
+        if len(need_rpc) > room:
+            notes.append(f"{len(need_rpc) - room} Graduierungen wegen --max-mints {max_mints} nicht geladen")
+        if todo_ext and rpc is None:
+            notes.append(f"{len(todo_ext)} Graduierungen nicht geladen: kein RPC (--rpc)")
+            todo_ext = []
+        load_mints([(m, True) for m in todo_ext], "extern")
 
     good = {m: vectors[m] for m, lab in labels.items() if lab["gut"] and m in vectors}
     bad = {m: vectors[m] for m, lab in labels.items() if not lab["gut"] and m in vectors}
