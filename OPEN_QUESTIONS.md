@@ -466,3 +466,11 @@ steht hier mit Datum und im Outcome-Register des Experten mit Prüftermin.
 - Default, wenn keine Antwort: so belassen.
 - Blockiert: keinen Freeze.
 - Status: `entschieden (Experte)` am 2026-10-03; (b)–(e) offen als Prüfpunkte.
+- Nachtrag 2026-10-04: Der Nutzer präzisiert den Wunsch zu einem **fairen** Launch (kleiner Teilverkauf, Coin soll
+  weiterlaufen, Halter sollen gute Chancen haben, Einsatz von X/Telegram). Der Experte liefert dafür Wissen statt
+  Entscheidung: `docs/fair_launch.md` (Graduation-Mechanik, Fairness-Regeln entlang der Sniper-Warnungen,
+  Verkaufsplan ≤ 25 % nach Graduation in Tranchen, Holder-Rewards als Fairness-Signal, Recht/Steuern NICHT
+  VERIFIZIERT) und `launch rechner` (E-010): Dev-Kauf 1 SOL ≈ 3,4 % Supply, Position bei Graduation ≈ 14,1 SOL,
+  Verkauf eines Viertels ≈ 3,4 SOL netto bei ≈ 6 % Kursimpact, Creator-Fee bis Graduation ≈ 0,5 SOL (Annahme
+  Volumen 2 × Zufluss). Die Entscheidung über Kapital, Enhanced Token Info (299 USD) und den Rechtsrahmen bleibt
+  beim Nutzer (Eskalation 1, 3, 7); Default unverändert: kein Launch ohne Berater und ohne Budget-Obergrenze.

@@ -129,6 +129,7 @@ geöffnet und die Entscheidung mit Datum revidiert.
 | E-007 | 2026-10-03 | EXP002-Draft-Parameter (OQ-009 bis OQ-017) gelten als Entscheidung für v0.1.1; Fixierung beim Freeze bleibt Nutzer | Draft ist freeze-fähig ohne weitere Rückfragen | beim Freeze | – | – |
 | E-008 | 2026-10-03 | Creator-Fee je beobachtetem Coin im `tape report` (Untergrenze aus den protokollierten Gebührenfeldern) als Datengrundlage für OQ-029 | vor jeder Launch-Entscheidung liegt die Verteilung vor, was Launches in ihren ersten Minuten an Gebühr abwerfen | erster `tape report` mit ≥ 100 Coins | – | – |
 | E-009 | 2026-10-03 | DexScreener-Bezahlsignale record-only messen (`dex beobachten`/`dex report`), keine Boosts kaufen (OQ-030) | Follower-Rendite nach Boost/„Dex paid" liegt mit Intervall vor; Erwartung aus der Evidenz: ≤ 0 | ≥ 200 Ereignisse aus ≥ 30 Stunden | – | – |
+| E-010 | 2026-10-04 | Launch-Rechner (`launch rechner`) und Fair-Launch-Anleitung (`docs/fair_launch.md`) als Wissensgrundlage für OQ-029; die Kapitalentscheidung bleibt Eskalation | der Nutzer entscheidet mit Zahlen (Dev-Anteil, Fremdzufluss, Teilverkauf, Impact) statt mit Gefühl | bei einer Launch-Entscheidung des Nutzers | – | – |
 
 ---
 

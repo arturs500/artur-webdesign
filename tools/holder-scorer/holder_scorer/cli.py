@@ -400,6 +400,21 @@ def cmd_dex(args: argparse.Namespace) -> int:
     return 2
 
 
+def cmd_launch(args: argparse.Namespace) -> int:
+    from .launchplan import DEFAULT_DEV_BUYS, DEFAULT_SALE_SHARES, format_table, table
+
+    def floats(text: str | None, default: tuple[float, ...]) -> tuple[float, ...]:
+        return default if not text else tuple(float(x) for x in text.split(",") if x.strip())
+
+    rows = table(floats(args.dev_kauf, DEFAULT_DEV_BUYS), floats(args.verkauf, DEFAULT_SALE_SHARES), volume_multiple=args.volumen_faktor, holder_rewards=args.holder_rewards)
+    print(format_table(rows))
+    if args.json:
+        with open(args.json, "w", encoding="utf-8") as fh:
+            json.dump(rows, fh, ensure_ascii=False, indent=1)
+        print(f"JSON nach {args.json} geschrieben")
+    return 0
+
+
 def cmd_selftest(args: argparse.Namespace) -> int:
     rpc = make_rpc(args.rpc, args.rps)
     try:
@@ -587,6 +602,16 @@ def build_parser() -> argparse.ArgumentParser:
     dr.add_argument("--gebuehr-bps", type=int, default=50, help="Gebühr je Seite in Basispunkten (Standard 50, Annahme)")
     dr.add_argument("--json", metavar="DATEI", help="Ergebnis zusätzlich als JSON")
     dr.set_defaults(func=cmd_dex)
+
+    la = sub.add_parser("launch", help="Launch-Rechner: Dev-Anteil, nötiger Fremdzufluss, Wert bei Graduation, Teilverkauf und Kursimpact (Kurvenmathematik, kein Kauf)")
+    las = la.add_subparsers(dest="launch_cmd", required=True)
+    lr = las.add_parser("rechner", help="Szenarien für Dev-Kauf × Verkaufsanteil ausgeben")
+    lr.add_argument("--dev-kauf", help="Dev-Kauf in SOL, kommagetrennt (Standard 0,0.25,0.5,1,2,3,5)")
+    lr.add_argument("--verkauf", help="Anteil der Dev-Token, der bei Graduation verkauft wird, kommagetrennt (Standard 0.25,0.5)")
+    lr.add_argument("--volumen-faktor", type=float, default=2.0, help="Annahme: Kurvenvolumen bis Graduation = Faktor × Netto-Zufluss (Standard 2)")
+    lr.add_argument("--holder-rewards", action="store_true", help="Coin mit Holder-Rewards: Creator-Fee geht an die Halter, nicht an den Dev")
+    lr.add_argument("--json", metavar="DATEI", help="Szenarien zusätzlich als JSON")
+    lr.set_defaults(func=cmd_launch)
 
     t = sub.add_parser("selftest", help="Datensammlung an einem echten Token prüfen")
     t.add_argument("mint")

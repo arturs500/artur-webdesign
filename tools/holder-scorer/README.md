@@ -91,6 +91,11 @@ python -m holder_scorer dex beobachten --out dex.jsonl
 python -m holder_scorer dex report dex.jsonl --records live.jsonl
 ```
 
+**Launch-Rechner (OQ-029, `docs/fair_launch.md`):** `python -m holder_scorer launch rechner` zeigt aus der
+geprüften Kurvenmathematik, welchen Supply-Anteil ein Dev-Kauf ergibt, wie viel Fremdzufluss bis zur Graduation
+fehlt, was die Dev-Position dann wert ist, was ein Teilverkauf netto bringt und wie stark er den Kurs drückt,
+plus die Creator-Fee bis dahin und die Sniper-Warnungen, die der Plan auslösen würde. Kein Kauf, keine Empfehlung.
+
 ```bash
 python -m holder_scorer live --stufe 1 --tiers go,widerruf,rug --notify go,widerruf,rug --telegram \
   --record live.jsonl --tape live_tape.jsonl --tape-sample 0.1 --budget 1000 --paper papier.jsonl --paper-latency 30 \
