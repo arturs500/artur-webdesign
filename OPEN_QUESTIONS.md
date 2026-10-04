@@ -502,3 +502,23 @@ steht hier mit Datum und im Outcome-Register des Experten mit Prüftermin.
 - Default: so belassen bis zum ersten `tape report` mit ≥ 100 GO und ≥ 100 GESPERRT; dann Schwellen nur mit Zeitsplit anpassen.
 - Blockiert: keinen Freeze.
 - Status: `entschieden (Nutzer)` am 2026-10-04; Prüfpunkte (a)–(d) offen.
+
+## OQ-032 – Sniper 0.3.5 „Abstimmung": alle Teile auf dieselben Prinzipien ausgerichtet
+
+- Datum: 2026-10-04
+- Kontext: Nutzerauftrag „alles genau so abstimmen, wie es sein sollte"; Plan und Gegenprüfung (Plan-Agent) am
+  2026-10-04; `docs/sniper_review.md` Abschnitt 4, `docs/experte.md` E-012.
+- Entschieden (Kohärenz, keine Kalibrierung): (1) Dev-Faktor des Scores monoton: bis `dev_small_buy` (3 %) volle
+  Punkte, zur Mitte 40 %, ab `dev_big_hold` (10 %) null; vorher 90 % der Punkte für 6,7–27 %, die das Gate sperrt.
+  (2) WIDERRUF auch nach GO, wenn ein schnelles Fairness-Prinzip neu verletzt wird (Dev verkauft unter der
+  DEV-RAUS-Schwelle, Bundle sichtbar); einmal je Token, RUG unverändert. (3) Kopie-Prüfung gerichtet nach
+  Registrierungsreihenfolge: das Original einer Welle wird nicht rückwirkend zur Kopie (vorher falscher WIDERRUF nach
+  GO möglich). (4) Zähler `go_wartet` (GO nur durch ladende Historie/Metadaten zurückgehalten) und Statuszeile mit
+  WIDERRUF/GESPERRT/wartenden GO. (5) Papier-Strategien respektieren die schnellen Fairness-Prüfungen
+  (`--paper-ohne-fair` zum Vergleich). (6) `tape report` Gate-Prüfung GO gegen GESPERRT (Block-Bootstrap der
+  Differenz, Lesart „Sperre richtig/unnötig/offen"). (7) Startbefehle mit `gesperrt` in `--tiers`.
+- Prüfpunkte: (a) Knickpunkte 3/6,5/10 % sind Richtung ohne Daten; (b) Papier-Statistik ab 0.3.5 nicht mit älteren
+  Aufzeichnungen vergleichbar (Regel-Hash trennt); (c) ein Token mit WIDERRUF nach BLICK und späterem GO bekommt
+  keinen zweiten WIDERRUF (einmal je Token); (d) Gate-Prüfung braucht ≥ 2 Alarmstunden je Gruppe für ein Intervall.
+- Blockiert: keinen Freeze.
+- Status: `entschieden (Experte)` am 2026-10-04 auf Nutzerauftrag; Prüfpunkte offen.

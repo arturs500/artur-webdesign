@@ -63,17 +63,27 @@ class NameRegistry:
     def __init__(self, window_s: float = 3600.0, max_items: int = 20000):
         self.window_s = window_s
         self.max_items = max_items
-        self._items: deque[tuple[float, str, str, str]] = deque()  # (time, mint, norm name, norm symbol)
+        self._items: deque[tuple[float, str, str, str, int]] = deque()  # (time, mint, norm name, norm symbol, order)
+        self._order: dict[str, int] = {}  # mint -> registration order: a copy is only what was registered *before* this mint
+        self._seq = 0
 
     def _prune(self, now: float) -> None:
         while self._items and (now - self._items[0][0] > self.window_s or len(self._items) > self.max_items):
-            self._items.popleft()
+            _, mint, _, _, _ = self._items.popleft()
+            self._order.pop(mint, None)
 
     def is_copycat(self, mint: str, name: str | None, symbol: str | None, now: float) -> bool:
+        """True when an *earlier registered* launch of the last hour carried the same name or symbol.
+
+        Directional since 0.3.5: the original of a wave does not become a copy because imitators followed it
+        (that produced a false WIDERRUF after GO). Registration order decides, so two launches in the same second
+        are still ordered. An unregistered mint is compared against everything seen.
+        """
         self._prune(now)
         n, s = normalize(name), normalize(symbol)
-        for _, other, on, os_ in self._items:
-            if other == mint:
+        own = self._order.get(mint, self._seq + 1)
+        for _t, other, on, os_, order in self._items:
+            if other == mint or order >= own:
                 continue
             if n and len(n) >= 3 and on == n:
                 return True
@@ -83,7 +93,9 @@ class NameRegistry:
 
     def register(self, mint: str, name: str | None, symbol: str | None, now: float) -> None:
         self._prune(now)
-        self._items.append((now, mint, normalize(name), normalize(symbol)))
+        self._seq += 1
+        self._items.append((now, mint, normalize(name), normalize(symbol), self._seq))
+        self._order.setdefault(mint, self._seq)
 
 
 # --- Themen-Wellen: das früheste Narrativ-Signal im eigenen Datenstrom (0.3.3, OQ-028) ------------------------------

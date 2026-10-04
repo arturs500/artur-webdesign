@@ -210,6 +210,7 @@ class TokenState:
     narrativ: dict[str, Any] | None = None  # theme wave of the launch stream: term, launches, devs, rank by inflow, shared source (OQ-028)
     welle_gezaehlt: bool = False
     fair: dict[str, Any] | None = None  # last fairness check (fair.py): ok, hard_ok, fails, pending, values
+    wartet_gezaehlt: bool = False  # a GO was held back only by checks still loading (counted once)
 
     @property
     def age(self) -> float:
@@ -321,7 +322,7 @@ class LiveEngine:
         self.tokens: dict[str, TokenState] = {}
         self.stats = {
             "launches": 0, "tracked": 0, "trades": 0, "missing": 0, "dropped_missing": 0, "alerts": 0,
-            "blick": 0, "go": 0, "rug": 0, "expired": 0, "side_tasks": 0, "side_skipped_budget": 0, "in_welle": 0, "watch": 0, "gesperrt": 0,
+            "blick": 0, "go": 0, "rug": 0, "expired": 0, "side_tasks": 0, "side_skipped_budget": 0, "in_welle": 0, "watch": 0, "gesperrt": 0, "go_wartet": 0,
         }
         self._budget_window_start = 0.0
         self._budget_units_start = 0
@@ -975,6 +976,10 @@ class LiveEngine:
                     out = QuickReport(**{**report.__dict__})
                     out.word = "GESPERRT"
                     self._emit(state, "GESPERRT", out, "statt GO · " + "; ".join(reasons[:3]), now)
+                elif not reasons and fair.pending and rise_go and sim_ok and not state.wartet_gezaehlt:
+                    # nothing is wrong yet, a check is still loading: visible in the status line instead of a silent sniper
+                    state.wartet_gezaehlt = True
+                    self.stats["go_wartet"] = self.stats.get("go_wartet", 0) + 1
         bad = word in ("RUG", "TOT")
         # a soft veto after BLICK (SCHNELL, FRISCH, FUNDER, UNSICHTBAR, bundle over the limit, ...) used to stay
         # silent: the phone kept a stale BLICK while the engine had already ruled the token out. Say so once.
@@ -995,6 +1000,19 @@ class LiveEngine:
                 reasons = list(fair.fails) + reasons
             reasons = reasons or list(report.flags)
             self._emit(state, "WIDERRUF", out, "nach BLICK · " + (", ".join(reasons[:4]) if reasons else "Warnsignal"), now)
+        # the same principle after a GO: the call is withdrawn when a fast fairness check newly fails (e.g. the dev
+        # sells a part below the 20 % DEV-RAUS threshold); RUG rules stay as they are and may follow
+        if (
+            "WIDERRUF" in cfg.tiers
+            and "GO" in sent
+            and "WIDERRUF" not in sent
+            and "RUG" not in sent
+            and not bad
+            and not fair.hard_ok
+        ):
+            out = QuickReport(**{**report.__dict__})
+            out.word = "WIDERRUF"
+            self._emit(state, "WIDERRUF", out, "nach GO · " + "; ".join(fair.hard_fails[:3]), now)
         # get-out signals for tokens that got an alert
         mc_drop = (
             "GO" in sent
@@ -1309,7 +1327,8 @@ async def run_live(
                 s = engine.stats
                 print(
                     f"Status: {s['tracked']} Token im Blick, {s['launches']} Launches, {s['trades']} Trades, "
-                    f"Alarme BLICK {s['blick']} / GO {s['go']} / RUG {s['rug']}, Hintergrundabfragen {s['side_tasks']} "
+                    f"Alarme BLICK {s['blick']} / GO {s['go']} / WIDERRUF {s.get('widerruf', 0)} / RUG {s['rug']} / GESPERRT {s.get('gesperrt', 0)}, "
+                    f"GO wartet auf Historie/Metadaten {s.get('go_wartet', 0)}, GO durch Profil/Halter-Anstieg gesperrt {s.get('go_profil', 0)}, Hintergrundabfragen {s['side_tasks']} "
                     f"(wegen Budget ausgelassen {s['side_skipped_budget']}), nachgeladen {s['missing']}, "
                     f"Log-Benachrichtigungen {stream.stats['notifications']} ({stream.stats['bytes'] / 1e6:.1f} MB, "
                     f"bei Helius etwa {stream.stats['bytes'] / 1e6 * 20:.0f} Credits), RPC-Einheiten {rpc.stats['requests']}"

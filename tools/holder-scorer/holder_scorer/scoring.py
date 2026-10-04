@@ -40,6 +40,7 @@ class ScoringConfig:
     dev_dump_share: float = 0.9
     dev_dump_min_buy: float = 0.005
     dev_big_hold: float = 0.10  # dev still holds this share of the supply: dump risk, warning DEV-GROSS (no GO)
+    dev_small_buy: float = 0.03  # up to this dev share (about 1 SOL) the dev factor gives full points; 0 from dev_big_hold on (0.3.5)
     max_top10_share: float = 0.60
     max_largest_holder: float = 0.30
     max_largest_float: float = 0.60
@@ -297,18 +298,28 @@ def _distribution(f: Features, cfg: ScoringConfig) -> FactorResult:
 
 
 def _dev(f: Features, cfg: ScoringConfig) -> FactorResult:
+    """Dev-Verhalten, monoton zum Fairness-Gate (0.3.5): klein und gehalten ist gut, groß ist Überhang, verkauft kostet.
+
+    Vorher bekam ein Dev-Kauf von 6,7–27 % der Supply 90 % der Punkte ("aktiver Start"), während das Gate ab 5–10 %
+    sperrt: der Score belohnte, was der Sniper ablehnt. Knickpunkte 3 % / 7 % / dev_big_hold sind Richtung, keine
+    Kalibrierung (OQ-032).
+    """
     mx = cfg.w_dev
     if f.dev_buy_share is None or f.dev_sold_share is None:
         return FactorResult("Dev-Verhalten", mx * 0.5, mx, "unbekannt", "")
     buy, sold = f.dev_buy_share, f.dev_sold_share
     if buy == 0:
         pts, value = mx * 0.3, "Dev hat nicht gekauft"
-    elif buy <= 0.067:
-        pts, value = mx * 0.7, f"Dev-Kauf {_pct(buy)}"
-    elif buy <= 0.27:
-        pts, value = mx * 0.9, f"Dev-Kauf {_pct(buy)} (groß, meist aktiver Start, aber teurer Einstieg)"
     else:
-        pts, value = mx * 0.5, f"Dev-Kauf {_pct(buy)} (sehr großer Überhang)"
+        small, big = cfg.dev_small_buy, max(cfg.dev_big_hold, cfg.dev_small_buy + 0.02)
+        mid = (small + big) / 2
+        if buy <= small:
+            pts, value = mx, f"Dev-Kauf {_pct(buy)} (klein)"
+        elif buy >= big:
+            pts, value = 0.0, f"Dev-Kauf {_pct(buy)} (Überhang ab {_pct(big)}: null Punkte, siehe Fair-Gate)"
+        else:
+            pts = _interp(buy, [(small, mx), (mid, mx * 0.4), (big, 0.0)])
+            value = f"Dev-Kauf {_pct(buy)}" + (" (groß: Überhang, siehe Fair-Gate)" if buy >= mid else "")
     comment = ""
     if buy > 0 and sold > 0:
         pts *= max(0.0, 1.0 - 2.0 * sold)

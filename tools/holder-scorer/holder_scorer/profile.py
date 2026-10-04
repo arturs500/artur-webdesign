@@ -496,35 +496,10 @@ def _mean(xs: list[float]) -> float | None:
 
 
 def _diff_bootstrap(rows: list[tuple[float, bool, int]], n_boot: int = 1000, seed: int = 20261002) -> dict[str, float] | None:
-    """Differenz der mittleren Rendite (bestanden − nicht bestanden) mit Block-Bootstrap nach Stunde."""
-    blocks: dict[int, list[tuple[float, bool]]] = {}
-    for r, passed, block in rows:
-        blocks.setdefault(block, []).append((r, passed))
-    keys = sorted(blocks)
-    if len(keys) < 2:
-        return None
+    """Differenz der mittleren Rendite (bestanden − nicht bestanden); Rechenweg in replay.diff_bootstrap."""
+    from .replay import diff_bootstrap
 
-    def diff(sample: list[tuple[float, bool]]) -> float | None:
-        a = [r for r, p in sample if p]
-        b = [r for r, p in sample if not p]
-        if not a or not b:
-            return None
-        return sum(a) / len(a) - sum(b) / len(b)
-
-    rng = random.Random(seed)
-    diffs: list[float] = []
-    for _ in range(n_boot):
-        sample: list[tuple[float, bool]] = []
-        for _k in keys:
-            sample.extend(blocks[rng.choice(keys)])
-        d = diff(sample)
-        if d is not None:
-            diffs.append(d)
-    if len(diffs) < 50:
-        return None
-    diffs.sort()
-    point = diff([x for k in keys for x in blocks[k]])
-    return {"diff": point if point is not None else float("nan"), "lo": diffs[int(0.025 * (len(diffs) - 1))], "hi": diffs[int(0.975 * (len(diffs) - 1))], "blocks": len(keys)}
+    return diff_bootstrap(rows, n_boot=n_boot, seed=seed)
 
 
 def holdout_check(

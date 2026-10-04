@@ -218,8 +218,10 @@ class PaperTrader:
         horizon_s: float = 900.0,
         sample_s: float = 5.0,
         entry_window_s: float = 30.0,
+        fair_filter: bool = True,
     ):
         self.strategies = strategies if strategies is not None else list(STRATEGIES)
+        self.fair_filter = fair_filter  # paper entries follow the sniper's fairness gate (fast checks), see OQ-032
         self.size_lamports = int(size_sol * LAMPORTS_PER_SOL)
         self.latency_s = latency_s
         self.fee_bps = fee_bps
@@ -299,6 +301,10 @@ class PaperTrader:
             return False, "Urteil " + info["wort"]
         if not state.curve.quote_is_sol:
             return False, "keine SOL-Kurve"  # curve math and prices below assume lamports as quote units
+        fair = getattr(state, "fair", None)
+        if self.fair_filter and isinstance(fair, dict) and fair.get("hard_ok") is False:
+            fails = fair.get("fails") or ["Prinzip verletzt"]
+            return False, "unfair: " + str(fails[0])
         if s.dev_must_hold and (info["dev_verkauft"] or 0.0) > 0:
             return False, "Dev hat verkauft"
         if s.max_bundle is not None and (info["bundle"] or 0.0) > s.max_bundle:

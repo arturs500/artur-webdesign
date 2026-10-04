@@ -211,6 +211,8 @@ werden (teuer: tausende `getTransaction` je Token, mit Helius-Kontingent für 20
 | **0.3.3** `tape report`: Latenz Empfang − Blockzeit (Median, p90) der live gesehenen Trades | Umbau-Plan Punkt 13 messbar: über 2 s ist jeder Follower-Call strukturell spät | `test_latency_stats_…` |
 | **0.3.3** `tape report`: Creator-Fee je beobachtetem Coin (Untergrenze) | Datengrundlage für die Frage „eigener Launch" (OQ-029, E-008) | `test_creator_fee_stats_…` |
 | **0.3.4** Fairness-Gate (`fair.py`): Prinzipien aus `docs/fair_launch.md` als Bedingung – Dev-Anteil, Dev-Verkauf, Bundle-Anteil und -Wallets, Kopie, unsichtbarer Float, Bots für BLICK/GO; Creator-Historie und Metadaten für GO; Unbekannt zählt nicht als sauber; ⛔ GESPERRT statt GO als Aufzeichnung, WIDERRUF mit Prinzip; Zeile `Fair`, Feld `fair` | der Sniper setzt durch, was er bisher nur beschrieb; Verschärfung bleibt messbar über GO gegen GESPERRT (OQ-031, E-011) | `tests/test_fair.py` |
+| **0.3.5** Abstimmung: Dev-Faktor monoton (`scoring._dev`, Knickpunkte `dev_small_buy`/`dev_big_hold`); WIDERRUF auch nach GO bei neu verletztem schnellen Prinzip; Zähler `go_wartet` und erweiterte Statuszeile; gerichtete Kopie-Prüfung (das Original einer Welle wird nicht rückwirkend zur Kopie) | Score, Gates und Meldungen widersprechen sich nicht mehr; ein stiller Sniper ist erklärbar | `tests/test_tuning.py` |
+| **0.3.5** Papier-Handel folgt dem Fairness-Gate (`PaperTrader(fair_filter=True)`, `--paper-ohne-fair`); `tape report` Gate-Prüfung GO gegen GESPERRT (`replay.gate_check`, `diff_bootstrap`); Startbefehle mit `gesperrt` in `--tiers` | Papier-Statistik misst die Coins, die der Sniper ruft; die Verschärfung ist auswertbar | `test_paper_filter_…`, `test_gate_check_…`, `test_readme_start_commands_…` |
 | **0.3.3** `dex beobachten` / `dex report` (Modul `dexpaid.py`): DexScreener-Boosts und Enhanced Token Info als zeitgestempelte Ereignisse mit Preis-Schnappschüssen, Follower-Rendite mit Wilson/Bootstrap, Verknüpfung mit eigenen Records | Bezahlsignale werden gemessen statt gekauft (OQ-030, E-009); keine Keys, 60/300 Anfragen je Minute | `tests/test_dexpaid.py` |
 | Alarm-Records mit Version, Regel-Hash, Slot, Kurvenstand, Creator, Datenqualität (`calibrate.alert_record_extra`, `rules_hash`) | Calls sind nachrechenbar und Regelstände trennbar | `test_alert_record_extra_carries_slot_curve_and_rule_version` |
 | `--tape DATEI`: jeder gesehene Trade eines Tokens mit Alarm, rückwirkend ab dem ersten Alarm | Offline-Replay jeder Latenz und Regel ohne `getTransaction` | `test_tape_backfills_at_first_alert_and_streams_afterwards` |
@@ -353,7 +355,7 @@ entscheidet.
     Bump-Bots kaufen klein), Socials als Punkte (drei Strings), FAKE-MC/DÜNN für die Kurvenphase, Narrativ-Score als
     Einstiegsfilter, TOT-Finalisierung nach 25 s Stille (nur Flag).
 12. **Umdrehen:** Dev-Kauf von 6,7–27 % gibt heute 90 % der Dev-Punkte ("aktiver Start"), blockt aber gleichzeitig
-    GO über DEV-GROSS – widersprüchlich; Dev-Bestand ist Überhang, also negativ. "RUG" nur bei nachweisbarem
+    GO über DEV-GROSS – widersprüchlich; Dev-Bestand ist Überhang, also negativ. **Erledigt in 0.3.5:** Dev-Faktor monoton (bis 3 % volle Punkte, ab 7 % fallend, ab 10 % null), passend zum Fairness-Gate. "RUG" nur bei nachweisbarem
     Insider-Abfluss (Dev/Bundle/Kohorte verkauft ≥ X % und Netto-Abfluss), sonst `WARN <Grund>`.
 13. **Neu messen** (kausal näher am künftigen Zufluss/Abfluss): Insider-Überhang = (Dev + Fenster-Wallets +
     Erstkohorte gehaltene Token) / Float; Anteil des Umlaufs in Wallets mit Einstand < 0,7 × aktueller Kurs
@@ -387,7 +389,7 @@ späteren Auswertung, keine Handlungsaufforderung.
    `python -c "from holder_scorer.notify import send_telegram; print(send_telegram('holder-scorer Test'))"` → `True`.
 4. **Start für frühe Calls mit wenig Lärm, Free-Tarif-verträglich, mit Kontrollgruppe:**
    ```bash
-   python -m holder_scorer live --stufe 1 --tiers go,widerruf,rug --notify go,widerruf,rug --telegram \
+   python -m holder_scorer live --stufe 1 --tiers go,widerruf,rug,gesperrt --notify go,widerruf,rug --telegram \
      --record live.jsonl --tape live_tape.jsonl --tape-sample 0.1 --budget 1000 --paper papier.jsonl --paper-latency 30
    ```
    Stufe 1 ≈ 20 GO je Stunde (Rechenmodell, kein Live-Test; mit dem Halter-Anstiegs-Gate aus 0.3.2 weniger);

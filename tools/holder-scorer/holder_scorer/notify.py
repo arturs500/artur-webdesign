@@ -20,7 +20,7 @@ if TYPE_CHECKING:  # pragma: no cover
 WORDS = {
     "BLICK": ("👀", "Frühalarm im Live-Modus: erste echte Käufer, kein Warnsignal, noch kein volles Urteil"),
     "GO": ("🟢", "kaufbar: kein Warnsignal, genug echte Käufer, gerade Zulauf"),
-    "WIDERRUF": ("↩️", "Warnsignal nach BLICK: der Frühalarm gilt nicht mehr, kein GO zu erwarten"),
+    "WIDERRUF": ("↩️", "der Call gilt nicht mehr: nach BLICK ein Warnsignal (kein GO zu erwarten), nach GO ein verletztes Fairness-Prinzip (z. B. Dev verkauft)"),
     "WATCH": ("👁️", "Launch mit einem Begriff von der Beobachtungsliste (--beobachte), noch kein Urteil"),
     "GESPERRT": ("⛔", "der Score sagt GO, aber ein Fairness-Prinzip ist verletzt (Dev-Anteil, Dev-Verkauf, Bundle, Kopie, Historie, Bots, Metadaten) oder das Profil passt nicht; nur Aufzeichnung"),
     "WARTE": ("🟡", "unklar oder Mindestmengen fehlen: nochmal prüfen, nicht kaufen"),

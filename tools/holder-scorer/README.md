@@ -24,7 +24,7 @@ Kontrollgruppe (`--tape-sample 0.1`: jeder zehnte beobachtete Token wird ab dem 
 mitgeschrieben, auch ohne Alarm):
 
 ```bash
-python -m holder_scorer live --stufe 1 --tiers go,widerruf,rug --notify go,widerruf,rug --telegram \
+python -m holder_scorer live --stufe 1 --tiers go,widerruf,rug,gesperrt --notify go,widerruf,rug --telegram \
   --record live.jsonl --tape live_tape.jsonl --tape-sample 0.1 --budget 1000 --paper papier.jsonl --paper-latency 30
 ```
 
@@ -53,7 +53,7 @@ Einstieg (kein Look-ahead). `--split 0.5` prüft auf der zeitlich späteren Häl
 ```bash
 python -m holder_scorer profil bauen --tape live_tape.jsonl --records live.jsonl --papier papier.jsonl --out profil.json
 python -m holder_scorer profil zeigen profil.json
-python -m holder_scorer live --stufe 1 --tiers go,widerruf,rug --notify go,widerruf,rug --telegram \
+python -m holder_scorer live --stufe 1 --tiers go,widerruf,rug,gesperrt --notify go,widerruf,rug --telegram \
   --record live.jsonl --tape live_tape.jsonl --tape-sample 0.1 --budget 1000 --paper papier.jsonl --paper-latency 30 \
   --profil profil.json
 ```
@@ -102,13 +102,22 @@ mit dem Grund. Jede Nachricht trägt die Zeile `Fair`. `--no-fair` schaltet das 
 `--fair-socials` und `--fair-ohne-historie` stellen es ein. Ob die Sperren richtig waren, zeigt
 `tape report --tiers GESPERRT` gegen `--tiers GO`.
 
+**Abstimmung (0.3.5, OQ-032):** Alle Teile verfolgen jetzt dieselben Prinzipien. Der Dev-Faktor des Scores ist
+monoton: ein kleiner, gehaltener Dev-Anteil bis 3 Prozent gibt volle Punkte, ab 7 Prozent fällt er, ab 10 Prozent
+ist er null, statt wie bisher 6,7 bis 27 Prozent als „aktiven Start" zu belohnen, den das Gate sperrt. ↩️ WIDERRUF
+kommt auch nach einem GO, wenn ein schnelles Fairness-Prinzip neu verletzt wird, etwa ein Dev-Verkauf unter der
+DEV-RAUS-Schwelle. Die Papier-Strategien kaufen nur noch Coins, die das Gate nicht sperrt (`--paper-ohne-fair` zum
+Vergleich). `tape report` enthält die Gate-Prüfung: Rendite der GO-Coins gegen die der GESPERRT-Coins mit
+Block-Bootstrap, Lesart „Sperre richtig", „Sperre unnötig" oder „offen". Dafür muss `gesperrt` in `--tiers` stehen,
+wie in den Startbefehlen oben. Die Statuszeile zeigt WIDERRUF, GESPERRT, wartende und durch Profil gesperrte GO.
+
 **Launch-Rechner (OQ-029, `docs/fair_launch.md`):** `python -m holder_scorer launch rechner` zeigt aus der
 geprüften Kurvenmathematik, welchen Supply-Anteil ein Dev-Kauf ergibt, wie viel Fremdzufluss bis zur Graduation
 fehlt, was die Dev-Position dann wert ist, was ein Teilverkauf netto bringt und wie stark er den Kurs drückt,
 plus die Creator-Fee bis dahin und die Sniper-Warnungen, die der Plan auslösen würde. Kein Kauf, keine Empfehlung.
 
 ```bash
-python -m holder_scorer live --stufe 1 --tiers go,widerruf,rug --notify go,widerruf,rug --telegram \
+python -m holder_scorer live --stufe 1 --tiers go,widerruf,rug,gesperrt --notify go,widerruf,rug --telegram \
   --record live.jsonl --tape live_tape.jsonl --tape-sample 0.1 --budget 1000 --paper papier.jsonl --paper-latency 30 \
   --beobachte TIFFANY
 ```
@@ -243,14 +252,14 @@ hört zwei Ströme gleichzeitig:
   Transaktion einmal nachgeladen.
 
 Jeder Token wird nach jedem Trade neu bewertet (höchstens einmal pro Sekunde)
-und erzeugt höchstens drei Alarme:
+und erzeugt jeden Alarm höchstens einmal je Token:
 
 | Alarm | Wann | Was du damit machst |
 |---|---|---|
 | 👀 BLICK | erste echte Käufer (nicht Dev, nicht Erstellungs-Block, keine Bots), kein Warnsignal, noch kein volles Urteil; nur in den ersten 60 s | Chart öffnen, selbst entscheiden |
 | 🟢 GO | das volle Urteil: Score, Mindestmengen, Zufluss gerade positiv, **keine offene Warnung** (kein Bundle über der Stufengrenze, kein DEV-GROSS, DEV-RAUS, BOTS, FRISCH, FUNDER, SCHNELL, SERIE, UNSICHTBAR), neue Halter in den letzten 15 s und, mit `--profil`, Ähnlichkeit zu den gespeicherten guten Coins; sonst bleibt es bei WARTE | der eigentliche Call |
 | 🔴 RUG / ⚫ TOT | ein Token mit BLICK oder GO ist gekippt: Dev-Dump, Bundle raus, Erstkäufer raus, Kurs −30 % vom 60-s-Hoch, MC −35 % seit dem GO, Stillstand | raus |
-| ↩️ WIDERRUF | nach einem BLICK kam ein weiches Warnsignal (DEV-GROSS, SCHNELL, FRISCH, FUNDER, UNSICHTBAR, Bundle über der Grenze …), das früher stumm blieb; ein GO ist nicht mehr zu erwarten | den 👀 vergessen |
+| ↩️ WIDERRUF | der Call gilt nicht mehr: nach einem BLICK kam ein weiches Warnsignal (DEV-GROSS, SCHNELL, FRISCH, FUNDER, UNSICHTBAR, Bundle über der Grenze …) und ein GO ist nicht mehr zu erwarten; nach einem GO ist ein Fairness-Prinzip verletzt (z. B. der Dev verkauft einen Teil, auch unter der DEV-RAUS-Schwelle) | den Call vergessen |
 | ⛔ GESPERRT | der Score sagt GO, aber ein Fairness-Prinzip ist endgültig verletzt (Dev-Anteil, Dev-Verkauf, Bundle-Wallets, Kopie, Historie, Bots, Metadaten) oder das Profil passt nicht; einmal je Token, im Standard nur Aufzeichnung | Lehrmaterial: `tape report --tiers GESPERRT` zeigt später, ob die Sperre richtig war |
 | 👁️ WATCH | ein Launch trägt einen Begriff der Beobachtungsliste (`--beobachte`) in Name, Symbol oder Beschreibung; sofort, noch ohne Urteil, einmal je Token | selbst hinsehen, die normalen Alarme folgen |
 
@@ -312,7 +321,7 @@ markiert seit 0.3.1 Prüfungen lange nach dem Horizont als `stale`.
 
 Die Stellschrauben, wenn dir die Mischung nicht passt:
 
-- `--tiers go,rug` oder `--notify go,rug`: nur den eigentlichen Call und den
+- `--tiers go,rug,gesperrt --notify go,rug`: nur den eigentlichen Call und den
   Ausstieg schicken, kein BLICK (halbiert die Nachrichten).
 - `--stufe 1` oder `--yes-threshold 75`: weniger, dafür bessere GO.
 - `--blick-buyers 4 --blick-inflow 0.3`: BLICK auf Stufe 2 etwas früher, ohne

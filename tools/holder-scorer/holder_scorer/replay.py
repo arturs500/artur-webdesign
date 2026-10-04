@@ -255,6 +255,83 @@ def block_bootstrap(values: list[float], blocks: list[int], n_boot: int = 2000, 
     return {"lo": lo, "hi": hi, "p": min(1.0, p), "blocks": len(keys)}
 
 
+def diff_bootstrap(rows: list[tuple[float, bool, int]], n_boot: int = 1000, seed: int = 20261004) -> dict[str, float] | None:
+    """Differenz der mittleren Rendite (Gruppe True − Gruppe False) mit Block-Bootstrap nach Stunde."""
+    blocks: dict[int, list[tuple[float, bool]]] = {}
+    for r, flag, block in rows:
+        blocks.setdefault(block, []).append((r, flag))
+    keys = sorted(blocks)
+    if len(keys) < 2:
+        return None
+
+    def diff(sample: list[tuple[float, bool]]) -> float | None:
+        a = [r for r, f in sample if f]
+        b = [r for r, f in sample if not f]
+        if not a or not b:
+            return None
+        return sum(a) / len(a) - sum(b) / len(b)
+
+    rng = random.Random(seed)
+    diffs: list[float] = []
+    for _ in range(n_boot):
+        sample: list[tuple[float, bool]] = []
+        for _k in keys:
+            sample.extend(blocks[rng.choice(keys)])
+        d = diff(sample)
+        if d is not None:
+            diffs.append(d)
+    if len(diffs) < 50:
+        return None
+    diffs.sort()
+    point = diff([x for k in keys for x in blocks[k]])
+    return {"diff": point if point is not None else float("nan"), "lo": diffs[int(0.025 * (len(diffs) - 1))], "hi": diffs[int(0.975 * (len(diffs) - 1))], "blocks": len(keys)}
+
+
+def gate_check(outcomes: list["Outcome"], latency_s: float = PRIMARY[1], horizon_s: float = PRIMARY[2]) -> dict[str, Any]:
+    """Gate-Prüfung: liefen die als GESPERRT aufgezeichneten Coins schlechter als die GO-Coins (Primärkombination)?"""
+
+    def group(items: list["Outcome"]) -> dict[str, Any]:
+        rs = [o.r_cons for o in items]
+        hits = sum(1 for r in rs if r > 0)
+        return {"n": len(rs), "mean": (sum(rs) / len(rs)) if rs else None, "treffer": (hits / len(rs)) if rs else None, "wilson": wilson(hits, len(rs)) if rs else None}
+
+    go = [o for o in outcomes if o.tier == "GO" and o.latency_s == latency_s and o.horizon_s == horizon_s]
+    sperre = [o for o in outcomes if o.tier == "GESPERRT" and o.latency_s == latency_s and o.horizon_s == horizon_s]
+    out: dict[str, Any] = {"latenz_s": latency_s, "horizont_s": horizon_s, "go": group(go), "gesperrt": group(sperre), "diff": None, "boot": None}
+    if not sperre:
+        out["lesart"] = "keine GESPERRT-Records: im Live-Betrieb --tiers go,widerruf,rug,gesperrt setzen (Aufzeichnung, keine Nachricht)"
+    elif not go:
+        out["lesart"] = "keine GO-Records in der Primärkombination"
+    else:
+        out["diff"] = out["go"]["mean"] - out["gesperrt"]["mean"]
+        boot = diff_bootstrap([(o.r_cons, True, o.block) for o in go] + [(o.r_cons, False, o.block) for o in sperre])
+        out["boot"] = boot
+        if boot is None:
+            out["lesart"] = "offen (zu wenige Stunden für ein Intervall)"
+        elif boot["lo"] > 0:
+            out["lesart"] = "Sperre richtig: GO-Coins rentieren besser als gesperrte"
+        elif boot["hi"] < 0:
+            out["lesart"] = "Sperre unnötig: gesperrte Coins rentieren besser – Schwellen prüfen (OQ-031)"
+        else:
+            out["lesart"] = "offen (Intervall schließt 0 ein)"
+    return out
+
+
+def _gate_line(g: dict[str, Any] | None) -> str:
+    if not g:
+        return ""
+    def grp(name: str, x: dict[str, Any]) -> str:
+        if not x["n"]:
+            return f"{name} 0"
+        return f"{name} n = {x['n']}, Ø {x['mean'] * 100:+.1f} %, Treffer {x['treffer'] * 100:.0f} %"
+    text = f"Gate-Prüfung (GO gegen GESPERRT, +{g['latenz_s']:.0f} s / +{g['horizont_s']:.0f} s): {grp('GO', g['go'])}; {grp('GESPERRT', g['gesperrt'])}"
+    if g.get("diff") is not None:
+        b = g.get("boot")
+        ci = "" if not b else f" (95 %-Block-Bootstrap {b['lo'] * 100:+.1f} … {b['hi'] * 100:+.1f} %, {b['blocks']} Stunden)"
+        text += f"; Differenz {g['diff'] * 100:+.1f} %{ci}"
+    return text + f" → {g['lesart']}."
+
+
 def holm(pvalues: dict[Any, float]) -> dict[Any, float]:
     """Holm-Bonferroni: korrigierte p-Werte für eine Familie von Tests."""
     items = sorted(pvalues.items(), key=lambda kv: kv[1])
@@ -413,6 +490,7 @@ def evaluate(
         "skipped": skipped,
         "latency": latency_stats(tape),
         "creator_fees": creator_fee_stats(tape),
+        "gate_check": gate_check(outcomes),
         "summary": summary,
         "outcomes": outcomes,
     }
@@ -517,6 +595,9 @@ def format_report(report: dict[str, Any], legacy: int = 0) -> str:
         )
     if not report["summary"]:
         lines.append("(keine auswertbaren Alarme – Records mit Slot ab Version 0.3.1 und ein Tape mit --tape nötig)")
+    gate = _gate_line(report.get("gate_check"))
+    if gate:
+        lines += ["", gate]
     lines += [
         "",
         "Lesart: Ein Edge liegt erst vor, wenn in der Primärzeile sowohl das Bootstrap-Intervall des Mittelwerts als auch das der Differenz zur "

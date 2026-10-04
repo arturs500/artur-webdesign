@@ -131,6 +131,7 @@ geöffnet und die Entscheidung mit Datum revidiert.
 | E-009 | 2026-10-03 | DexScreener-Bezahlsignale record-only messen (`dex beobachten`/`dex report`), keine Boosts kaufen (OQ-030) | Follower-Rendite nach Boost/„Dex paid" liegt mit Intervall vor; Erwartung aus der Evidenz: ≤ 0 | ≥ 200 Ereignisse aus ≥ 30 Stunden | – | – |
 | E-010 | 2026-10-04 | Launch-Rechner (`launch rechner`) und Fair-Launch-Anleitung (`docs/fair_launch.md`) als Wissensgrundlage für OQ-029; die Kapitalentscheidung bleibt Eskalation | der Nutzer entscheidet mit Zahlen (Dev-Anteil, Fremdzufluss, Teilverkauf, Impact) statt mit Gefühl | bei einer Launch-Entscheidung des Nutzers | – | – |
 | E-011 | 2026-10-04 | Fairness-Gate (fair.py) auf Anweisung des Nutzers sofort aktiv; messbar über GESPERRT-Records (OQ-031) | weniger GO auf unfaire Launches; `tape report` GO vs. GESPERRT zeigt den Effekt | erster `tape report` mit ≥ 100 GO und ≥ 100 GESPERRT | – | – |
+| E-012 | 2026-10-04 | Abstimmung 0.3.5: Dev-Faktor monoton, WIDERRUF nach GO, Papier-Filter, Gate-Prüfung GO/GESPERRT, Startbefehl mit gesperrt (OQ-032) | keine Regel belohnt, was eine andere sperrt; Verschärfung ist mit `tape report` prüfbar | erster `tape report` mit ≥ 100 GO und ≥ 100 GESPERRT | – | – |
 
 ---
 
@@ -187,6 +188,13 @@ der Sniper-Warnungen umgesetzt (gleiche Merkmale, strengere Schwellen), Unbekann
 gesperrte GO wird als GESPERRT aufgezeichnet, damit R2 und R4 nicht verletzt werden: Die Wirkung des Gates ist über
 GO gegen GESPERRT im `tape report` messbar, ohne dass Schwellen auf dem Prüfdatensatz gedreht werden.
 Revisionsauslöser: Zeigen GESPERRT-Coins keine schlechtere Rendite als GO-Coins, werden die Schwellen gelockert.
+
+**E-012 Abstimmung (OQ-032).** Auftrag „alles genau so abstimmen, wie es sein sollte". Entschieden wurde nur
+Kohärenz, keine Kalibrierung (R4): Der Dev-Faktor darf nicht belohnen, was das Gate sperrt (Richtung umgedreht,
+Knickpunkte in der Konfiguration und damit im Regel-Hash); ein Prinzip gilt nach GO genauso wie davor (WIDERRUF nach
+GO); der Papier-Handel misst nur, was der Sniper ruft; die Verschärfung wird mit GO gegen GESPERRT geprüft, dafür
+gehört `gesperrt` in jeden Startbefehl. Revisionsauslöser: Gate-Prüfung „Sperre unnötig" → Schwellen des Fair-Gates
+lockern; „Sperre richtig" → beibehalten.
 
 Nicht entscheidbar (bleiben `offen`, Eskalation): OQ-001 (Datei fehlt), OQ-002 (Abgleich mit dem Prereg-Text
 braucht die Datei), OQ-008 (Veröffentlichung im Pages-Repo = Eskalationspunkt 5), OQ-020 (Kauf), OQ-021

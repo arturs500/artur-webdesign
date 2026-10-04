@@ -72,6 +72,7 @@ class FairResult:
     ok: bool  # alle Prüfungen bestanden und nichts mehr offen: Bedingung für GO
     hard_ok: bool  # schnelle Prüfungen bestanden: Bedingung für BLICK
     fails: list[str] = field(default_factory=list)
+    hard_fails: list[str] = field(default_factory=list)  # nur die schnellen Prüfungen (für WIDERRUF nach GO)
     pending: list[str] = field(default_factory=list)  # noch nicht prüfbar (lädt)
     values: dict[str, Any] = field(default_factory=dict)
 
@@ -163,7 +164,7 @@ def fair_check(
         v["metadaten"] = "ungeprüft"
 
     hard_ok = not hard
-    return FairResult(ok=hard_ok and not slow and not pending, hard_ok=hard_ok, fails=hard + slow, pending=pending, values=v)
+    return FairResult(ok=hard_ok and not slow and not pending, hard_ok=hard_ok, fails=hard + slow, hard_fails=list(hard), pending=pending, values=v)
 
 
 def fair_line(res: FairResult | None) -> str | None:

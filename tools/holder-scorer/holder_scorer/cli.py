@@ -276,6 +276,7 @@ def cmd_live(args: argparse.Namespace) -> int:
             on_message=send_async if args.telegram else None,
             message_strategies=message_strategies,
             keywords=load_keywords(args.narratives),
+            fair_filter=not getattr(args, "paper_ohne_fair", False),
         )
         print(f"Papier-Trading: {len(strategies)} Strategien, {args.paper_size} SOL je Trade, Latenz {args.paper_latency:.0f} s, Aufzeichnung in {args.paper}")
 
@@ -511,8 +512,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     lv = sub.add_parser("live", help="Live-Modus: Trades aus den Logs, Alarme BLICK/GO/RUG so früh wie möglich")
     lv.add_argument("--stufe", type=int, choices=(1, 2, 3), default=2, help="1 vorsichtig, 2 Standard, 3 aggressiv (mehr Calls, mehr Fehlalarme)")
-    lv.add_argument("--tiers", help="welche Alarme erzeugt werden, kommagetrennt (Standard blick,go,widerruf,rug)")
-    lv.add_argument("--notify", help="welche Alarme per Telegram gehen (Standard blick,go,rug)")
+    lv.add_argument("--tiers", help="welche Alarme erzeugt und aufgezeichnet werden, kommagetrennt (Standard blick,go,widerruf,rug,gesperrt)")
+    lv.add_argument("--notify", help="welche Alarme per Telegram gehen (Standard blick,go,widerruf,rug; GESPERRT nur mit Nennung)")
     lv.add_argument("--telegram", action="store_true", help="Alarme per Telegram senden")
     lv.add_argument("--record", help="Alarme samt Merkmalen, Slot, Kurvenstand und Regelversion an diese JSONL-Datei anhängen (für outcome/evaluate)")
     lv.add_argument("--tape", metavar="DATEI", help="jeden gesehenen Trade eines Tokens mit Alarm an diese JSONL-Datei anhängen (Nachrechnen ohne getTransaction)")
@@ -543,6 +544,7 @@ def build_parser() -> argparse.ArgumentParser:
     lv.add_argument("--paper-strategies", help="welche Strategien, kommagetrennt (Standard alle; Liste: paper strategien)")
     lv.add_argument("--paper-telegram", help="Papier-Käufe und -Verkäufe dieser Strategien per Telegram melden (kommagetrennt)")
     lv.add_argument("--narratives", metavar="DATEI", help="Trend-Wörter für den Narrativ-Score, eines je Zeile")
+    lv.add_argument("--paper-ohne-fair", action="store_true", help="Papier-Strategien dürfen auch Coins kaufen, die das Fairness-Gate sperrt (nur zum Vergleich)")
     _add_rpc_args(lv)
     lv.set_defaults(func=cmd_live)
 
