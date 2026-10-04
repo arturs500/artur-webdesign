@@ -90,6 +90,10 @@ Historie das ist, was Sniper prüfen. Vorab festlegen: Budget-Obergrenze (was ve
 
 ## 7. Was Edge Lab dafür bereitstellt
 
+Seit Sniper 0.3.4 setzt der Sniper die Regeln aus Abschnitt 3 selbst durch (Fairness-Gate, OQ-031): Ein Coin, der sie
+verletzt, bekommt kein GO, sondern ⛔ GESPERRT in die Aufzeichnung. Dein eigener Launch würde also genau an diesen
+Punkten gemessen.
+
 `launch rechner` (Szenarien), Themen-Register und `--beobachte` (Wellen und Begriffe live), `tape report`
 (Creator-Fee je beobachtetem Coin als Untergrenze, OQ-029), `dex report` (was Bezahlsignale bringen, OQ-030), und
 der Sniper selbst, mit dem du deinen eigenen Launch beobachten kannst: Du siehst dann, was die Bots sehen.

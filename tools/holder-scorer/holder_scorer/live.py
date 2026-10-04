@@ -48,6 +48,7 @@ from .collect import (
     derive_balances,
 )
 from .encoding import BorshError
+from .fair import FairConfig, FairResult, fair_check, fair_line
 from .features import CREATION_WINDOW_SLOTS, compute_features
 from .market import sol_usd
 from .narrative import NameRegistry, ThemeRegistry, link_anchors, normalize, theme_line
@@ -127,8 +128,9 @@ class LiveConfig:
     fetch_missing_events: bool = True
     fetch_create_tx: bool = True
     include_link: bool = True
-    tiers: tuple[str, ...] = ("BLICK", "GO", "WIDERRUF", "RUG")
+    tiers: tuple[str, ...] = ("BLICK", "GO", "WIDERRUF", "RUG", "GESPERRT")
     max_tracked: int = 400
+    fair: FairConfig = field(default_factory=FairConfig)  # fairness gate (fair.py): the principles of docs/fair_launch.md as conditions
     tape_path: str | None = None  # append every seen trade of an alerted token here (JSONL), for offline replays
     tape_sample: float = 0.0  # share of tracked tokens taped from their first seen trade regardless of alerts (control group)
     # precision gate (profile.py): new holders in the last seconds, similarity to the saved good coins
@@ -143,7 +145,10 @@ class LiveConfig:
     @classmethod
     def for_stufe(cls, stufe: int) -> tuple["LiveConfig", ScoringConfig]:
         if stufe <= 1:
-            return cls(stufe=1, blick_min_outside_buyers=8, blick_min_inflow_sol=1.0, max_bundle_share=0.05, creator_scan_min_buyers=8, blick_min_holder_rise=3, go_min_holder_rise=3), ScoringConfig()
+            return cls(
+                stufe=1, blick_min_outside_buyers=8, blick_min_inflow_sol=1.0, max_bundle_share=0.05, creator_scan_min_buyers=8,
+                blick_min_holder_rise=3, go_min_holder_rise=3, fair=FairConfig.for_stufe(1),
+            ), ScoringConfig()
         if stufe >= 3:
             scoring = ScoringConfig.early()
             scoring.min_age_s = 15.0
@@ -151,8 +156,8 @@ class LiveConfig:
             scoring.yes_min_outside_buyers = 4
             scoring.yes_min_outside_buys_120s = 3
             scoring.yes_min_net_inflow_120s_sol = 0.3
-            return cls(stufe=3, blick_min_outside_buyers=3, blick_min_inflow_sol=0.25, max_bundle_share=0.15, creator_scan_min_buyers=3), scoring
-        return cls(stufe=2), ScoringConfig.early()
+            return cls(stufe=3, blick_min_outside_buyers=3, blick_min_inflow_sol=0.25, max_bundle_share=0.15, creator_scan_min_buyers=3, fair=FairConfig.for_stufe(3)), scoring
+        return cls(stufe=2, fair=FairConfig.for_stufe(2)), ScoringConfig.early()
 
 
 @dataclass
@@ -204,6 +209,7 @@ class TokenState:
     profil_cache: dict[str, tuple[int, dict[str, Any]]] = field(default_factory=dict)  # checkpoint -> (ticks up to it, vector)
     narrativ: dict[str, Any] | None = None  # theme wave of the launch stream: term, launches, devs, rank by inflow, shared source (OQ-028)
     welle_gezaehlt: bool = False
+    fair: dict[str, Any] | None = None  # last fairness check (fair.py): ok, hard_ok, fails, pending, values
 
     @property
     def age(self) -> float:
@@ -315,7 +321,7 @@ class LiveEngine:
         self.tokens: dict[str, TokenState] = {}
         self.stats = {
             "launches": 0, "tracked": 0, "trades": 0, "missing": 0, "dropped_missing": 0, "alerts": 0,
-            "blick": 0, "go": 0, "rug": 0, "expired": 0, "side_tasks": 0, "side_skipped_budget": 0, "in_welle": 0, "watch": 0,
+            "blick": 0, "go": 0, "rug": 0, "expired": 0, "side_tasks": 0, "side_skipped_budget": 0, "in_welle": 0, "watch": 0, "gesperrt": 0,
         }
         self._budget_window_start = 0.0
         self._budget_units_start = 0
@@ -876,6 +882,31 @@ class LiveEngine:
         state.profil = out
         return out
 
+    def _fair_check(self, state: TokenState, feats, now: float) -> FairResult:
+        """The fairness principles (docs/fair_launch.md) against what the engine knows right now."""
+        cfg = self.cfg
+        if not state.create.uri:
+            meta = "fehlt"
+        elif state.metadata_ok:
+            meta = "ok"
+        elif "metadata" in state.done:
+            meta = "fehler"
+        else:
+            meta = "laedt"
+        checks_possible = self.run_side_task is not None
+        res = fair_check(
+            feats,
+            cfg.fair,
+            bundle_limit=cfg.max_bundle_share,
+            copycat=self.names.is_copycat(state.mint, state.create.name, state.create.symbol, now),
+            creator_done=state.creator_history is not None or "creator" in state.done,
+            creator_possible=checks_possible and self.rpc is not None and cfg.creator_scan_min_buyers <= 1000,
+            metadata_state=meta,
+            checks_possible=checks_possible,
+        )
+        state.fair = res.to_dict()
+        return res
+
     def _alerts(self, state: TokenState, report: QuickReport, feats, now: float) -> None:
         if state.final:
             return
@@ -897,6 +928,9 @@ class LiveEngine:
         else:
             sim_ok = prof["aehnlich"] is not None and prof["aehnlich"] >= cfg.profile_min_similarity
         gate_text = profile_suffix(prof, self.profile is not None)
+        # fairness gate: the principles of a fair launch as conditions (fast ones for BLICK, all for GO)
+        fair = self._fair_check(state, feats, now)
+        report.fair = fair_line(fair)
         if (
             "BLICK" in cfg.tiers
             and "BLICK" not in sent
@@ -907,6 +941,7 @@ class LiveEngine:
             and bundle_ok
             and not window_uncertain
             and rise_blick
+            and fair.hard_ok
             and feats.unique_outside_buyers >= cfg.blick_min_outside_buyers
             and (feats.organic_net_flow_120s_sol or 0.0) >= cfg.blick_min_inflow_sol
         ):
@@ -922,14 +957,24 @@ class LiveEngine:
             and (feats.organic_net_flow_120s_sol is None or feats.organic_net_flow_120s_sol > 0)
         )
         if "GO" in cfg.tiers and go_ok and "GO" not in sent:
-            if rise_go and sim_ok:
+            if rise_go and sim_ok and fair.ok:
                 state.go_mc_sol = feats.mc_sol
                 suffix = " · ".join(x for x in (("nach BLICK" if "BLICK" in sent else None), gate_text) if x) or None
                 self._emit(state, "GO", report, suffix, now)
-            elif not state.profil_blockiert:
-                # the scorer said GO, the gate did not: counted once per token, visible in the status line
-                state.profil_blockiert = True
-                self.stats["go_profil"] = self.stats.get("go_profil", 0) + 1
+            else:
+                if not (rise_go and sim_ok) and not state.profil_blockiert:
+                    # the scorer said GO, the precision gate did not: counted once per token, visible in the status line
+                    state.profil_blockiert = True
+                    self.stats["go_profil"] = self.stats.get("go_profil", 0) + 1
+                # a definitive breach (not a check still loading, not a momentary holder dip) is recorded once as GESPERRT,
+                # so `tape report --tiers GESPERRT` can later show whether the gate kept bad coins out
+                reasons = list(fair.fails)
+                if self.profile is not None and not sim_ok and prof["aehnlich"] is not None:
+                    reasons.append(f"Profil {prof['aehnlich'] * 100:.0f} % unter {cfg.profile_min_similarity * 100:.0f} %")
+                if reasons and "GESPERRT" in cfg.tiers and "GESPERRT" not in sent:
+                    out = QuickReport(**{**report.__dict__})
+                    out.word = "GESPERRT"
+                    self._emit(state, "GESPERRT", out, "statt GO · " + "; ".join(reasons[:3]), now)
         bad = word in ("RUG", "TOT")
         # a soft veto after BLICK (SCHNELL, FRISCH, FUNDER, UNSICHTBAR, bundle over the limit, ...) used to stay
         # silent: the phone kept a stale BLICK while the engine had already ruled the token out. Say so once.
@@ -941,11 +986,14 @@ class LiveEngine:
             and "RUG" not in sent
             and "WIDERRUF" not in sent
             and not bad
-            and (veto or not bundle_ok or blockers)
+            and (veto or not bundle_ok or blockers or not fair.hard_ok)
         ):
             out = QuickReport(**{**report.__dict__})
             out.word = "WIDERRUF"
-            reasons = [f for f in report.flags if f.split(" ")[0] in BLICK_VETO_FLAGS or f in blockers] or list(report.flags)
+            reasons = [f for f in report.flags if f.split(" ")[0] in BLICK_VETO_FLAGS or f in blockers]
+            if not fair.hard_ok:
+                reasons = list(fair.fails) + reasons
+            reasons = reasons or list(report.flags)
             self._emit(state, "WIDERRUF", out, "nach BLICK · " + (", ".join(reasons[:4]) if reasons else "Warnsignal"), now)
         # get-out signals for tokens that got an alert
         mc_drop = (

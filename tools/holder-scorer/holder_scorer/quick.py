@@ -110,6 +110,7 @@ class QuickReport:
     market: MarketData | None = None
     elapsed_s: float = 0.0
     theme: str | None = None  # Narrativ-Welle aus dem Launch-Strom (live, 0.3.3): Thema, Launches, Devs, Rang, Quelle
+    fair: str | None = None  # Fairness-Gate (live, 0.3.4): ✓ mit Werten oder ✗ mit verletzten Prinzipien
 
     @property
     def buy_signal(self) -> bool:

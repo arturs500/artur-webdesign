@@ -179,8 +179,16 @@ def cmd_live(args: argparse.Namespace) -> int:
         config.blick_min_inflow_sol = args.blick_inflow
     if args.budget is not None:
         config.rpc_units_per_hour = args.budget
-    tiers = tuple(t.strip().upper() for t in (args.tiers or "blick,go,widerruf,rug").split(",") if t.strip())
+    tiers = tuple(t.strip().upper() for t in (args.tiers or "blick,go,widerruf,rug,gesperrt").split(",") if t.strip())
     notify_words = {w.strip().upper() for w in (args.notify or "blick,go,widerruf,rug").split(",") if w.strip()}
+    # fairness gate (fair.py): the principles of docs/fair_launch.md as conditions for BLICK and GO
+    config.fair.enabled = not getattr(args, "no_fair", False)
+    if getattr(args, "fair_dev_max", None) is not None:
+        config.fair.max_dev_share = args.fair_dev_max
+    if getattr(args, "fair_socials", None) is not None:
+        config.fair.min_socials = args.fair_socials
+    if getattr(args, "fair_ohne_historie", False):
+        config.fair.require_creator_check = False
     watch = tuple(w.strip() for w in (getattr(args, "beobachte", None) or "").split(",") if w.strip())
     config.watch_terms = watch
     if watch:
@@ -239,6 +247,7 @@ def cmd_live(args: argparse.Namespace) -> int:
         + f" · Halter-Anstieg ≥ {config.go_min_holder_rise} in {config.holder_rise_window_s:.0f} s"
         + profile_line
         + (f" · Beobachtungsliste: {', '.join(watch)}" if watch else "")
+        + f" · Fair-Gate: {config.fair.summary()}"
     )
 
     def on_alert(alert):
@@ -524,6 +533,10 @@ def build_parser() -> argparse.ArgumentParser:
     lv.add_argument("--profil-pflicht", action="store_true", help="ohne nutzbares Profil kein GO")
     lv.add_argument("--holder-anstieg", type=int, help="neue Halter (ohne Dev) in den letzten 15 s, die BLICK und GO brauchen (Stufe 1: 3, sonst 2)")
     lv.add_argument("--beobachte", metavar="BEGRIFFE", help="Beobachtungsliste, kommagetrennt (z. B. TIFFANY): sofort 👁️ WATCH, wenn Name, Symbol oder Beschreibung eines Launches den Begriff enthält; unabhängig von --tiers/--notify")
+    lv.add_argument("--no-fair", action="store_true", help="Fairness-Gate ausschalten (Standard an: Dev-Anteil, Dev-Verkauf, Bundle-Wallets, Kopie, Historie, Bots, Metadaten als Bedingung für BLICK/GO)")
+    lv.add_argument("--fair-dev-max", type=float, help="höchster Dev-Anteil an der Supply für einen Call (Stufe 1: 0,05, 2: 0,07, 3: 0,10)")
+    lv.add_argument("--fair-socials", type=int, help="Mindestzahl Social-Links in den Metadaten für GO (Stufe 1/2: 2, 3: 1)")
+    lv.add_argument("--fair-ohne-historie", action="store_true", help="GO nicht auf die geladene Creator-Historie warten lassen")
     lv.add_argument("--paper", metavar="DATEI", help="Papier-Trading: alle Strategien handeln jeden Call ohne Geld, jede Entscheidung landet in dieser JSONL-Datei")
     lv.add_argument("--paper-size", type=float, default=0.08, help="SOL je Papier-Trade (Standard 0,08)")
     lv.add_argument("--paper-latency", type=float, default=2.0, help="Sekunden zwischen Entscheidung und Ausführung (Standard 2)")

@@ -22,6 +22,7 @@ WORDS = {
     "GO": ("🟢", "kaufbar: kein Warnsignal, genug echte Käufer, gerade Zulauf"),
     "WIDERRUF": ("↩️", "Warnsignal nach BLICK: der Frühalarm gilt nicht mehr, kein GO zu erwarten"),
     "WATCH": ("👁️", "Launch mit einem Begriff von der Beobachtungsliste (--beobachte), noch kein Urteil"),
+    "GESPERRT": ("⛔", "der Score sagt GO, aber ein Fairness-Prinzip ist verletzt (Dev-Anteil, Dev-Verkauf, Bundle, Kopie, Historie, Bots, Metadaten) oder das Profil passt nicht; nur Aufzeichnung"),
     "WARTE": ("🟡", "unklar oder Mindestmengen fehlen: nochmal prüfen, nicht kaufen"),
     "FRÜH": ("⏳", "zu jung für ein Urteil (unter dem Mindestalter)"),
     "NEIN": ("⚪", "schwach: Score zu niedrig, aber kein Rug-Muster"),
@@ -68,6 +69,7 @@ LINES = {
     "Crea": "Creator: frühere Token, graduiert, tot",
     "Soc": "Social-Links (X = Twitter, TG = Telegram, WWW = Website) und Bot-Anteil der Käufe",
     "Them": "Narrativ-Welle: Begriff, Launches im 10-Minuten-Fenster, verschiedene Devs, WELLE bei ≥ 4 Launches von ≥ 3 Devs über dem Vierfachen der Grundrate, Rang des Coins nach Außen-Zufluss, Quelle ×n = gleicher Social-Link bei n Launches (nur Information, kein Filter)",
+    "Fair": "Fairness-Gate: ✓ Dev-Anteil, Dev hält, Bundle-Anteil/Wallets im Create-Block, Creator-Historie, Social-Links+Bild; ✗ verletzte Prinzipien. BLICK braucht die schnellen Prüfungen, GO alle; sonst ⛔ GESPERRT statt GO",
 }
 
 
@@ -155,6 +157,8 @@ def format_short(r: "QuickReport", suffix: str | None = None, link: bool = False
     lines.append(f"Soc  {soc}")
     if r.theme:
         lines.append(f"Them {r.theme}")
+    if r.fair:
+        lines.append(f"Fair {r.fair}")
     lines.append("⚠️   " + (" · ".join(r.flags) if r.flags else "–"))
     if link:
         lines.append(f"pump.fun/coin/{r.mint}")

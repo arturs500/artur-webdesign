@@ -84,7 +84,7 @@ __all__ = [
     "LABEL_NO_DATA",
 ]
 
-__version__ = "0.3.3"
+__version__ = "0.3.4"
 
 _clients: dict[tuple[str, float], SolanaRpc] = {}
 _clients_lock = threading.Lock()

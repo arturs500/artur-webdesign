@@ -130,6 +130,7 @@ geöffnet und die Entscheidung mit Datum revidiert.
 | E-008 | 2026-10-03 | Creator-Fee je beobachtetem Coin im `tape report` (Untergrenze aus den protokollierten Gebührenfeldern) als Datengrundlage für OQ-029 | vor jeder Launch-Entscheidung liegt die Verteilung vor, was Launches in ihren ersten Minuten an Gebühr abwerfen | erster `tape report` mit ≥ 100 Coins | – | – |
 | E-009 | 2026-10-03 | DexScreener-Bezahlsignale record-only messen (`dex beobachten`/`dex report`), keine Boosts kaufen (OQ-030) | Follower-Rendite nach Boost/„Dex paid" liegt mit Intervall vor; Erwartung aus der Evidenz: ≤ 0 | ≥ 200 Ereignisse aus ≥ 30 Stunden | – | – |
 | E-010 | 2026-10-04 | Launch-Rechner (`launch rechner`) und Fair-Launch-Anleitung (`docs/fair_launch.md`) als Wissensgrundlage für OQ-029; die Kapitalentscheidung bleibt Eskalation | der Nutzer entscheidet mit Zahlen (Dev-Anteil, Fremdzufluss, Teilverkauf, Impact) statt mit Gefühl | bei einer Launch-Entscheidung des Nutzers | – | – |
+| E-011 | 2026-10-04 | Fairness-Gate (fair.py) auf Anweisung des Nutzers sofort aktiv; messbar über GESPERRT-Records (OQ-031) | weniger GO auf unfaire Launches; `tape report` GO vs. GESPERRT zeigt den Effekt | erster `tape report` mit ≥ 100 GO und ≥ 100 GESPERRT | – | – |
 
 ---
 
@@ -179,6 +180,13 @@ Signale messen (kostenlos, ohne Schlüssel, R2); nichts tun. Entscheidung: messe
 Preise frei abrufbar, der Aufwand liegt bei einer Anfrage je Minute. Revisionsauslöser: Bootstrap-Intervall der
 Follower-Rendite bei ≥ 200 Ereignissen; unter 0 → Signal wird als Warnhinweis in den Sniper aufgenommen (nach
 eigener Zeitsplit-Prüfung), über 0 → Prereg EXP004.
+
+**E-011 Fairness-Gate (OQ-031).** Der Nutzer hat die Verschärfung angeordnet; sie ist damit Anweisung, nicht
+Experten-Entscheidung, und gilt sofort. Was der Experte dazu entschieden hat: Die Prinzipien werden exakt in der Form
+der Sniper-Warnungen umgesetzt (gleiche Merkmale, strengere Schwellen), Unbekanntes zählt nicht als sauber, und jeder
+gesperrte GO wird als GESPERRT aufgezeichnet, damit R2 und R4 nicht verletzt werden: Die Wirkung des Gates ist über
+GO gegen GESPERRT im `tape report` messbar, ohne dass Schwellen auf dem Prüfdatensatz gedreht werden.
+Revisionsauslöser: Zeigen GESPERRT-Coins keine schlechtere Rendite als GO-Coins, werden die Schwellen gelockert.
 
 Nicht entscheidbar (bleiben `offen`, Eskalation): OQ-001 (Datei fehlt), OQ-002 (Abgleich mit dem Prereg-Text
 braucht die Datei), OQ-008 (Veröffentlichung im Pages-Repo = Eskalationspunkt 5), OQ-020 (Kauf), OQ-021

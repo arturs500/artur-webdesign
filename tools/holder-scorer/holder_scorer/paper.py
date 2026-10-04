@@ -290,6 +290,7 @@ class PaperTrader:
             "symbol": state.create.symbol or None,
             "profil": getattr(state, "profil", None),  # holder rise, similarity, checkpoint vectors: `profil bauen --papier` reads them
             "thema": getattr(state, "narrativ", None),  # theme wave of the launch stream (OQ-028), record-only
+            "fair": getattr(state, "fair", None),  # fairness gate result (OQ-031)
         }
         return info
 

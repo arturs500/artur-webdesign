@@ -91,6 +91,17 @@ python -m holder_scorer dex beobachten --out dex.jsonl
 python -m holder_scorer dex report dex.jsonl --records live.jsonl
 ```
 
+**Fairness-Gate (0.3.4, OQ-031):** Die Prinzipien eines fairen Launches aus `docs/fair_launch.md` sind
+seit 0.3.4 Bedingung für einen Call. Für BLICK und GO: Dev-Anteil aus Kauf und Bestand unter der Stufengrenze
+(5/7/10 Prozent), kein Dev-Verkauf, Bundle-Anteil und Zahl fremder Wallets im Create-Fenster begrenzt, keine
+Kopie eines Launches der letzten Stunde, kein unsichtbarer Float, keine Bots. Nur für GO zusätzlich: Creator-Historie
+geladen und sauber (nicht frisch, keine Serie toter Launches) und Metadaten mit Social-Links und Bild. Unbekannt
+zählt nicht als sauber: GO wartet auf Historie und Metadaten. Sagt der Score GO und ein Prinzip ist verletzt, geht
+einmal ⛔ GESPERRT in die Aufzeichnung (keine Handy-Nachricht im Standard), nach einem BLICK zusätzlich ↩️ WIDERRUF
+mit dem Grund. Jede Nachricht trägt die Zeile `Fair`. `--no-fair` schaltet das Gate aus, `--fair-dev-max`,
+`--fair-socials` und `--fair-ohne-historie` stellen es ein. Ob die Sperren richtig waren, zeigt
+`tape report --tiers GESPERRT` gegen `--tiers GO`.
+
 **Launch-Rechner (OQ-029, `docs/fair_launch.md`):** `python -m holder_scorer launch rechner` zeigt aus der
 geprüften Kurvenmathematik, welchen Supply-Anteil ein Dev-Kauf ergibt, wie viel Fremdzufluss bis zur Graduation
 fehlt, was die Dev-Position dann wert ist, was ein Teilverkauf netto bringt und wie stark er den Kurs drückt,
@@ -240,6 +251,7 @@ und erzeugt höchstens drei Alarme:
 | 🟢 GO | das volle Urteil: Score, Mindestmengen, Zufluss gerade positiv, **keine offene Warnung** (kein Bundle über der Stufengrenze, kein DEV-GROSS, DEV-RAUS, BOTS, FRISCH, FUNDER, SCHNELL, SERIE, UNSICHTBAR), neue Halter in den letzten 15 s und, mit `--profil`, Ähnlichkeit zu den gespeicherten guten Coins; sonst bleibt es bei WARTE | der eigentliche Call |
 | 🔴 RUG / ⚫ TOT | ein Token mit BLICK oder GO ist gekippt: Dev-Dump, Bundle raus, Erstkäufer raus, Kurs −30 % vom 60-s-Hoch, MC −35 % seit dem GO, Stillstand | raus |
 | ↩️ WIDERRUF | nach einem BLICK kam ein weiches Warnsignal (DEV-GROSS, SCHNELL, FRISCH, FUNDER, UNSICHTBAR, Bundle über der Grenze …), das früher stumm blieb; ein GO ist nicht mehr zu erwarten | den 👀 vergessen |
+| ⛔ GESPERRT | der Score sagt GO, aber ein Fairness-Prinzip ist endgültig verletzt (Dev-Anteil, Dev-Verkauf, Bundle-Wallets, Kopie, Historie, Bots, Metadaten) oder das Profil passt nicht; einmal je Token, im Standard nur Aufzeichnung | Lehrmaterial: `tape report --tiers GESPERRT` zeigt später, ob die Sperre richtig war |
 | 👁️ WATCH | ein Launch trägt einen Begriff der Beobachtungsliste (`--beobachte`) in Name, Symbol oder Beschreibung; sofort, noch ohne Urteil, einmal je Token | selbst hinsehen, die normalen Alarme folgen |
 
 Ist der Erstellungs-Slot eines Tokens nur geschätzt (der erste Trade kam später

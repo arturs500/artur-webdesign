@@ -474,3 +474,31 @@ steht hier mit Datum und im Outcome-Register des Experten mit Prüftermin.
   Verkauf eines Viertels ≈ 3,4 SOL netto bei ≈ 6 % Kursimpact, Creator-Fee bis Graduation ≈ 0,5 SOL (Annahme
   Volumen 2 × Zufluss). Die Entscheidung über Kapital, Enhanced Token Info (299 USD) und den Rechtsrahmen bleibt
   beim Nutzer (Eskalation 1, 3, 7); Default unverändert: kein Launch ohne Berater und ohne Budget-Obergrenze.
+
+## OQ-031 – Sniper: Fairness-Gate als Pflicht für BLICK/GO (Verschärfung auf Anweisung des Nutzers)
+
+- Datum: 2026-10-04
+- Kontext: Nutzeranweisung „den Sniper jetzt genau nach den Prinzipien verbessern und verschärfen"; Prinzipien aus
+  `docs/fair_launch.md` Abschnitt 3; Modul `tools/holder-scorer/holder_scorer/fair.py` (0.3.4).
+- Umsetzung: Schnelle Prüfungen gelten für BLICK und GO (Dev-Anteil aus Kauf und Bestand, kein Dev-Verkauf, Bundle-Anteil
+  und Zahl fremder Wallets im Create-Fenster, keine Kopie eines Launches der letzten Stunde, kein unsichtbarer Float,
+  keine Bots/Wash); langsame Prüfungen nur für GO (Creator-Historie: nicht frisch, keine Serie toter Launches;
+  Metadaten: Social-Links und Bild). Unbekannt zählt nicht als sauber: GO wartet auf Historie und Metadaten, solange
+  RPC bzw. Nebenabfragen vorhanden sind; fehlende Metadaten sind ein Fehlen. Sagt der Score GO und ein Prinzip ist
+  endgültig verletzt, geht einmal ⛔ GESPERRT heraus (Aufzeichnung, im Standard keine Handy-Nachricht), nach BLICK
+  zusätzlich ↩️ WIDERRUF mit dem verletzten Prinzip. Zeile `Fair` in jeder Nachricht, Feld `fair` in Record und
+  Papier-Kontext.
+- Schwellen ohne Daten gesetzt: Stufe 1 Dev ≤ 5 %, ≤ 3 Create-Wallets; Stufe 2 Dev ≤ 7 %, ≤ 5 Wallets; Stufe 3 Dev ≤ 10 %,
+  Dev-Verkauf ≤ 10 %, ≤ 8 Wallets, keine Kopie-/Historie-/Metadaten-Pflicht. Alle: Wash ≤ 20 % (Stufe 3: 30 %),
+  Bots ≤ 25 % (30 %), unsichtbarer Float < 2 %, Historie ab 3 Vor-Launches mit ≥ 50 % tot gesperrt, Socials ≥ 2 + Bild
+  (Stufe 3: ≥ 1, kein Bild nötig). `--no-fair`, `--fair-dev-max`, `--fair-socials`, `--fair-ohne-historie`.
+- Spannung zu R2 („erst messen, dann filtern"): Die Verschärfung ist Nutzeranweisung und gilt sofort. Messbar bleibt sie,
+  weil jeder gesperrte GO als GESPERRT-Record mit Grund vorliegt: `tape report --tiers GO` gegen `--tiers GESPERRT`
+  zeigt, ob die gesperrten Coins schlechter liefen als die durchgelassenen.
+- Fragen: (a) Welche Schwelle trennt Rendite (Dev-Anteil 5 % vs. 7 % vs. 10 %)? (b) Kostet die Historien-Pflicht zu viele
+  GO, wenn das RPC-Budget knapp ist (Stufe 1 mit Budget 1000)? (c) Sollen WIDERRUF-Gründe aus dem Gate auch nach GO einen
+  RUG auslösen (Dev verkauft nach GO)? (d) Kopie-Sperre vs. Wellen-Rang 1 (OQ-028): ein Kopierer mit dem meisten Zufluss
+  wäre heute gesperrt.
+- Default: so belassen bis zum ersten `tape report` mit ≥ 100 GO und ≥ 100 GESPERRT; dann Schwellen nur mit Zeitsplit anpassen.
+- Blockiert: keinen Freeze.
+- Status: `entschieden (Nutzer)` am 2026-10-04; Prüfpunkte (a)–(d) offen.
