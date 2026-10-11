@@ -165,26 +165,34 @@ sind, zeigt `tape report` mit GO gegen GESPERRT.
 **Wallet-Folge (0.3.8, OQ-035):** Es gibt Wallets, die früh in Coins einsteigen, die später viral gehen. Der Sniper
 beobachtet eine Liste solcher Wallets (`--wallets wallets.txt`, Zeile `<Adresse> [Tag] [k/n] # Notiz`; Adressen von
 Solscan oder DexScreener trägst du von Hand ein, eigene Funde liefert `wallets scout`). Je Wallet läuft ein
-Log-Abonnement auf dem vorhandenen Stream, null RPC. Kauft ein beobachtetes Wallet einen pump.fun-Coin, kommt
-🐋 FOLGE aufs Handy, mit Kontext statt Urteil: Tag und Quelle des Wallets, seine Trefferquote aus der Liste, Kaufgröße,
-Thema-Welle, Kurvenstand, Solscan-Links für Coin, Dev und Wallet. Das gilt auch für Coins, die der Sniper nie als
-Launch gesehen hat („spät gesehen"): Für sie baut er den Stand aus dem Trade selbst, ohne Alter, Dev-Historie oder
-Bundle-Anteil, und schickt deshalb nie BLICK, GO oder RUG dafür, nur FOLGE. Jeder FOLGE-Coin bleibt 30 Minuten im Blick
-und wird getapet; weitere Käufe beobachteter Wallets stehen im Record (`folge.weitere`), Verkäufe im Tape. Ein Wallet
-mit mehr als 600 Benachrichtigungen je Stunde wird stummgeschaltet (Bot oder Börse, kostet nur Bytes).
+Log-Abonnement auf dem vorhandenen Stream; weder die Wallet-Abos noch die dadurch gesehenen Coins lösen einen
+RPC-Aufruf aus (kein Nachladen, keine Nebenabfragen), sie kosten nur Benachrichtigungs-Bytes. Kauft ein beobachtetes
+Wallet einen pump.fun-Coin, kommt 🐋 FOLGE aufs Handy, auch nach einem GO oder RUG des Coins, mit Kontext statt Urteil:
+Tag und Quelle des Wallets, seine Trefferquote aus der Liste, Kaufgröße, Thema-Welle, Kurvenstand, Solscan-Links für
+Coin, Dev und Wallet. Das gilt auch für Coins, die der Sniper nie als Launch gesehen hat („spät gesehen"): Für sie baut
+er den Stand aus dem Trade selbst, ohne Alter, Dev-Historie oder Bundle-Anteil, und schickt deshalb nie BLICK, GO oder
+RUG dafür, nur FOLGE; kommt der Launch-Frame erst nach dem Kauf des Wallets (Sniper im Create-Block), holt der Coin ihn
+nach und gilt wieder als Launch. Jeder FOLGE-Coin bleibt 30 Minuten im Blick und wird getapet (Tape-Zeilen tragen
+`spaet`, damit kein Nachkäufer als Frühkäufer und kein später Coin als Kontrolle zählt); weitere Käufe beobachteter
+Wallets stehen im Record (`folge.weitere`), Verkäufe im Tape. Ein Wallet mit mehr als 600 Benachrichtigungen je Stunde
+wird stummgeschaltet (Bot oder Börse, kostet nur Bytes).
 
 - **Eigene Funde:** `wallets scout live_tape.jsonl --extern aussen.jsonl --out wallets.txt` sucht im Tape die frühen
   Käufer (ohne Dev, ohne Create-Block, in den ersten 60 s) der Coins, die graduierten oder nach 24 h noch Liquidität
-  hatten, und schreibt Wallets mit einer Wilson-Untergrenze über der Kontrollgruppe (ab 20 Kontroll-Coins, sonst über
-  der Grundrate aller getapeten Coins) im Listenformat. Wallets, die früh in jedem fünften Coin sind, gelten als Bots.
-  Die Stichprobe ist das Tape, also Alarm-Coins plus Kontroll-Anteil: Quoten sind relativ, nicht absolut, und die
-  Fundmenge überschätzt sich selbst. Die saubere Messung sind die FOLGE-Alarme danach.
+  hatten. Vergleichswert je Wallet ist die gruppengleiche Erwartung: Alarm-Coins treffen viel öfter als die
+  Kontrollgruppe, weil der Sniper sie ausgesucht hat, also zählt für jeden Coin des Wallets die Rate seiner Gruppe.
+  Kandidat ist, wessen Wilson-Untergrenze darüber liegt; die Datei bekommt das Listenformat mit `k/n` und der
+  Erwartung in der Notiz. Wallets, die früh in jedem fünften Coin sind, gelten als Bots; spät gesehene Coins liefern
+  keine Frühkäufer. Die Stichprobe ist das Tape, also Alarm-Coins plus Kontroll-Anteil: Quoten sind relativ, nicht
+  absolut, und die Fundmenge überschätzt sich selbst. Die saubere Messung sind die FOLGE-Alarme danach.
 - **Halten bis zum nächsten Tag:** Der Live-Papierhandel kann nur bepreisen, solange der Coin im Blick ist (30 min,
   Strategien `FOLGE-halten`, `FOLGE-trail`, `FOLGE-2x`, ohne Fair-Gate und ohne Urteil als Filter). Was danach
   passiert, holt `quellen nachlauf` von DexScreener (+1 h, +24 h), und `wallets report live.jsonl --extern
-  aussen.jsonl --wallets wallets.txt` zeigt je Wallet: Alarme, Graduation, Überleben nach 24 h und das Kurs-Vielfaches
-  gegen den Kurvenpreis beim Alarm (Median, Anteil über 1x, konservativ mit fehlt/unverkäuflich als 0x). So wird „manche
-  gehen am nächsten Tag hoch" eine Zahl je Wallet statt einer Erinnerung.
+  aussen.jsonl --wallets wallets.txt` zeigt je Wallet: Alarme, Graduation, Überleben nach 24 h und das Kurs-Vielfache
+  gegen den Kurvenpreis beim FOLGE (Anteil über 1x und konservativer Median über alle Alarme, mit fehlt, unverkäuflich
+  und fehlendem SOL-Preis als 0x; der Median der Überlebenden nur zur Beschreibung). Nachlauf-Zeilen, die zu einem
+  früheren Alarm desselben Coins gehören, zählen nicht; USDC-Kurven und Paare gegen USDC bleiben ohne Vielfaches. So
+  wird „manche gehen am nächsten Tag hoch" eine Zahl je Wallet statt einer Erinnerung.
 - **Was fehlt:** Twitter liest der Sniper nicht (API-Zugang ist eine Kaufentscheidung); virale Begriffe kommen über
   `--narratives` und die Thema-Welle. Ob `user` bei Käufen über Router das Wallet ist, ist NICHT VERIFIZIERT; Käufe
   über Zwischen-Wallets bleiben unsichtbar. Kein Gate, kein Kauf: FOLGE ist Aufzeichnung (R2).

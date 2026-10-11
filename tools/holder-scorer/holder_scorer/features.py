@@ -194,7 +194,7 @@ def compute_features(snap: Snapshot, now: float | None = None) -> Features:
     complete_history = snap.history_complete
 
     # age -------------------------------------------------------------------------
-    if snap.create:
+    if snap.create and snap.create.timestamp:
         launch_ts, age_source = float(snap.create.timestamp), "create"
     elif snap.launch_hint:
         launch_ts, age_source = float(snap.launch_hint), "hint"

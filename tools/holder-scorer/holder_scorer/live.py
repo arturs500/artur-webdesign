@@ -100,6 +100,7 @@ CREATE_B64_PREFIX = "G3KpTd7rY3"
 COMPLETE_B64_PREFIX = "X3JhnNQumA"
 VIRTUAL_TOKEN_OFFSET = INITIAL_VIRTUAL_TOKEN_RESERVES - INITIAL_REAL_TOKEN_RESERVES  # virtual - real tokens on a fresh curve
 CREATION_WINDOW_S = 1.5  # trades arriving this soon after the create are treated as the creation block
+FOLGE_KEEP_GRACE_S = 10.0  # a FOLGE coin outlives its hold horizon by this, so a 30-min paper exit (ZEIT) fires before ENDE
 BLICK_VETO_FLAGS = (
     "DEV-DUMP", "DEV-RAUS", "DEV-GROSS", "SERIE", "SCHNELL", "FUNDER", "FRISCH", "TOP1", "TOP10", "WASH", "BOTS",
     "SELF-PUMP", "EXIT", "DUMP", "STILL", "MAYHEM", "USDC", "UNSICHTBAR",
@@ -397,10 +398,11 @@ class LiveEngine:
         if not ok:
             return None
         mint = msg["mint"]
-        if mint in self.tokens:
+        existing = self.tokens.get(mint)
+        if existing is not None and not existing.spaet:
             return None
         self.stats["launches"] += 1
-        if len(self.tokens) >= self.cfg.max_tracked:
+        if existing is None and len(self.tokens) >= self.cfg.max_tracked:
             self.stats["dropped_full"] = self.stats.get("dropped_full", 0) + 1  # visible instead of silent
             return None
         creator = msg.get("traderPublicKey") or msg.get("creator") or ""
@@ -423,36 +425,17 @@ class LiveEngine:
             slot=0,
             block_time=int(now),
         )
+        dev_buy = self._dev_buy_from_frame(msg, mint, creator, create, now)
+        if existing is not None:
+            # the watched wallet's buy (wallet subscription) arrived before the launch frame: the coin is a launch
+            # after all, so it gets its frame, its name and the normal rules back (0.3.8)
+            return self._upgrade_late_state(existing, create, creator, dev_buy, now)
         state = TokenState(mint=mint, created_at=now, creator=creator, create=create, bonding_curve=curve_key)
         # the create transaction's own log notification (if the subscription is fast enough) is welcome:
         # it carries the real slot and the exact dev buy, so its signature is deliberately not marked as seen
-        v_tokens = _raw_tokens(msg.get("vTokensInBondingCurve") or 0) or INITIAL_VIRTUAL_TOKEN_RESERVES
-        v_sol = _lamports(msg.get("vSolInBondingCurve") or 0) or INITIAL_VIRTUAL_SOL_RESERVES
-        initial_buy = _raw_tokens(msg.get("initialBuy") or 0)
-        sol_amount = _lamports(msg.get("solAmount") or 0)
-        if initial_buy > 0 and creator:
-            if sol_amount <= 0:
-                sol_amount = max(0, v_sol - INITIAL_VIRTUAL_SOL_RESERVES)
-            state.trades.append(
-                TradeEvent(
-                    mint=mint,
-                    sol_amount=sol_amount,
-                    token_amount=initial_buy,
-                    is_buy=True,
-                    user=creator,
-                    timestamp=int(now),
-                    virtual_sol_reserves=v_sol,
-                    virtual_token_reserves=v_tokens,
-                    real_sol_reserves=max(0, v_sol - INITIAL_VIRTUAL_SOL_RESERVES),
-                    real_token_reserves=max(0, v_tokens - VIRTUAL_TOKEN_OFFSET),
-                    creator=creator,
-                    ix_name="create",
-                    signature=create.signature,
-                    slot=0,
-                    block_time=int(now),
-                )
-            )
-            self._update_curve(state, state.trades[-1])
+        if dev_buy is not None:
+            state.trades.append(dev_buy)
+            self._update_curve(state, dev_buy)
         self.tokens[mint] = state
         self.stats["tracked"] = len(self.tokens)
         self.names.register(mint, create.name, create.symbol, now)
@@ -461,6 +444,71 @@ class LiveEngine:
         hits = self.watch_hits(create.name, create.symbol)
         if hits:
             self.themes.register(mint, creator, hits, now, raw=True)  # a watched term inside a longer name still counts for its wave
+            self._watch_alert(state, hits, "Name", now)
+        return state
+
+    @staticmethod
+    def _dev_buy_from_frame(msg: dict[str, Any], mint: str, creator: str, create: CreateEvent, now: float) -> TradeEvent | None:
+        """The dev's buy inside the create transaction as the PumpPortal frame reports it (synthetic, slot 0)."""
+        v_tokens = _raw_tokens(msg.get("vTokensInBondingCurve") or 0) or INITIAL_VIRTUAL_TOKEN_RESERVES
+        v_sol = _lamports(msg.get("vSolInBondingCurve") or 0) or INITIAL_VIRTUAL_SOL_RESERVES
+        initial_buy = _raw_tokens(msg.get("initialBuy") or 0)
+        sol_amount = _lamports(msg.get("solAmount") or 0)
+        if initial_buy <= 0 or not creator:
+            return None
+        if sol_amount <= 0:
+            sol_amount = max(0, v_sol - INITIAL_VIRTUAL_SOL_RESERVES)
+        return TradeEvent(
+            mint=mint,
+            sol_amount=sol_amount,
+            token_amount=initial_buy,
+            is_buy=True,
+            user=creator,
+            timestamp=int(now),
+            virtual_sol_reserves=v_sol,
+            virtual_token_reserves=v_tokens,
+            real_sol_reserves=max(0, v_sol - INITIAL_VIRTUAL_SOL_RESERVES),
+            real_token_reserves=max(0, v_tokens - VIRTUAL_TOKEN_OFFSET),
+            creator=creator,
+            ix_name="create",
+            signature=create.signature,
+            slot=0,
+            block_time=int(now),
+        )
+
+    def _upgrade_late_state(self, state: TokenState, create: CreateEvent, creator: str, dev_buy: TradeEvent | None, now: float) -> TokenState:
+        """A coin first seen through a watched wallet turns out to be a fresh launch: take the frame over.
+
+        The wallet's trade stays (it may be the creation block: the earliest slot seen within the creation window
+        stands in for slot 0 until the create transaction itself is decoded, as in ``_add_trade``). The dev's buy from
+        the frame is added in front of it, otherwise the dev's tokens would look like an unexplained (hidden) float.
+        """
+        state.create = create
+        state.creator = creator or state.creator
+        state.bonding_curve = create.bonding_curve
+        state.spaet = False
+        state.create_slot_known = False
+        state.window_guessed = False
+        first_slot = min((t.slot for t in state.trades if t.slot), default=0)
+        if first_slot and now - state.created_at <= CREATION_WINDOW_S:
+            state.create.slot = first_slot
+        if dev_buy is not None and not any(t.ix_name == "create" for t in state.trades):
+            dev_buy.timestamp = dev_buy.block_time = int(state.created_at)
+            dev_buy.slot = state.create.slot
+            state.trades.insert(0, dev_buy)
+            state.trades.sort(key=lambda t: (t.slot, t.timestamp))
+            # the curve already reflects this buy (the wallet's trade carried the later reserves): do not roll back
+        if state.folge is not None:
+            state.folge["spaet"] = False
+            state.folge["alter_s"] = round(float(state.folge["t"]) - state.created_at, 1)
+            state.folge["bundle"] = bool(state.folge.get("slot") and state.folge["slot"] == state.create.slot)
+        state.dirty = True
+        self.names.register(state.mint, create.name, create.symbol, now)
+        self.themes.register(state.mint, state.creator, [create.name, create.symbol], now)
+        self._schedule_metadata(state)
+        hits = self.watch_hits(create.name, create.symbol)
+        if hits:
+            self.themes.register(state.mint, state.creator, hits, now, raw=True)
             self._watch_alert(state, hits, "Name", now)
         return state
 
@@ -557,8 +605,9 @@ class LiveEngine:
             added += 1
         truncated = any(line == "Log truncated" for line in logs)
         if (not trades and not creates and not completed) or truncated:
-            # no decodable event, or Solana cut the log at 10 000 bytes: fetch the transaction once
-            if self.cfg.fetch_missing_events:
+            # no decodable event, or Solana cut the log at 10 000 bytes: fetch the transaction once. Not for a coin seen
+            # only through a watched wallet: it gets no verdict, so a complete history is not worth RPC units (0.3.8)
+            if self.cfg.fetch_missing_events and not state.spaet:
                 state.missing_sigs.append(signature)
                 self.stats["missing"] += 1
         return added
@@ -585,7 +634,7 @@ class LiveEngine:
         state.trades.sort(key=lambda t: (t.slot, t.timestamp))
         state.last_trade_at = now
         if self.cfg.tape_path:
-            if not state.tape_started and self.cfg.tape_sample > 0 and tape_sampled(state.mint, self.cfg.tape_sample):
+            if not state.tape_started and not state.spaet and self.cfg.tape_sample > 0 and tape_sampled(state.mint, self.cfg.tape_sample):
                 # control group: a deterministic random share of tokens is taped from the first seen trade on
                 state.tape_started, state.tape_control = True, True
                 for t in list(state.trades):
@@ -624,9 +673,10 @@ class LiveEngine:
         """A token the engine never saw launch, built from a watched wallet's trade: mint, dev and curve come from the
         event, everything else (name, age, create slot, early holders) stays unknown. Costs no RPC."""
         creator = tr.creator or ""
+        # timestamp 0: the launch time is unknown, so the features report no age instead of "seconds since the buy"
         create = CreateEvent(
             name="", symbol="", uri="", mint=tr.mint, bonding_curve=derive_bonding_curve(tr.mint), user=creator, creator=creator,
-            timestamp=int(tr.timestamp or now), virtual_token_reserves=INITIAL_VIRTUAL_TOKEN_RESERVES, virtual_sol_reserves=INITIAL_VIRTUAL_SOL_RESERVES,
+            timestamp=0, virtual_token_reserves=INITIAL_VIRTUAL_TOKEN_RESERVES, virtual_sol_reserves=INITIAL_VIRTUAL_SOL_RESERVES,
             real_token_reserves=INITIAL_REAL_TOKEN_RESERVES, token_total_supply=TOKEN_TOTAL_SUPPLY, is_mayhem_mode=tr.mayhem_mode,
             signature="", slot=0, block_time=int(now),
         )
@@ -636,8 +686,10 @@ class LiveEngine:
     def on_wallet_logs(self, wallet: str, slot: int, signature: str, err: Any, logs: list[str], now: float | None = None) -> tuple[list[str], bool]:
         """A logsNotification of a watched wallet. Returns the mints to subscribe and whether to mute the wallet.
 
-        Only pump.fun trade events with ``user == wallet`` count; everything else a wallet does (transfers, other DEXes)
-        is dropped without any fetch: the missing-signature path would cost one RPC unit per notification.
+        Only pump.fun trade events with ``user == wallet`` count as the wallet's buy; everything else a wallet does
+        (transfers, other DEXes) is dropped without any fetch. The transaction itself is then applied through
+        ``on_logs`` like a mint notification, so a complete event, a create or a sale in the same transaction is
+        not lost, and the mint subscription delivering the same signature later is a no-op.
         """
         now = now if now is not None else time.time()
         if wallet in self.follow_muted:
@@ -656,26 +708,22 @@ class LiveEngine:
             return [], False
         trades, _creates, _completed = parse_log_events(logs)
         new: list[str] = []
+        mints: list[str] = []
         for tr in trades:
-            if tr.user != wallet or not tr.is_buy:
+            if tr.user != wallet or not tr.is_buy or tr.mint in mints:
                 continue
             state = self.tokens.get(tr.mint)
             if state is None:
                 if len(self.tokens) >= self.cfg.max_tracked:
                     self.stats["dropped_full"] = self.stats.get("dropped_full", 0) + 1
                     continue
-                state = self._state_from_trade(tr, now)
-                self.tokens[tr.mint] = state
+                self.tokens[tr.mint] = self._state_from_trade(tr, now)
                 self.stats["tracked"] = len(self.tokens)
                 self.stats["spaet"] += 1
                 new.append(tr.mint)
-            if signature in state.seen_sigs:
-                continue  # the mint subscription delivered the same transaction already
-            state.seen_sigs.add(signature)
-            tr.slot, tr.signature, tr.block_time = slot, signature, int(now)
-            if not tr.timestamp:
-                tr.timestamp = int(now)
-            self._add_trade(state, tr, now)
+            mints.append(tr.mint)
+        for mint in mints:
+            self.on_logs(mint, slot, signature, err, logs, now)  # every event of this transaction for this mint, once
         if not trades:
             self.stats["wallet_fremd"] += 1
         return new, False
@@ -951,8 +999,8 @@ class LiveEngine:
         check is marked as skipped, and the fairness gate treats that as unknown, not as clean.
         """
         fair = self.cfg.fair
-        if not fair.enabled or not self._creator_check_possible() or not self._creator_settled(state):
-            return
+        if state.spaet or not fair.enabled or not self._creator_check_possible() or not self._creator_settled(state):
+            return  # a coin seen only through a watched wallet never gets GO, so it never pays for GO checks
         ch = state.creator_history
         if fair.require_complete_history and ch is not None and not ch.complete and "creator_tief" not in state.pending and "creator_tief" not in state.done:
             if ch.sample_capped:
@@ -1064,9 +1112,9 @@ class LiveEngine:
             failed_tx=state.failed,
             sig_meta=[],  # block times of failed txs are unknown here: never fabricate "failed after 30 s"
             history_ok=True,
-            head_complete=True,
+            head_complete=not state.spaet,  # seen through a watched wallet: the launch and the first trades were missed
             partial_history=False,
-            launch_hint=state.created_at,
+            launch_hint=None if state.spaet else state.created_at,
             holders=[HolderInfo(o, a) for o, a in balances.items() if a > 0],
             holders_source="trades",
             metadata=state.metadata or {},
@@ -1088,7 +1136,7 @@ class LiveEngine:
     def evaluate(self, state: TokenState, now: float | None = None) -> QuickReport:
         now = now if now is not None else time.time()
         report, feats = self._score(state, now)
-        if report.word == "GO" and "GO" not in state.tiers_sent:
+        if report.word == "GO" and "GO" not in state.tiers_sent and not state.spaet:
             # GO candidate: deeper creator scan and top-holder wallets (0.3.7). A runner that answers at once must not
             # leave the gate judging the features from before the answer, so score once more on the fresh data
             before = (state.creator_history, state.wallets_ok, len(state.wallet_profiles), state.creator_funder)
@@ -1164,6 +1212,7 @@ class LiveEngine:
             "rT": tr.real_token_reserves,
             "fee": tr.fee,
             "creator_fee": tr.creator_fee,
+            "spaet": state.spaet,  # t0 is the first sight through a watched wallet, not the launch (0.3.8)
         }
         try:
             with open(self.cfg.tape_path, "a", encoding="utf-8") as fh:
@@ -1262,15 +1311,29 @@ class LiveEngine:
         state.fair = res.to_dict()
         return res
 
+    def _emit_folge(self, state: TokenState, report: QuickReport, now: float) -> None:
+        """🐋 FOLGE: a watched wallet bought. Context, not a verdict; goes out even after RUG, GO or graduation."""
+        out = QuickReport(**{**report.__dict__})
+        out.word = "FOLGE"
+        out.folge_wallet = state.folge["wallet"]
+        after = next((f"nach {t}" for t in ("RUG", "GO", "BLICK") if t in state.tiers_sent), None)
+        if state.complete:
+            after = "graduiert" if after is None else f"{after} · graduiert"
+        self._emit(state, "FOLGE", out, folge_suffix(self.follow.get(state.folge["wallet"]), state.folge, after), now)
+
+    def _folge_only(self, state: TokenState, now: float) -> None:
+        """Score once and send only the FOLGE alert: for coins the normal evaluation no longer visits (final, graduated)."""
+        report, _feats = self._score(state, now)
+        report.theme = theme_line(self._theme_check(state, now))
+        report.creator = state.creator or None
+        state.last_eval = now
+        state.dirty = False
+        self._emit_folge(state, report, now)
+
     def _alerts(self, state: TokenState, report: QuickReport, feats, now: float) -> None:
         cfg = self.cfg
         if state.folge is not None and "FOLGE" in cfg.tiers and "FOLGE" not in state.tiers_sent:
-            # 🐋 FOLGE: a watched wallet bought. Context, not a verdict; goes out even after RUG or GO
-            out = QuickReport(**{**report.__dict__})
-            out.word = "FOLGE"
-            out.folge_wallet = state.folge["wallet"]
-            after = next((f"nach {t}" for t in ("GO", "RUG", "BLICK") if t in state.tiers_sent), None)
-            self._emit(state, "FOLGE", out, folge_suffix(self.follow.get(state.folge["wallet"]), state.folge, after), now)
+            self._emit_folge(state, report, now)
         if state.spaet:
             return  # record-only (R2): age, create slot, bundle and dev history are unknown for a coin seen this late
         if state.final:
@@ -1404,6 +1467,13 @@ class LiveEngine:
         expired: list[str] = []
         for mint, state in list(self.tokens.items()):
             age = now - state.created_at
+            if (state.complete or state.final) and state.folge is not None and "FOLGE" in self.cfg.tiers and "FOLGE" not in state.tiers_sent:
+                # a watched wallet bought into a coin that is graduated or final: the buy is the whole point, say so
+                # once before the coin leaves (the normal evaluation never runs for such coins)
+                try:
+                    self._folge_only(state, now)
+                except Exception as exc:  # noqa: BLE001
+                    print(f"[{mint[:8]}] FOLGE-Bewertung fehlgeschlagen: {exc!r}")
             idle = state.outside_trades() == 0 and age > self.cfg.idle_expire_s and not state.tiers_sent
             keep = False
             if self.keep_alive is not None and age <= self.cfg.max_keep_alive_s and not state.complete:
@@ -1411,7 +1481,12 @@ class LiveEngine:
                     keep = bool(self.keep_alive(mint, now))
                 except Exception:  # noqa: BLE001
                     keep = False
-            if state.folge_at is not None and not state.complete and now - state.folge_at <= min(self.cfg.folge_keep_s, self.cfg.max_keep_alive_s):
+            if (
+                state.folge_at is not None
+                and not state.complete
+                and not state.final
+                and now - state.folge_at <= min(self.cfg.folge_keep_s, self.cfg.max_keep_alive_s) + FOLGE_KEEP_GRACE_S
+            ):
                 keep = True  # a coin a watched wallet bought stays taped for the follow horizon (0.3.8)
             if not keep and (
                 age > self.cfg.track_seconds

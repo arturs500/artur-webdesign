@@ -266,8 +266,8 @@ def control_groups(tape_path: str, exclude: Iterable[str] = ()) -> dict[str, tup
             except ValueError:
                 continue
             mint = row.get("mint") if isinstance(row, dict) else None
-            if not mint or mint in skip or mint in out:
-                continue
+            if not mint or mint in skip or mint in out or row.get("spaet"):
+                continue  # a coin first seen through a watched wallet has no launch time: never a control (0.3.8)
             t0 = _num(row.get("t0") if row.get("t0") is not None else row.get("seen_at"))
             if t0 is not None:
                 out[mint] = (GRUPPE_KONTROLLE, t0)

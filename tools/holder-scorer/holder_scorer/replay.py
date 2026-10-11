@@ -372,7 +372,7 @@ def evaluate(
     costs = costs or Costs()
     size_lamports = int(round(size_sol * LAMPORTS_PER_SOL))
     alert_mints = {a["mint"] for a in alerts}
-    controls = {m: rows for m, rows in tape.items() if m not in alert_mints and rows and rows[0].get("control")}
+    controls = {m: rows for m, rows in tape.items() if m not in alert_mints and rows and rows[0].get("control") and not rows[0].get("spaet")}
     control_launch = {m: (float(rows[0].get("t0") or rows[0].get("seen_at") or 0), _launch_chain_time(rows)) for m, rows in controls.items()}
     tiers_set = {t.upper() for t in tiers} if tiers else None
 

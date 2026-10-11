@@ -658,4 +658,21 @@ steht hier mit Datum und im Outcome-Register des Experten mit Prüftermin.
   24 h Feed-Reife; Grenzen (60 s, 20 %, 600/h, 30 min) bleiben bis dahin.
 - Blockiert: keinen Freeze.
 - Status: `entschieden (Experte)` am 2026-10-11 auf Nutzerauftrag; Prüfpunkte (a)–(h) offen.
+- Nachtrag 2026-10-11 (Code-Prüfung der Umsetzung, drei Blickwinkel, 16 bestätigte Befunde): (1) Kam der Launch-Frame
+  nach dem Wallet-Kauf, blieb der Coin für immer „spät gesehen" (kein BLICK/GO, kein Name): jetzt übernimmt der Coin den
+  Frame nachträglich. (2) Das Wallet-Log trug die Signatur als gesehen ein, wandte aber nur den Kauf an; Complete-Event,
+  Create und Verkauf derselben Transaktion gingen verloren, wenn das Mint-Log später kam: jetzt läuft die Transaktion
+  für den Mint über `on_logs`. (3) FOLGE nach RUG kam nie (finale Coins wurden nicht mehr bewertet), der finale Coin
+  blieb aber 30 min im Blick: jetzt einmalige Bewertung für den FOLGE, Keep-Regel nur für nicht-finale Coins.
+  (4) Spät gesehene Coins trugen ein erfundenes Alter (Sekunden seit dem Kauf) und wurden Kontroll-Coins mit t0 =
+  Kaufzeit; der Scout zählte ihre Nachkäufer als Frühkäufer: Alter jetzt unbekannt (Features ohne Launch, kein
+  Create-Fenster), Tape-Zeile mit `spaet`, keine Kontroll-Stichprobe, Scout überspringt sie, `control_groups` und
+  `tape report` schließen sie aus, Record mit `launch_received_at` None und `seen_at`. (5) Scout-Vergleichswert war die
+  Kontroll-Obergrenze, die Coins eines Wallets sind aber fast nur Alarm-Coins mit viel höherer Rate: jetzt gruppengleiche
+  Erwartung je Wallet. (6) Report: USDC-Kurven und Paare gegen USDC liefern kein Vielfaches (`quote` in der
+  Nachlauf-Zeile), Nachlauf-Zeilen eines früheren Alarms des Coins zählen nicht (t_ref-Bindung), „über 1x" über alle
+  Alarme statt nur Überlebende. (7) GO-Prüfungen (Wallet-Runde, RPC) für späte Coins ausdrücklich gesperrt, Nachladen
+  für späte Coins aus. (8) FOLGE-Coins bleiben 10 s länger als das Papier-Haltefenster, damit ZEIT vor ENDE greift.
+  (9) Tests mit Nebenabfragen-Rekorder statt leerer Zusicherung. Offen bleiben (a)–(h); neu (i): der Keep-Regel-Puffer
+  von 10 s ist Annahme (Papier-Latenz 2 s plus Tick).
 

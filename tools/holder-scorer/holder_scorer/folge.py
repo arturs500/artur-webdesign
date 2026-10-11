@@ -28,7 +28,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Iterable
 
 from .extern import DEFAULT_NACHLAUF_HORIZONS, UEBERLEBEN_LIQ_USD, Extern, iter_rows
-from .pump import LAMPORTS_PER_SOL
+from .pump import LAMPORTS_PER_SOL, WSOL_MINT, ZERO_PUBKEY
 
 B58 = re.compile(r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")
 RATIO = re.compile(r"^(\d+)/(\d+)$")
@@ -151,10 +151,12 @@ def folge_suffix(entry: WalletEntry | None, folge: dict[str, Any], after: str | 
 @dataclass
 class ScoutResult:
     coins: int = 0  # getapete Coins
+    spaet: int = 0  # davon erst durch ein Wallet gesehen: t0 ist kein Launch, keine frühen Käufer daraus
     beurteilbar: int = 0  # davon mit Label (Graduation oder Nachlauf am Horizont)
     kontrollen: int = 0  # beurteilbare Kontroll-Coins
     kontroll_rate: float | None = None
     kontroll_wilson: tuple[float, float] | None = None
+    alarm_rate: float | None = None  # Trefferrate der beurteilbaren Alarm-Coins (höher als die Kontrollen: Selektion)
     grundrate_alle: float | None = None
     wallets: int = 0  # Wallets mit mindestens einem frühen Kauf
     bots: int = 0  # ausgeschlossen: früh in mehr als max_anteil aller Coins
@@ -187,7 +189,13 @@ def scout(
     now: float | None = None,
 ) -> ScoutResult:
     """Frühe Käufer je getapetem Coin (ohne Dev, ohne Create-Block, innerhalb ``frueh_s`` nach t0), Label aus den
-    Außenquellen, je Wallet Trefferquote mit Wilson-Intervall gegen die Kontrollgruppe."""
+    Außenquellen, je Wallet Trefferquote mit Wilson-Intervall.
+
+    Vergleichswert je Wallet: die erwartete Trefferzahl aus den Raten der Gruppen, in denen seine Coins liegen
+    (Alarm-Coins haben eine viel höhere Rate als die Kontrollgruppe, weil der Sniper sie ausgesucht hat). Ein Wallet
+    ist Kandidat, wenn die Wilson-Untergrenze seiner Quote über dieser gruppengleichen Erwartung liegt. Coins, die erst
+    durch ein Wallet gesehen wurden (``spaet``), haben kein Launch-t0 und liefern keine frühen Käufer.
+    """
     from .replay import wilson
 
     coins: dict[str, dict[str, Any]] = {}
@@ -195,7 +203,8 @@ def scout(
         mint = r.get("mint")
         if not mint or r.get("ts") is None:
             continue
-        c = coins.setdefault(mint, {"t0": float(r.get("t0") or 0), "dev": r.get("dev"), "control": bool(r.get("control")), "rows": []})
+        c = coins.setdefault(mint, {"t0": float(r.get("t0") or 0), "dev": r.get("dev"), "control": bool(r.get("control")), "spaet": False, "rows": []})
+        c["spaet"] = c["spaet"] or bool(r.get("spaet"))
         c["rows"].append(r)
     res = ScoutResult(coins=len(coins))
     if not coins:
@@ -205,13 +214,16 @@ def scout(
     labels: dict[str, bool | None] = {}
     for mint, c in coins.items():
         rows = c["rows"]
-        first_slot = min(int(r.get("slot") or 0) for r in rows)
         label = _good(ex, mint, horizon_s)
         labels[mint] = label
         if label is not None:
             res.beurteilbar += 1
             if c["control"]:
                 res.kontrollen += 1
+        if c["spaet"]:
+            res.spaet += 1
+            continue  # t0 is the wallet's buy, not the launch: the buyers after it are followers, not early birds
+        first_slot = min(int(r.get("slot") or 0) for r in rows)
         for r in rows:
             if not r.get("buy") or not r.get("user") or r.get("user") == c["dev"]:
                 continue
@@ -225,42 +237,50 @@ def scout(
             elif label is False:
                 w["bad"].add(mint)
     res.wallets = len(early)
-    good_controls = sum(1 for m, c in coins.items() if c["control"] and labels[m] is True)
+    judged = {m for m in coins if labels[m] is not None}
+    good_controls = sum(1 for m in judged if coins[m]["control"] and labels[m] is True)
     if res.kontrollen:
         res.kontroll_rate = good_controls / res.kontrollen
         res.kontroll_wilson = wilson(good_controls, res.kontrollen)
-    good_all = sum(1 for m in coins if labels[m] is True)
+    alarm_judged = [m for m in judged if not coins[m]["control"]]
+    if alarm_judged:
+        res.alarm_rate = sum(1 for m in alarm_judged if labels[m] is True) / len(alarm_judged)
     if res.beurteilbar:
-        res.grundrate_alle = good_all / res.beurteilbar
-    # Vergleichswert: Wilson-Obergrenze der Kontrollen (ab 20 beurteilbaren), sonst die Grundrate aller getapeten Coins
-    if res.kontroll_wilson is not None and res.kontrollen >= 20:
-        bar, bar_text = res.kontroll_wilson[1], f"Kontrollgruppe {res.kontroll_rate:.1%} (n={res.kontrollen}, Wilson-Obergrenze {res.kontroll_wilson[1]:.1%})"
-    elif res.grundrate_alle is not None:
-        bar, bar_text = res.grundrate_alle, f"Grundrate aller getapeten Coins {res.grundrate_alle:.1%} (verzerrt: Alarm-Coins, keine Kontrollgruppe ab 20)"
-    else:
-        bar, bar_text = None, "keine Labels: Außenquellen (`quellen nachlauf`, Migrationsfeed) fehlen"
+        res.grundrate_alle = sum(1 for m in judged if labels[m] is True) / res.beurteilbar
+    rate_of = {m: (res.kontroll_rate if coins[m]["control"] else res.alarm_rate) for m in judged}
     for addr, w in early.items():
         n_total = len(w["coins"])
         if n_total / max(len(coins), 1) > max_anteil:
             res.bots += 1  # früh in jedem fünften Coin: Sniper- oder Bump-Bot, kein Narrativ-Käufer
             continue
-        n = len(w["good"]) + len(w["bad"])
-        k = len(w["good"])
+        mine = [m for m in w["good"] | w["bad"]]
+        n, k = len(mine), len(w["good"])
         if n < min_coins:
             continue
         wi = wilson(k, n)
-        if wi is None or bar is None or wi[0] <= bar:
+        expected = [rate_of[m] for m in mine if rate_of.get(m) is not None]
+        if wi is None or len(expected) < n:
+            continue
+        bar = sum(expected) / n
+        if wi[0] <= bar:
             continue
         res.kandidaten.append(
             {
                 "wallet": addr, "treffer": k, "coins": n, "frueh_in": n_total, "wilson": [round(wi[0], 4), round(wi[1], 4)],
-                "seit": w["first"], "zuletzt": w["last"],
+                "erwartet": round(bar, 4), "seit": w["first"], "zuletzt": w["last"],
             }
         )
-    res.kandidaten.sort(key=lambda c: (-c["wilson"][0], -c["coins"]))
+    res.kandidaten.sort(key=lambda c: (-(c["wilson"][0] - c["erwartet"]), -c["coins"]))
+    rates = []
+    if res.alarm_rate is not None:
+        rates.append(f"Alarm-Coins {res.alarm_rate:.1%} (n={len(alarm_judged)})")
+    if res.kontroll_rate is not None:
+        rates.append(f"Kontrollgruppe {res.kontroll_rate:.1%} (n={res.kontrollen})")
     res.lesart = (
-        f"{res.coins} Coins im Tape, {res.beurteilbar} beurteilbar, {res.wallets} Wallets früh dabei, {res.bots} als Bot ausgeschlossen; "
-        f"Vergleich: {bar_text}; Kandidat = Wilson-Untergrenze über dem Vergleichswert bei mindestens {min_coins} beurteilbaren Coins"
+        f"{res.coins} Coins im Tape ({res.spaet} spät gesehen, ohne Launch-t0), {res.beurteilbar} beurteilbar, {res.wallets} Wallets früh dabei, "
+        f"{res.bots} als Bot ausgeschlossen; Trefferraten je Gruppe: {', '.join(rates) or 'keine Labels (Außenquellen fehlen)'}; "
+        f"Kandidat = Wilson-Untergrenze über der gruppengleichen Erwartung bei mindestens {min_coins} beurteilbaren Coins"
+        + ("" if res.kontrollen >= 20 else "; unter 20 Kontroll-Coins ist die Kontrollrate selbst unsicher")
     )
     return res
 
@@ -273,7 +293,7 @@ def scout_lines(res: ScoutResult, now: float | None = None) -> list[str]:
         seit = time.strftime("%Y-%m-%d", time.gmtime(c["seit"]))
         e = WalletEntry(
             c["wallet"], quelle="scout", treffer=c["treffer"], coins=c["coins"],
-            notiz=f"Wilson {c['wilson'][0]:.0%}–{c['wilson'][1]:.0%}, früh in {c['frueh_in']} Coins, seit {seit}",
+            notiz=f"Wilson {c['wilson'][0]:.0%}–{c['wilson'][1]:.0%} gegen erwartet {c['erwartet']:.0%}, früh in {c['frueh_in']} Coins, seit {seit}",
         )
         out.append(format_wallet_line(e))
     return out
@@ -283,8 +303,9 @@ def scout_lines(res: ScoutResult, now: float | None = None) -> list[str]:
 
 
 def _curve_price_sol(curve: dict[str, Any] | None) -> float | None:
-    """SOL je ganzem Token aus den virtuellen Reserven des Records (9 bzw. 6 Dezimalen), wie paper.curve_price."""
-    if not curve:
+    """SOL je ganzem Token aus den virtuellen Reserven des Records (9 bzw. 6 Dezimalen), wie paper.curve_price.
+    None für eine Kurve, die nicht in SOL quotiert ist (USDC): deren Reserven haben andere Dezimalen."""
+    if not curve or curve.get("quote_mint") not in (None, WSOL_MINT, ZERO_PUBKEY):
         return None
     vq, vt = curve.get("virtual_quote_reserves"), curve.get("virtual_token_reserves")
     if not vq or not vt or float(vt) <= 0:
@@ -292,7 +313,9 @@ def _curve_price_sol(curve: dict[str, Any] | None) -> float | None:
     return (float(vq) / LAMPORTS_PER_SOL) / (float(vt) / 1e6)
 
 
-def _nachlauf_at(ex: Extern, mint: str, horizon_s: float) -> dict[str, Any] | None:
+def _nachlauf_at(ex: Extern, mint: str, horizon_s: float, t_folge: float | None = None) -> dict[str, Any] | None:
+    """Die Nachlauf-Zeile zum Horizont, nur wenn sie zum FOLGE-Zeitpunkt passt: ``quellen nachlauf`` misst ab dem
+    ersten Alarm des Coins; kam der FOLGE lange nach einem GO, gehört die Zeile zum GO, nicht zum Wallet-Kauf."""
     rows = [r for r in ex.nachlauf.get(mint, ()) if abs(float(r.get("nach_s") or 0) - horizon_s) < 1.0]
     if not rows:
         return None
@@ -300,7 +323,17 @@ def _nachlauf_at(ex: Extern, mint: str, horizon_s: float) -> dict[str, Any] | No
     alter = row.get("alter_s")
     if alter is not None and float(alter) > 2 * horizon_s:
         return None  # verspäteter Schnappschuss, wie in extern_summary
+    if t_folge is not None and row.get("t_ref") is not None and abs(float(row["t_ref"]) - t_folge) > 0.1 * horizon_s:
+        return None
     return row
+
+
+def _preis_sol(row: dict[str, Any]) -> float | None:
+    """preis_native der Nachlauf-Zeile als SOL je Token; None, wenn das Paar gegen etwas anderes quotiert ist."""
+    quote = row.get("quote")
+    if quote not in (None, WSOL_MINT):
+        return None
+    return row.get("preis_native")
 
 
 def wallet_report(
@@ -323,15 +356,17 @@ def wallet_report(
         wallet, mint = fo.get("wallet"), rec.get("mint")
         if not wallet or not mint:
             continue
-        w = per.setdefault(wallet, {"alarme": 0, "mints": {}, "spaet": 0})
+        w = per.setdefault(wallet, {"alarme": 0, "mints": {}, "spaet": 0, "keine_sol_kurve": 0})
         if mint in w["mints"]:
             continue  # ein Alarm je Coin und Wallet
         w["alarme"] += 1
         w["spaet"] += 1 if rec.get("spaet") else 0
-        w["mints"][mint] = {"t": float(rec.get("alert_at") or 0), "p0": _curve_price_sol(rec.get("curve"))}
+        p0 = _curve_price_sol(rec.get("curve"))
+        w["keine_sol_kurve"] += 1 if (rec.get("curve") and p0 is None) else 0
+        w["mints"][mint] = {"t": float(rec.get("alert_at") or 0), "p0": p0}
     out: dict[str, Any] = {"wallets": {}, "horizonte": list(horizons), "fee_bps": fee_bps}
     for wallet, w in per.items():
-        row: dict[str, Any] = {"alarme": w["alarme"], "spaet": w["spaet"]}
+        row: dict[str, Any] = {"alarme": w["alarme"], "spaet": w["spaet"], "keine_sol_kurve": w["keine_sol_kurve"]}
         entry = (wallets or {}).get(wallet)
         row["tag"] = entry.name if entry else wallet[:4] + "…" + wallet[-4:]
         row["liste"] = entry.stats_text() if entry else "nicht in der Liste"
@@ -339,25 +374,30 @@ def wallet_report(
         grad = [m for m in beurteilbar if m in ex.graduiert or ex.dex_graduiert(m)]
         row["graduation"] = {"n": len(beurteilbar), "k": len(grad), "wilson": wilson(len(grad), len(beurteilbar)) if beurteilbar else None}
         for h in horizons:
-            mults: list[float] = []
-            cons: list[float] = []
-            tot = lebt = 0
+            mults: list[float] = []  # Vielfache der Überlebenden mit SOL-Preis auf beiden Seiten
+            cons: list[float] = []  # alle: fehlt, unverkäuflich oder ohne SOL-Preis zählt als Totalverlust
+            tot = lebt = passt_nicht = ohne_preis = 0
             for m, d in w["mints"].items():
-                nl = _nachlauf_at(ex, m, h)
+                nl = _nachlauf_at(ex, m, h, d["t"])
                 if nl is None:
+                    passt_nicht += 1 if _nachlauf_at(ex, m, h) is not None else 0  # Zeile gehört zu einem früheren Alarm
                     continue
                 tot += 1
                 alive = not nl.get("fehlt") and nl.get("liq_usd") is not None and float(nl["liq_usd"]) >= UEBERLEBEN_LIQ_USD
                 lebt += 1 if alive else 0
-                r = follower_return(d["p0"], nl.get("preis_native"), fee_bps) if alive else None
+                p1 = _preis_sol(nl) if alive else None
+                r = follower_return(d["p0"], p1, fee_bps) if alive else None
+                if alive and r is None:
+                    ohne_preis += 1  # SOL-Preis fehlt auf einer Seite (USDC-Kurve, Paar gegen USDC)
                 if r is not None:
                     mults.append(r + 1.0)
-                cons.append((r + 1.0) if r is not None else 0.0)  # fehlt oder unverkäuflich: Totalverlust (konservativ)
+                cons.append((r + 1.0) if r is not None else 0.0)
             row[f"nach_{int(h)}"] = {
                 "n": tot, "lebt": lebt, "wilson": wilson(lebt, tot) if tot else None,
-                "median_x": round(statistics.median(mults), 3) if mults else None,
-                "anteil_ueber_1x": round(sum(1 for x in mults if x >= 1.0) / len(mults), 3) if mults else None,
+                "median_x_ueberlebende": round(statistics.median(mults), 3) if mults else None,
+                "anteil_ueber_1x": round(sum(1 for x in cons if x >= 1.0) / len(cons), 3) if cons else None,
                 "median_x_konservativ": round(statistics.median(cons), 3) if cons else None,
+                "nachlauf_passt_nicht": passt_nicht, "ohne_sol_preis": ohne_preis,
             }
         out["wallets"][wallet] = row
     return out
@@ -367,24 +407,37 @@ def format_wallet_report(rep: dict[str, Any]) -> str:
     if not rep["wallets"]:
         return "Keine FOLGE-Alarme in den Aufzeichnungen (live --wallets DATEI --record live.jsonl)."
     lines = [
-        f"Wallet-Folge: {len(rep['wallets'])} Wallets mit FOLGE-Alarmen; Kurs-Vielfaches = DexScreener-Preis nach dem Horizont gegen den "
-        f"Kurvenpreis beim Alarm, Gebühr {rep['fee_bps'] / 100:.2f} % je Seite, ohne Preisimpact; konservativ: fehlt/unverkäuflich = 0x"
+        f"Wallet-Folge: {len(rep['wallets'])} Wallets mit FOLGE-Alarmen; Kurs-Vielfaches = DexScreener-Preis (SOL je Token, [Snippet]) nach dem "
+        f"Horizont gegen den Kurvenpreis beim FOLGE, Gebühr {rep['fee_bps'] / 100:.2f} % je Seite, ohne Preisimpact. "
+        "'über 1x' und 'konservativ' zählen fehlt, unverkäuflich (< 1 000 USD Liquidität) und fehlenden SOL-Preis als 0x; "
+        "'Median Überlebende' nur über die Coins mit Paar."
     ]
     for wallet, row in sorted(rep["wallets"].items(), key=lambda kv: -kv[1]["alarme"]):
         g = row["graduation"]
         gw = f" [{g['wilson'][0]:.0%}–{g['wilson'][1]:.0%}]" if g["wilson"] else ""
         head = f"{row['tag']} ({wallet[:8]}…): {row['alarme']} Alarme" + (f", {row['spaet']} spät gesehen" if row["spaet"] else "")
+        if row.get("keine_sol_kurve"):
+            head += f", {row['keine_sol_kurve']} ohne SOL-Kurve"
         head += f" · Liste: {row['liste']} · Graduation {g['k']}/{g['n']}{gw}"
         lines.append(head)
         for h in rep["horizonte"]:
             d = row.get(f"nach_{int(h)}") or {}
             if not d.get("n"):
-                lines.append(f"    +{int(h) // 3600} h: noch kein Nachlauf (`quellen nachlauf`)")
+                note = f" ({d['nachlauf_passt_nicht']} Zeilen gehören zu einem früheren Alarm des Coins)" if d.get("nachlauf_passt_nicht") else ""
+                lines.append(f"    +{int(h) // 3600} h: noch kein Nachlauf (`quellen nachlauf`){note}")
                 continue
             lw = f" [{d['wilson'][0]:.0%}–{d['wilson'][1]:.0%}]" if d.get("wilson") else ""
-            med = f"{d['median_x']:.2f}x" if d.get("median_x") is not None else "–"
+            med = f"{d['median_x_ueberlebende']:.2f}x" if d.get("median_x_ueberlebende") is not None else "–"
             over = f"{d['anteil_ueber_1x']:.0%}" if d.get("anteil_ueber_1x") is not None else "–"
             cons = f"{d['median_x_konservativ']:.2f}x" if d.get("median_x_konservativ") is not None else "–"
-            lines.append(f"    +{int(h) // 3600} h: lebt {d['lebt']}/{d['n']}{lw} · Median {med} (über 1x: {over}) · konservativ {cons}")
-    lines.append("Lesart: erst ab 10 beurteilbaren Alarmen je Wallet; Wilson-Untergrenze über der Kontrollgruppe aus `tape report --extern` zählt.")
+            extra = []
+            if d.get("ohne_sol_preis"):
+                extra.append(f"{d['ohne_sol_preis']} ohne SOL-Preis")
+            if d.get("nachlauf_passt_nicht"):
+                extra.append(f"{d['nachlauf_passt_nicht']} Zeilen zu einem früheren Alarm")
+            lines.append(
+                f"    +{int(h) // 3600} h: lebt {d['lebt']}/{d['n']}{lw} · über 1x {over} · konservativ {cons} · Median Überlebende {med}"
+                + (f" ({', '.join(extra)})" if extra else "")
+            )
+    lines.append("Lesart: erst ab 10 beurteilbaren Alarmen je Wallet; 'über 1x' und 'konservativ' zählen, der Median der Überlebenden beschreibt nur.")
     return "\n".join(lines)

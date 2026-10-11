@@ -264,7 +264,8 @@ def alert_record_extra(alert: Any, stufe: int, rules: str, version: str, live_co
         "live_config": dataclasses.asdict(live_config) if dataclasses.is_dataclass(live_config) else None,
         "scoring_config": dataclasses.asdict(scoring) if dataclasses.is_dataclass(scoring) else None,
         "alert_at": time.time(),
-        "launch_received_at": st.created_at,
+        "launch_received_at": None if getattr(st, "spaet", False) else st.created_at,  # a late coin's launch was not seen
+        "seen_at": st.created_at,
         "slot": st.curve_slot,
         "create_slot": getattr(create, "slot", None),
         "create_slot_known": st.create_slot_known,
