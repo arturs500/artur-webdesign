@@ -84,7 +84,7 @@ def sell_on_curve(curve: BondingCurveState, tokens: int, fee_bps: int = CURVE_FE
 @dataclass
 class Strategy:
     name: str
-    entry: str  # BLICK | GO | FRÜH (FRÜH = at any evaluation, before any alert)
+    entry: str  # BLICK | GO | FOLGE | FRÜH (FRÜH = at any evaluation, before any alert; FOLGE = a watched wallet bought)
     tp: float | None = 3.0  # take profit at this multiple of the effective entry price
     sl: float | None = 0.4  # stop loss when the price falls this fraction below the entry
     trail: float | None = None  # trailing stop: exit this fraction below the peak once armed
@@ -99,6 +99,7 @@ class Strategy:
     min_narrative: int | None = None  # enter only with at least this narrative score
     min_outside_buyers: int | None = None
     no_warnings: bool = False  # enter only without any warning flag (NOSOC, MINDEST and LÜCKE allowed)
+    folge: bool = False  # FOLGE strategy (0.3.8): enters on the watched wallet's buy whatever the verdict or the fairness gate says
     description: str = ""
 
 
@@ -115,6 +116,11 @@ STRATEGIES: list[Strategy] = [
     Strategy("BLICK-trail", "BLICK", tp=None, sl=0.5, trail=0.35, trail_arm=1.5, max_hold_s=900.0, description="Kauf beim BLICK, ab 1,5x Trailing-Stop 35 %"),
     Strategy("NARRATIV-früh", "FRÜH", tp=3.0, sl=0.5, min_narrative=60, dev_must_hold=True, max_bundle=0.05, min_outside_buyers=2, description="vor jedem Alarm: Narrativ 60+, Dev hält, Bundle ≤ 5 %, ab 2 echten Käufern"),
     Strategy("SAUBER-früh", "FRÜH", tp=2.0, sl=0.4, max_hold_s=300.0, dev_must_hold=True, max_bundle=0.02, min_outside_buyers=3, no_warnings=True, description="vor jedem Alarm: keine Warnung, Dev hält, kein Bundle, ab 3 echten Käufern, Ziel 2x, 5 min"),
+    # Wallet-Folge (0.3.8): the live paper trader prices only while the engine holds the coin (at most 30 min);
+    # holding to the next day is measured offline from the DexScreener follow-up (`wallets report`)
+    Strategy("FOLGE-halten", "FOLGE", tp=None, sl=None, max_hold_s=1800.0, exit_on_rug=False, folge=True, description="Kauf beim FOLGE, halten bis 30 min oder GRAD/ENDE, kein Stop"),
+    Strategy("FOLGE-trail", "FOLGE", tp=None, sl=0.5, trail=0.35, trail_arm=1.5, max_hold_s=1800.0, exit_on_rug=False, folge=True, description="Kauf beim FOLGE, Stop −50 %, ab 1,5x Trailing-Stop 35 %, 30 min"),
+    Strategy("FOLGE-2x", "FOLGE", tp=2.0, sl=0.5, max_hold_s=1800.0, exit_on_rug=False, folge=True, description="Kauf beim FOLGE, Ziel 2x, Stop −50 %, 30 min"),
 ]
 
 
@@ -297,10 +303,14 @@ class PaperTrader:
         return info
 
     def _filters_ok(self, s: Strategy, info: dict[str, Any], state: Any) -> tuple[bool, str]:
-        if info["wort"] in ("RUG", "TOT", "?") or state.curve is None or state.complete:
-            return False, "Urteil " + info["wort"]
+        if state.curve is None or state.complete:
+            return False, "keine Kurve" if state.curve is None else "graduiert"
         if not state.curve.quote_is_sol:
             return False, "keine SOL-Kurve"  # curve math and prices below assume lamports as quote units
+        if s.folge:
+            return True, ""  # the wallet's buy is the signal; verdict and gate are recorded, not applied (0.3.8)
+        if info["wort"] in ("RUG", "TOT", "?"):
+            return False, "Urteil " + info["wort"]
         fair = getattr(state, "fair", None)
         if self.fair_filter and isinstance(fair, dict) and fair.get("hard_ok") is False:
             fails = fair.get("fails") or ["Prinzip verletzt"]
@@ -323,7 +333,7 @@ class PaperTrader:
         if alert.tier == "RUG":
             self.rug.add(alert.state.mint)
             return
-        if alert.tier in ("BLICK", "GO"):
+        if alert.tier in ("BLICK", "GO", "FOLGE"):
             self.armed[(alert.tier, alert.state.mint)] = now
             feats = alert.report.verdict.features if alert.report.verdict is not None else None
             self._consider(alert.state, alert.report, feats, now, alert.tier)
@@ -334,7 +344,7 @@ class PaperTrader:
         if report.word in ("RUG", "TOT"):
             self.rug.add(state.mint)
         self._consider(state, report, feats, now, "FRÜH", info)
-        for tier in ("BLICK", "GO"):
+        for tier in ("BLICK", "GO", "FOLGE"):
             armed_at = self.armed.get((tier, state.mint))
             if armed_at is not None and now - armed_at <= self.entry_window_s:
                 self._consider(state, report, feats, now, tier, info)

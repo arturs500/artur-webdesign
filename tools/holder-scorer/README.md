@@ -162,6 +162,41 @@ Börsen-Hot-Wallets erkennt der Sniper an mindestens 50 Transaktionen; eine Rug-
 deshalb als Börse durchgehen (Prüfpunkt in OQ-034). Die Grenzen sind Startwerte ohne Daten: ob die Sperren richtig
 sind, zeigt `tape report` mit GO gegen GESPERRT.
 
+**Wallet-Folge (0.3.8, OQ-035):** Es gibt Wallets, die früh in Coins einsteigen, die später viral gehen. Der Sniper
+beobachtet eine Liste solcher Wallets (`--wallets wallets.txt`, Zeile `<Adresse> [Tag] [k/n] # Notiz`; Adressen von
+Solscan oder DexScreener trägst du von Hand ein, eigene Funde liefert `wallets scout`). Je Wallet läuft ein
+Log-Abonnement auf dem vorhandenen Stream, null RPC. Kauft ein beobachtetes Wallet einen pump.fun-Coin, kommt
+🐋 FOLGE aufs Handy, mit Kontext statt Urteil: Tag und Quelle des Wallets, seine Trefferquote aus der Liste, Kaufgröße,
+Thema-Welle, Kurvenstand, Solscan-Links für Coin, Dev und Wallet. Das gilt auch für Coins, die der Sniper nie als
+Launch gesehen hat („spät gesehen"): Für sie baut er den Stand aus dem Trade selbst, ohne Alter, Dev-Historie oder
+Bundle-Anteil, und schickt deshalb nie BLICK, GO oder RUG dafür, nur FOLGE. Jeder FOLGE-Coin bleibt 30 Minuten im Blick
+und wird getapet; weitere Käufe beobachteter Wallets stehen im Record (`folge.weitere`), Verkäufe im Tape. Ein Wallet
+mit mehr als 600 Benachrichtigungen je Stunde wird stummgeschaltet (Bot oder Börse, kostet nur Bytes).
+
+- **Eigene Funde:** `wallets scout live_tape.jsonl --extern aussen.jsonl --out wallets.txt` sucht im Tape die frühen
+  Käufer (ohne Dev, ohne Create-Block, in den ersten 60 s) der Coins, die graduierten oder nach 24 h noch Liquidität
+  hatten, und schreibt Wallets mit einer Wilson-Untergrenze über der Kontrollgruppe (ab 20 Kontroll-Coins, sonst über
+  der Grundrate aller getapeten Coins) im Listenformat. Wallets, die früh in jedem fünften Coin sind, gelten als Bots.
+  Die Stichprobe ist das Tape, also Alarm-Coins plus Kontroll-Anteil: Quoten sind relativ, nicht absolut, und die
+  Fundmenge überschätzt sich selbst. Die saubere Messung sind die FOLGE-Alarme danach.
+- **Halten bis zum nächsten Tag:** Der Live-Papierhandel kann nur bepreisen, solange der Coin im Blick ist (30 min,
+  Strategien `FOLGE-halten`, `FOLGE-trail`, `FOLGE-2x`, ohne Fair-Gate und ohne Urteil als Filter). Was danach
+  passiert, holt `quellen nachlauf` von DexScreener (+1 h, +24 h), und `wallets report live.jsonl --extern
+  aussen.jsonl --wallets wallets.txt` zeigt je Wallet: Alarme, Graduation, Überleben nach 24 h und das Kurs-Vielfaches
+  gegen den Kurvenpreis beim Alarm (Median, Anteil über 1x, konservativ mit fehlt/unverkäuflich als 0x). So wird „manche
+  gehen am nächsten Tag hoch" eine Zahl je Wallet statt einer Erinnerung.
+- **Was fehlt:** Twitter liest der Sniper nicht (API-Zugang ist eine Kaufentscheidung); virale Begriffe kommen über
+  `--narratives` und die Thema-Welle. Ob `user` bei Käufen über Router das Wallet ist, ist NICHT VERIFIZIERT; Käufe
+  über Zwischen-Wallets bleiben unsichtbar. Kein Gate, kein Kauf: FOLGE ist Aufzeichnung (R2).
+
+```bash
+python -m holder_scorer wallets scout live_tape.jsonl --extern aussen.jsonl --out wallets.txt
+python -m holder_scorer live --stufe 2 --wallets wallets.txt --record live.jsonl --tape live_tape.jsonl --tape-sample 0.1 --extern aussen.jsonl --telegram
+python -m holder_scorer quellen nachlauf live.jsonl --extern aussen.jsonl --tape live_tape.jsonl
+python -m holder_scorer wallets report live.jsonl --extern aussen.jsonl --wallets wallets.txt
+python -m holder_scorer tape report live.jsonl live_tape.jsonl --tiers FOLGE --extern aussen.jsonl
+```
+
 **Launch-Rechner (OQ-029, `docs/fair_launch.md`):** `python -m holder_scorer launch rechner` zeigt aus der
 geprüften Kurvenmathematik, welchen Supply-Anteil ein Dev-Kauf ergibt, wie viel Fremdzufluss bis zur Graduation
 fehlt, was die Dev-Position dann wert ist, was ein Teilverkauf netto bringt und wie stark er den Kurs drückt,
@@ -313,6 +348,7 @@ und erzeugt jeden Alarm höchstens einmal je Token:
 | ↩️ WIDERRUF | der Call gilt nicht mehr: nach einem BLICK kam ein weiches Warnsignal (DEV-GROSS, SCHNELL, FRISCH, FUNDER, UNSICHTBAR, Bundle über der Grenze …) und ein GO ist nicht mehr zu erwarten; nach einem GO ist ein Fairness-Prinzip verletzt (z. B. der Dev verkauft einen Teil, auch unter der DEV-RAUS-Schwelle) | den Call vergessen |
 | ⛔ GESPERRT | der Score sagt GO, aber ein Fairness-Prinzip ist endgültig verletzt (Dev-Anteil, Dev-Verkauf, Bundle-Wallets, Kopie, Historie, Bots, Metadaten) oder das Profil passt nicht; einmal je Token, im Standard nur Aufzeichnung | Lehrmaterial: `tape report --tiers GESPERRT` zeigt später, ob die Sperre richtig war |
 | 👁️ WATCH | ein Launch trägt einen Begriff der Beobachtungsliste (`--beobachte`) in Name, Symbol oder Beschreibung; sofort, noch ohne Urteil, einmal je Token | selbst hinsehen, die normalen Alarme folgen |
+| 🐋 FOLGE | ein beobachtetes Wallet (`--wallets`) hat einen pump.fun-Coin gekauft, auch einen außerhalb des Blicks („spät gesehen"); Kontext: Tag, Quelle, Trefferquote, Kaufgröße, Thema, Kurvenstand; einmal je Coin, kein Urteil | Solscan-Links öffnen, das Warum prüfen, selbst entscheiden; `wallets report` zeigt später, was aus den Käufen dieses Wallets wurde |
 
 Ist der Erstellungs-Slot eines Tokens nur geschätzt (der erste Trade kam später
 als 1,5 s nach dem Launch an), wartet der Live-Modus bis zu 15 s auf die
@@ -441,6 +477,9 @@ allen eingebauten Strategien gleichzeitig, mit 0,08 SOL je Trade
 | BLICK-trail | beim BLICK | ab 1,5x Trailing-Stop 35 %, Stop −50 % |
 | NARRATIV-früh | vor jedem Alarm: Narrativ 60+, Dev hält, Bundle ≤ 5 %, ab 2 echten Käufern | Ziel 3x, Stop −50 % |
 | SAUBER-früh | vor jedem Alarm: keine Warnung, Dev hält, kein Bundle, ab 3 echten Käufern | Ziel 2x, Stop −40 %, 5 min |
+| FOLGE-halten | Kauf beim FOLGE (ohne Urteil und Fair-Gate als Filter) | halten bis 30 min oder GRAD/ENDE, kein Stop |
+| FOLGE-trail | Kauf beim FOLGE | Stop −50 %, ab 1,5x Trailing-Stop 35 %, 30 min |
+| FOLGE-2x | Kauf beim FOLGE | Ziel 2x, Stop −50 %, 30 min |
 
 Mit `--paper-strategies GO-3x,DEV-HÄLT` läuft nur ein Teil; eigene Varianten
 sind eine Zeile in `STRATEGIES` (`holder_scorer/paper.py`).

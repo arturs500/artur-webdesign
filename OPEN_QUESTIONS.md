@@ -615,3 +615,47 @@ steht hier mit Datum und im Outcome-Register des Experten mit Prüftermin.
   aktualisieren die frühen Profile. (8) Stufe 3 prüft die Wallets ohne zu warten (`wait_for_wallets`), die dokumentierte
   20-%-Grenze wirkt damit. Tests für alle Punkte in `tests/test_wallets.py`. Neuer Prüfpunkt (g): die Wartezeit auf die
   Wallet-Runde vor GO im Betrieb messen (eine Signaturseite je neuem Top-Halter plus ein Batch), siehe (e).
+
+## OQ-035 – Sniper 0.3.8 „Wallet-Folge": beobachtete Wallets, 🐋 FOLGE, eigene Funde, Halten bis zum nächsten Tag
+
+- Datum: 2026-10-11
+- Kontext: Nutzerauftrag „der Bot muss zusätzlich die Informationen von internen Wallets (Solscan, DexScreener, eigene
+  Funde) nutzen, die frühe Narrative kaufen, die auf Twitter viral gehen; kauft so ein Wallet, prüfen wir wieso und
+  entscheiden, ob wir nachkaufen; manche Coins muss man halten, weil sie am nächsten Tag hochgehen". Kartierung der
+  Integrationspunkte (vier Leser, 2026-10-11), `docs/experte.md` E-015.
+- Entschieden (Nutzeranweisung, Umsetzung Experte, record-only, R2/R5): (1) Wallet-Liste als Textdatei (`--wallets`,
+  Zeile `<Adresse> [Tag] [k/n] # Notiz`), Adressen von Hand (keine Solscan-API: Abo und Schlüssel, Eskalationspunkte 1
+  und 2) oder aus `wallets scout`; Datei-Hash im Record, Pfad und Schalter in `RECORD_ONLY_FIELDS`. (2) Ein
+  `logsSubscribe` je Wallet auf dem vorhandenen Stream (Reconnect inklusive), Verteiler nach Schlüssel; nur pump.fun-
+  Trade-Events mit `user == wallet` zählen, alles andere wird ohne Nachladen verworfen (der missing-Pfad läuft am Budget
+  vorbei). (3) Coins außerhalb des Blicks bekommen einen Stand aus dem Trade (`spaet`, Alter/Create-Slot/Bundle/Historie
+  unbekannt): nie BLICK/GO/RUG, keine Nebenabfragen, nur FOLGE; Coins im Blick nehmen denselben Hook in `_add_trade`
+  (Dedupe über `seen_sigs` und `folge_sigs`, Dev-Adressen ausgeschlossen). (4) 🐋 FOLGE einmal je Coin mit dem
+  gescorten Report (Record mit Kurve, Slot, Features), Kopfzeile mit Tag, Quelle, Trefferquote, Kaufgröße, Create-Block-
+  Marker, „spät gesehen", „nach GO/RUG"; weitere Käufe im Record (`folge.weitere`); `--folge-min-sol`;
+  `TIER_RANK["FOLGE"] = 0`, damit ein Coin mit GO und FOLGE in der GO-Gruppe bleibt. (5) FOLGE-Coins bleiben
+  `folge_keep_s` (1800, gedeckelt durch `max_keep_alive_s`) im Blick und werden getapet. (6) Wallet mit mehr als
+  `folge_max_logs_h` (600) Benachrichtigungen je Stunde wird stummgeschaltet (Bot/Börse, Bytes). (7) Papier-Strategien
+  `FOLGE-halten`, `FOLGE-trail`, `FOLGE-2x` (30 min, ohne Urteil und Fair-Gate als Filter, `Strategy.folge`); Halten
+  bis zum nächsten Tag nicht im Papierhandel (Engine-Kappe, Graduation beendet die Kurve), sondern aus dem Nachlauf.
+  (8) `wallets scout`: frühe Käufer je getapetem Coin (ohne Dev, ohne ersten Slot, ≤ 60 s), Label Graduation/Paar
+  außerhalb der Kurve/Liquidität ≥ 1 000 USD nach 24 h (fehlt = nicht beurteilbar), Bots = früh in > 20 % aller Coins,
+  Kandidat = Wilson-Untergrenze über der Wilson-Obergrenze der Kontrollgruppe (ab 20 beurteilbaren Kontrollen, sonst
+  Grundrate aller getapeten Coins) bei ≥ 3 beurteilbaren Coins. (9) `wallets report`: je Wallet Alarme, Graduation,
+  Überleben und Vielfaches `preis_native(+h) / Kurvenpreis beim Alarm` mit Gebühr 1,25 % je Seite, ohne Impact,
+  konservativ fehlt/unverkäuflich = 0x; Mindest-n 10 vor jeder Lesart.
+- Twitter/X: Mitlesen braucht API-Zugang (Abo) oder Scraping (ToS, Eskalationspunkt 7) – nicht gebaut (E-005 bleibt);
+  virale Begriffe über `--narratives` und die Thema-Welle.
+- Prüfpunkte: (a) `user` bei Käufen über Router oder PDA-Signer NICHT VERIFIZIERT – erste FOLGE-Zeilen gegen Solscan
+  prüfen; (b) Websocket-Kosten je Wallet (README: ~20 Credits je MB, NICHT VERIFIZIERT, OQ-025) – Statuszeile zählt
+  Wallet-Logs, Deckel 600/h ist Annahme; (c) Mehrfach-`mentions` je Abonnement nicht genutzt, N Wallets = N Abos;
+  (d) `preis_native` als SOL je Token [Snippet] – Vielfache erst nach Stichprobe gegen Solscan-Trades lesen;
+  (e) Scout-Stichprobe = Tape (Alarm-Coins + Kontroll-Anteil), Fundmenge überschätzt sich (Selektion) – Zeitsplit und
+  Vorwärtsmessung über FOLGE; (f) mehrstufige Finanzierung und Zwischen-Wallets unsichtbar; (g) `max_tracked` 400 gilt
+  auch für späte Coins (`dropped_full` beobachten); (h) ein FOLGE-Coin ohne SOL-Kurve (USDC) wird aufgezeichnet, aber
+  nicht papiergehandelt.
+- Default: record-only; keine Regel aus FOLGE vor einem `wallets report` mit ≥ 10 beurteilbaren Alarmen je Wallet und
+  24 h Feed-Reife; Grenzen (60 s, 20 %, 600/h, 30 min) bleiben bis dahin.
+- Blockiert: keinen Freeze.
+- Status: `entschieden (Experte)` am 2026-10-11 auf Nutzerauftrag; Prüfpunkte (a)–(h) offen.
+

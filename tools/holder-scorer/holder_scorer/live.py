@@ -52,6 +52,7 @@ from .encoding import BorshError
 from .extern import RECENT_ALERTS_MAX, TIER_RANK, append_row, feed_row, parse_migration, rugcheck_fetch
 from .fair import FairConfig, FairResult, fair_check, fair_line
 from .features import CREATION_WINDOW_SLOTS, compute_features
+from .folge import WalletEntry, folge_suffix, parse_wallets_file
 from .market import sol_usd
 from .narrative import NameRegistry, ThemeRegistry, link_anchors, normalize, theme_line
 from .narrative import terms as text_terms
@@ -150,6 +151,13 @@ class LiveConfig:
     # Außenquellen (extern.py, 0.3.6): record-only, no RPC
     extern_path: str | None = None  # --extern: graduations of the whole platform from the PumpPortal migration feed, Rugcheck rows
     rugcheck: bool = False  # one Rugcheck query per GO/GESPERRT into the extern file (HTTP group, outside the RPC budget)
+    # Wallet-Folge (folge.py, 0.3.8, OQ-035): record-only, no RPC. The watched addresses live in the engine, the config
+    # keeps only the file and its hash so records stay small and the rules hash stays stable.
+    follow_path: str | None = None  # --wallets: one logsSubscribe per watched wallet, 🐋 FOLGE when it buys a pump.fun coin
+    follow_hash: str | None = None
+    folge_keep_s: float = 1800.0  # keep a coin a watched wallet bought this long (capped by max_keep_alive_s)
+    folge_min_sol: float = 0.0  # ignore buys below this size (noise from dust buys)
+    folge_max_logs_h: int = 600  # a wallet with more notifications per hour is muted: bot or exchange, and it costs bytes
 
     @classmethod
     def for_stufe(cls, stufe: int) -> tuple["LiveConfig", ScoringConfig]:
@@ -229,6 +237,11 @@ class TokenState:
     welle_gezaehlt: bool = False
     fair: dict[str, Any] | None = None  # last fairness check (fair.py): ok, hard_ok, fails, pending, values
     wartet_gezaehlt: bool = False  # a GO was held back only by checks still loading (counted once)
+    # Wallet-Folge (0.3.8): first buy of a watched wallet, later ones appended; spaet = seen through a wallet, not a launch
+    folge: dict[str, Any] | None = None
+    folge_sigs: set[str] = field(default_factory=set)
+    folge_at: float | None = None
+    spaet: bool = False  # age, create slot, bundle and dev history unknown: record-only, no BLICK/GO/RUG
 
     @property
     def age(self) -> float:
@@ -341,8 +354,17 @@ class LiveEngine:
         self.stats = {
             "launches": 0, "tracked": 0, "trades": 0, "missing": 0, "dropped_missing": 0, "alerts": 0,
             "blick": 0, "go": 0, "rug": 0, "expired": 0, "side_tasks": 0, "side_skipped_budget": 0, "in_welle": 0, "watch": 0, "gesperrt": 0, "go_wartet": 0,
-            "graduierungen": 0, "graduierungen_alarm": 0,
+            "graduierungen": 0, "graduierungen_alarm": 0, "folge": 0, "wallet_logs": 0, "wallet_fremd": 0, "spaet": 0, "wallet_stumm": 0,
         }
+        # Wallet-Folge (0.3.8): watched wallets, their hourly notification counters, and the ones muted for being too busy
+        self.follow: dict[str, WalletEntry] = {}
+        if config.follow_path:
+            try:
+                self.follow = parse_wallets_file(config.follow_path)
+            except OSError as exc:
+                print(f"Wallet-Liste {config.follow_path} nicht ladbar: {exc}")
+        self.follow_logs: dict[str, tuple[float, int]] = {}
+        self.follow_muted: set[str] = set()
         self.recent_alerts: "OrderedDict[str, str]" = OrderedDict()  # mint -> highest tier sent; joins migration events to our calls
         self.rugcheck_fetch: Callable[[str], dict[str, Any]] = rugcheck_fetch  # replaceable in tests (no network)
         self._budget_window_start = 0.0
@@ -573,8 +595,90 @@ class LiveEngine:
         state.dirty = True
         self.stats["trades"] += 1
         self._update_curve(state, tr)
+        if idx is None and tr.is_buy and tr.user in self.follow:
+            self._note_folge(state, tr, now)
         if not state.create_slot_known and self.cfg.fetch_create_tx and state.create.signature and tr.user != state.creator:
             self._schedule_create_tx(state)
+
+    # --- Wallet-Folge (folge.py, 0.3.8, OQ-035) ------------------------------------------------------------------------
+    def _note_folge(self, state: TokenState, tr: TradeEvent, now: float) -> None:
+        """A watched wallet bought: remember it on the token; the alert goes out with the next scored evaluation."""
+        if tr.user in self._dev_addresses(state) or tr.signature in state.folge_sigs:
+            return
+        sol = tr.quote_lamports / LAMPORTS_PER_SOL
+        if sol < self.cfg.folge_min_sol:
+            return
+        state.folge_sigs.add(tr.signature)
+        entry = self.follow[tr.user]
+        buy = {"wallet": tr.user, "sol": round(sol, 4), "slot": tr.slot, "sig": tr.signature, "t": round(now, 3), "bundle": bool(tr.slot and tr.slot == state.create.slot)}
+        if state.folge is None:
+            state.folge = {
+                **buy, "tag": entry.tag, "quelle": entry.quelle, "treffer": entry.treffer, "coins": entry.coins, "notiz": entry.notiz,
+                "liste": self.cfg.follow_hash, "spaet": state.spaet, "alter_s": None if state.spaet else round(now - state.created_at, 1), "weitere": [],
+            }
+            state.folge_at = now
+        else:
+            state.folge["weitere"].append(buy)
+
+    def _state_from_trade(self, tr: TradeEvent, now: float) -> TokenState:
+        """A token the engine never saw launch, built from a watched wallet's trade: mint, dev and curve come from the
+        event, everything else (name, age, create slot, early holders) stays unknown. Costs no RPC."""
+        creator = tr.creator or ""
+        create = CreateEvent(
+            name="", symbol="", uri="", mint=tr.mint, bonding_curve=derive_bonding_curve(tr.mint), user=creator, creator=creator,
+            timestamp=int(tr.timestamp or now), virtual_token_reserves=INITIAL_VIRTUAL_TOKEN_RESERVES, virtual_sol_reserves=INITIAL_VIRTUAL_SOL_RESERVES,
+            real_token_reserves=INITIAL_REAL_TOKEN_RESERVES, token_total_supply=TOKEN_TOTAL_SUPPLY, is_mayhem_mode=tr.mayhem_mode,
+            signature="", slot=0, block_time=int(now),
+        )
+        # create_slot_known with slot 0: no trade can land "in the creation block", the window logic stays off
+        return TokenState(mint=tr.mint, created_at=now, creator=creator, create=create, bonding_curve=create.bonding_curve, create_slot_known=True, spaet=True)
+
+    def on_wallet_logs(self, wallet: str, slot: int, signature: str, err: Any, logs: list[str], now: float | None = None) -> tuple[list[str], bool]:
+        """A logsNotification of a watched wallet. Returns the mints to subscribe and whether to mute the wallet.
+
+        Only pump.fun trade events with ``user == wallet`` count; everything else a wallet does (transfers, other DEXes)
+        is dropped without any fetch: the missing-signature path would cost one RPC unit per notification.
+        """
+        now = now if now is not None else time.time()
+        if wallet in self.follow_muted:
+            return [], False
+        self.stats["wallet_logs"] += 1
+        start, n = self.follow_logs.get(wallet, (now, 0))
+        if now - start >= 3600:
+            start, n = now, 0
+        self.follow_logs[wallet] = (start, n + 1)
+        if n + 1 > self.cfg.folge_max_logs_h:
+            self.follow_muted.add(wallet)
+            self.stats["wallet_stumm"] += 1
+            print(f"Wallet {wallet[:8]} stummgeschaltet: über {self.cfg.folge_max_logs_h} Benachrichtigungen je Stunde (Bot oder Börse)")
+            return [], True
+        if err is not None:
+            return [], False
+        trades, _creates, _completed = parse_log_events(logs)
+        new: list[str] = []
+        for tr in trades:
+            if tr.user != wallet or not tr.is_buy:
+                continue
+            state = self.tokens.get(tr.mint)
+            if state is None:
+                if len(self.tokens) >= self.cfg.max_tracked:
+                    self.stats["dropped_full"] = self.stats.get("dropped_full", 0) + 1
+                    continue
+                state = self._state_from_trade(tr, now)
+                self.tokens[tr.mint] = state
+                self.stats["tracked"] = len(self.tokens)
+                self.stats["spaet"] += 1
+                new.append(tr.mint)
+            if signature in state.seen_sigs:
+                continue  # the mint subscription delivered the same transaction already
+            state.seen_sigs.add(signature)
+            tr.slot, tr.signature, tr.block_time = slot, signature, int(now)
+            if not tr.timestamp:
+                tr.timestamp = int(now)
+            self._add_trade(state, tr, now)
+        if not trades:
+            self.stats["wallet_fremd"] += 1
+        return new, False
 
     def _update_curve(self, state: TokenState, tr: TradeEvent) -> None:
         if tr.virtual_token_reserves <= 0 or tr.slot < state.curve_slot:
@@ -996,12 +1100,12 @@ class LiveEngine:
         state.last_eval = now
         state.dirty = False
         state.last_word = report.word
-        # side checks once the token shows real buyers
-        if feats.unique_outside_buyers >= self.cfg.creator_scan_min_buyers:
+        # side checks once the token shows real buyers; never for a coin seen only through a watched wallet (R5)
+        if feats.unique_outside_buyers >= self.cfg.creator_scan_min_buyers and not state.spaet:
             self._schedule_creator(state)
         # the early-buyer profiles wait for the creator scan (0.3.7): before, both started in the same tick, the
         # profiles never saw the creator's first transaction and "funded from the dev's source" was never detected
-        if feats.unique_outside_buyers >= self.cfg.profiles_min_buyers and self._creator_settled(state):
+        if feats.unique_outside_buyers >= self.cfg.profiles_min_buyers and self._creator_settled(state) and not state.spaet:
             self._schedule_profiles(state)
         report.creator = state.creator or None
         self._alerts(state, report, feats, now)
@@ -1159,6 +1263,16 @@ class LiveEngine:
         return res
 
     def _alerts(self, state: TokenState, report: QuickReport, feats, now: float) -> None:
+        cfg = self.cfg
+        if state.folge is not None and "FOLGE" in cfg.tiers and "FOLGE" not in state.tiers_sent:
+            # 🐋 FOLGE: a watched wallet bought. Context, not a verdict; goes out even after RUG or GO
+            out = QuickReport(**{**report.__dict__})
+            out.word = "FOLGE"
+            out.folge_wallet = state.folge["wallet"]
+            after = next((f"nach {t}" for t in ("GO", "RUG", "BLICK") if t in state.tiers_sent), None)
+            self._emit(state, "FOLGE", out, folge_suffix(self.follow.get(state.folge["wallet"]), state.folge, after), now)
+        if state.spaet:
+            return  # record-only (R2): age, create slot, bundle and dev history are unknown for a coin seen this late
         if state.final:
             return
         word = report.word
@@ -1297,6 +1411,8 @@ class LiveEngine:
                     keep = bool(self.keep_alive(mint, now))
                 except Exception:  # noqa: BLE001
                     keep = False
+            if state.folge_at is not None and not state.complete and now - state.folge_at <= min(self.cfg.folge_keep_s, self.cfg.max_keep_alive_s):
+                keep = True  # a coin a watched wallet bought stays taped for the follow horizon (0.3.8)
             if not keep and (
                 age > self.cfg.track_seconds
                 or (state.final and state.final_at is not None and now - state.final_at > self.cfg.final_linger_s)
@@ -1508,7 +1624,22 @@ async def run_live(
     )
     if paper is not None:
         paper.attach(engine)
-    stream = SolanaLogStream(ws_url or ws_url_from_rpc(rpc.url), config.commitment, lambda *a: engine.on_logs(*a))
+
+    def dispatch(key: str, slot: int, sig: str, err: Any, logs: list[str]) -> None:
+        # one stream, two kinds of keys: mints of tracked coins and watched wallets (0.3.8)
+        if key in engine.follow:
+            new_mints, mute = engine.on_wallet_logs(key, slot, sig, err, logs)
+            for m in new_mints:
+                loop.create_task(stream.subscribe(m))
+            if mute:
+                loop.create_task(stream.unsubscribe(key))
+        else:
+            engine.on_logs(key, slot, sig, err, logs)
+
+    stream = SolanaLogStream(ws_url or ws_url_from_rpc(rpc.url), config.commitment, dispatch)
+    stream.wanted.update(engine.follow)  # subscribed on every (re)connect like the mints
+    if engine.follow:
+        print(f"Wallet-Folge: {len(engine.follow)} Wallets aus {config.follow_path} (Liste {config.follow_hash}), 🐋 FOLGE bei jedem pump.fun-Kauf")
 
     async def pumpportal() -> None:
         backoff = 5.0
@@ -1584,7 +1715,9 @@ async def run_live(
                 s = engine.stats
                 print(
                     f"Status: {s['tracked']} Token im Blick, {s['launches']} Launches, {s['trades']} Trades, "
-                    f"Alarme BLICK {s['blick']} / GO {s['go']} / WIDERRUF {s.get('widerruf', 0)} / RUG {s['rug']} / GESPERRT {s.get('gesperrt', 0)}, "
+                    f"Alarme BLICK {s['blick']} / GO {s['go']} / WIDERRUF {s.get('widerruf', 0)} / RUG {s['rug']} / GESPERRT {s.get('gesperrt', 0)} / FOLGE {s.get('folge', 0)}, "
+                    + (f"Wallet-Logs {s.get('wallet_logs', 0)} (davon ohne pump.fun-Trade {s.get('wallet_fremd', 0)}, spät gesehene Coins {s.get('spaet', 0)}, stumm {s.get('wallet_stumm', 0)}), " if engine.follow else "")
+                    +
                     f"GO wartet auf Historie/Metadaten {s.get('go_wartet', 0)}, GO durch Profil/Halter-Anstieg gesperrt {s.get('go_profil', 0)}, "
                     f"Graduierungen (PumpPortal) {s.get('graduierungen', 0)} (davon mit Alarm {s.get('graduierungen_alarm', 0)}), Hintergrundabfragen {s['side_tasks']} "
                     f"(wegen Budget ausgelassen {s['side_skipped_budget']}), nachgeladen {s['missing']}, "

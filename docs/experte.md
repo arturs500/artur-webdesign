@@ -134,6 +134,7 @@ geöffnet und die Entscheidung mit Datum revidiert.
 | E-012 | 2026-10-04 | Abstimmung 0.3.5: Dev-Faktor monoton, WIDERRUF nach GO, Papier-Filter, Gate-Prüfung GO/GESPERRT, Startbefehl mit gesperrt (OQ-032) | keine Regel belohnt, was eine andere sperrt; Verschärfung ist mit `tape report` prüfbar | erster `tape report` mit ≥ 100 GO und ≥ 100 GESPERRT | – | – |
 | E-013 | 2026-10-04 | Außenquellen 0.3.6 record-only: PumpPortal-Migrationsfeed als externe Labels und Referenz-Coins, DexScreener-Nachlauf (+1 h/+24 h), Rugcheck opt-in; kein Gate (OQ-033) | externe Graduation- und Überlebensrate je Tier und für Kontrollen liegt mit Intervall vor; Profil aus Coins, die der Sniper nie gerufen hat; Kontroll-Stichprobe gegen die Grundrate 0,26–1,4 % geprüft | erster `tape report --extern` mit ≥ 100 GO und 24 h Feed-Reife | – | – |
 | E-014 | 2026-10-11 | Wallet-Prüfung 0.3.7 auf Anweisung des Nutzers: Top-Halter-Verbund vor GO, vollständige Creator-Historie, fehlgeschlagene Abfrage sperrt, Profile nach Creator-Abfrage, Serien-Regel laut README, Solscan-Links (OQ-034) | weniger GO auf Coins, deren Float am Dev hängt; GESPERRT „Wallet-Verbund" rentiert schlechter als GO | erster `tape report` mit ≥ 100 GO und ≥ 100 GESPERRT | – | – |
+| E-015 | 2026-10-11 | Wallet-Folge 0.3.8 auf Anweisung des Nutzers: Wallet-Liste, Log-Abo je Wallet, 🐋 FOLGE record-only (auch für Coins außerhalb des Blicks), Scout aus Tape × Außenquellen, Report mit Vielfachem +1 h/+24 h (OQ-035) | je Wallet liegt nach Vorwärtsmessung vor, ob seine Käufe häufiger graduieren/überleben als die Kontrollgruppe und ob Halten bis zum nächsten Tag ein Vielfaches über 1x bringt | erster `wallets report` mit ≥ 10 beurteilbaren FOLGE-Alarmen je Wallet und 24 h Feed-Reife | – | – |
 
 ---
 
@@ -221,6 +222,21 @@ Top-Halter vor jedem GO, alles über den RPC und nur für GO-Kandidaten (OQ-025)
 Hand. Die Nutzeranweisung macht die Sperre sofort wirksam (wie E-011); R2 bleibt gewahrt, weil jede Sperre als GESPERRT
 mit Gründen und Verbundwerten aufgezeichnet wird. Revisionsauslöser: „Sperre unnötig" in der Gate-Prüfung → Grenze
 lockern; mehr als die Hälfte der GO-Kandidaten mit „Historie unvollständig" → Prüfpunkt (d) in OQ-034 entscheiden.
+
+
+**E-015 Wallet-Folge (OQ-035).** Auftrag „Informationen von internen Wallets nutzen, die frühe Narrative kaufen; kauft
+so ein Wallet, prüfen wir wieso und entscheiden, ob wir nachkaufen; manche Coins halten, weil sie am nächsten Tag
+hochgehen". Outcome-Maß: je Wallet Graduation und Überleben der gekauften Coins gegen die Kontrollgruppe, Kurs-Vielfaches
+nach 1 h und 24 h gegen den Kurvenpreis beim Alarm. Optionen: Solscan/DexScreener-Wallet-APIs (Abo, Schlüssel:
+Eskalationspunkte 1 und 2); PumpPortal-Kontoabonnement (bezahlt, Schlüssel: Punkte 1 und 2); Twitter-API oder Scraping
+(Punkte 1 und 7); nur Coins im Blick prüfen (null Zusatzkosten, aber Käufe in älteren Coins unsichtbar, also genau der
+Anwendungsfall nicht abgedeckt); ein Log-Abo je Wallet auf dem vorhandenen Stream (null RPC, Bytes je Wallet). Evidenz:
+Stufe 5 (Mechanik: der Kauf ist ein On-Chain-Ereignis, das der Stream ohnehin liefert; Außenquellen tragen die
+24-h-Wahrheit) und der Nutzerbericht „am nächsten Tag hoch" (Stufe 1, Erinnerung, unbelegt). Entscheidung: Log-Abo je
+Wallet plus Hook für Coins im Blick, FOLGE record-only, Scout und Report aus eigenen Daten; keine bezahlte Quelle, kein
+Twitter, kein Gate, kein Kauf (R1, R2, R5). Revisionsauslöser: Wallet-Logs über 1 MB je Stunde → Deckel senken oder
+Liste kürzen; `wallets report` zeigt bei ≥ 10 Alarmen je Wallet ein 24-h-Vielfaches unter 1x → Wallet aus der Liste;
+über 1x mit Wilson-Untergrenze über der Kontrollgruppe → Prereg-Kandidat EXP005 (Eskalation, Punkt 4).
 
 Nicht entscheidbar (bleiben `offen`, Eskalation): OQ-001 (Datei fehlt), OQ-002 (Abgleich mit dem Prereg-Text
 braucht die Datei), OQ-008 (Veröffentlichung im Pages-Repo = Eskalationspunkt 5), OQ-020 (Kauf), OQ-021

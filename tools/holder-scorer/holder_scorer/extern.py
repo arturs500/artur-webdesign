@@ -33,7 +33,9 @@ from .dexpaid import BASE_URL, MAX_TOKENS_PER_CALL, RATE_PAIRS_PER_MIN, TOKENS, 
 
 Fetch = Callable[[str], tuple[int, Any]]
 
-TIER_RANK = {"GO": 5, "GESPERRT": 4, "WIDERRUF": 3, "RUG": 2, "BLICK": 1}  # gemeinsame Rangfolge für Alarm-Gedächtnis und Nachlauf-Gruppen
+# gemeinsame Rangfolge für Alarm-Gedächtnis und Nachlauf-Gruppen; FOLGE (0.3.8) ganz unten, damit ein Coin mit GO und FOLGE
+# in der GO-Gruppe bleibt – die Auswertung je Wallet läuft über die FOLGE-Records selbst (folge.wallet_report)
+TIER_RANK = {"GO": 5, "GESPERRT": 4, "WIDERRUF": 3, "RUG": 2, "BLICK": 1, "FOLGE": 0}
 GRUPPE_KONTROLLE = "KONTROLLE"
 LAUNCH_TX_TYPES = {"create", "buy", "sell"}  # alles andere mit Mint auf dem Migrationsfeed gilt als Graduation
 # Rugcheck-Kurzbericht: Felder score / score_normalised (0–100, höher = riskanter) / risks[] laut Drittanleitungen,
