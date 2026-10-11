@@ -598,3 +598,20 @@ steht hier mit Datum und im Outcome-Register des Experten mit Prüftermin.
   und „Historie unvollständig" getrennt auswerten; Lesart „Sperre unnötig" → Grenze lockern.
 - Blockiert: keinen Freeze.
 - Status: `entschieden (Experte)` am 2026-10-11 auf Nutzerauftrag; Prüfpunkte (a)–(f) offen.
+- Nachtrag 2026-10-11 (Code-Prüfung der Umsetzung, drei Blickwinkel, 15 bestätigte Befunde): (1) Die zweite Wallet-Runde
+  kam einen Tick zu spät, dazwischen ging ein GESPERRT „bei ungeprüften Top-Haltern" heraus und danach ein GO für denselben
+  Coin, was die Messung GO gegen GESPERRT verfälscht hätte; jetzt wird der Verbund vor der Rundenentscheidung frisch
+  gerechnet, und Ungeprüftes ist bis zur letzten möglichen Runde „lädt". (2) Verbund und Ungeprüftes zählen zusammen gegen
+  die Grenze („Unbekannt zählt nicht als sauber" galt vorher nur je Teil). (3) Leeres Budget, übersprungener tiefer Scan und
+  eine vom Budget still übersprungene Runde sind „lädt", nicht GESPERRT; eine Runde zählt erst, wenn sie wirklich startet.
+  (4) Fehlende Erst-Transaktionen werden einmal nachgeladen, sonst ist der Finanzierer unbekannt (`funder_unknown`,
+  nicht gecacht, zählt als ungeprüft); ein ausgefallener Börsen-Check lässt die Quelle unbekannt statt „keine Börse".
+  (5) Vom Batch verlorene Creator-Transaktionen zählen nicht als gescannt (lückenloser Präfix), beim Neuladen wegen Lücke
+  bleiben bekannte Launches erhalten (Regression gegenüber 0.3.6 behoben), die Launch-Rate zählt nur Launches in der
+  gescannten Spanne. (6) Der Score-Abzug für einen Ausschnitt gilt nur noch für die gekappte 1000er-Seite; ein kürzerer
+  Scan hätte sonst Kandidaten knapp über der Schwelle unter GO gedrückt, und der tiefe Scan, der nur für GO-Kandidaten
+  läuft, wäre nie gekommen (tote Zone). Bei 1000er-Seite kein tiefer Scan (kann nie vollständig werden). (7) Profile der
+  ersten Käufer warten in jeder Stufe auf die Creator-Abfrage (Stufe 1 startet beide ab 8 Käufern); spätere Runden
+  aktualisieren die frühen Profile. (8) Stufe 3 prüft die Wallets ohne zu warten (`wait_for_wallets`), die dokumentierte
+  20-%-Grenze wirkt damit. Tests für alle Punkte in `tests/test_wallets.py`. Neuer Prüfpunkt (g): die Wartezeit auf die
+  Wallet-Runde vor GO im Betrieb messen (eine Signaturseite je neuem Top-Halter plus ein Batch), siehe (e).

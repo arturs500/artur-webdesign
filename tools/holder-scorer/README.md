@@ -135,23 +135,32 @@ mit gemeinsamer Quelle. Liegt dieser Verbund über der Stufengrenze (5/10/20 Pro
 ⛔ GESPERRT mit dem Grund, etwa `Wallet-Verbund 18 % in 3 Wallets`. Die Werte stehen in jeder Aufzeichnung unter
 `fair.values` (`verbund`, `verbund_details`, `frisch_anteil`). Außerdem:
 
+- Ungeprüfte Top-Halter zählen nicht als sauber: Profil fehlgeschlagen, Erst-Transaktion nicht ladbar, Börsen-Check
+  ausgefallen oder erst nach dem Rundenstart eingestiegen. Liegen Verbund und Ungeprüftes zusammen über der Grenze,
+  läuft eine zweite Runde; bleibt es dabei, ist das eine Sperre (`Wallet-Verbund 6 % (+5 % ungeprüft)`). Ein GESPERRT
+  entsteht nur aus einem endgültigen Ergebnis, nie aus einer Runde, die noch läuft.
 - Die Creator-Historie muss vollständig gescannt sein. Ein GO-Kandidat mit einem Ausschnitt bekommt einmal einen tiefen
   Scan (150 Transaktionen); bleibt es ein Ausschnitt, ist das ein Grund für GESPERRT (`Historie unvollständig`). Vorher
-  galt ein Serien-Deployer mit mehr als 30 neueren Transaktionen als Creator ohne Vor-Launches.
+  galt ein Serien-Deployer mit mehr als 30 neueren Transaktionen als Creator ohne Vor-Launches. Transaktionen, die ein
+  Batch verliert, zählen nicht als gescannt; einmal gefundene Launches bleiben bekannt, auch wenn die Seite neu geladen
+  wird. Ein Dev-Wallet mit mehr als 1000 Signaturen bekommt keinen tiefen Scan, weil keiner es vollständig machen kann;
+  es wird sofort gesperrt.
 - Eine fehlgeschlagene Creator-Abfrage sperrt GO (`Historie nicht ladbar`), statt als leere, saubere Historie zu gelten.
 - Die Profile der ersten Käufer warten auf die Creator-Abfrage. Vorher liefen beide im selben Moment los, und
   „aus derselben Quelle wie der Dev" wurde im Live-Modus nie erkannt.
 - Serien-Deployer wie dokumentiert: 5 tote Vor-Launches ohne Graduation reichen für NEIN und die Warnung SERIE, auch
-  wenn daneben lebende stehen.
+  wenn daneben lebende stehen. „0 Vor-Launches" in einer gekappten 1000er-Seite gibt nur die Punkte eines unbekannten
+  Creators; ein kürzerer Scan senkt den Score nicht, damit der Kandidat GO erreicht und den tiefen Scan bekommt.
 - Die Nachricht trägt Solscan-Links für den Token und das Dev-Wallet; `start.sh`/`start.bat` schicken WIDERRUF jetzt
   aufs Handy.
 
-Kosten: nur GO-Kandidaten, etwa 10 bis 20 RPC-Einheiten je Kandidat (frühe Käufer kommen aus dem Cache), der tiefe
-Scan bis 120 Einheiten. Ist das Stundenbudget leer, gilt die Prüfung als nicht gemacht (`Wallets nicht geprüft
-(RPC-Budget)`), nicht als bestanden. `--fair-ohne-wallets` schaltet die Prüfung ab, `--fair-verbund-max` stellt die
-Grenze ein. Börsen-Hot-Wallets erkennt der Sniper an mindestens 50 Transaktionen; eine Rug-Quelle mit vielen
-Transaktionen kann deshalb als Börse durchgehen (Prüfpunkt in OQ-034). Die Grenzen sind Startwerte ohne Daten: ob die
-Sperren richtig sind, zeigt `tape report` mit GO gegen GESPERRT.
+Kosten: nur GO-Kandidaten, etwa 10 bis 20 RPC-Einheiten je Runde (frühe Käufer kommen aus dem Cache), der tiefe
+Scan bis 120 Einheiten. Ist das Stundenbudget leer, wartet GO (`Wallets lädt`), bis die Prüfung nachgeholt ist; der
+Zähler „wartet" in der Statuszeile zeigt das. Stufe 3 wartet nicht auf die Prüfung, sperrt aber ein vorliegendes
+Ergebnis über 20 Prozent. `--fair-ohne-wallets` schaltet die Prüfung ab, `--fair-verbund-max` stellt die Grenze ein.
+Börsen-Hot-Wallets erkennt der Sniper an mindestens 50 Transaktionen; eine Rug-Quelle mit vielen Transaktionen kann
+deshalb als Börse durchgehen (Prüfpunkt in OQ-034). Die Grenzen sind Startwerte ohne Daten: ob die Sperren richtig
+sind, zeigt `tape report` mit GO gegen GESPERRT.
 
 **Launch-Rechner (OQ-029, `docs/fair_launch.md`):** `python -m holder_scorer launch rechner` zeigt aus der
 geprüften Kurvenmathematik, welchen Supply-Anteil ein Dev-Kauf ergibt, wie viel Fremdzufluss bis zur Graduation

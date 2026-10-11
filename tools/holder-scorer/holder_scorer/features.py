@@ -366,7 +366,9 @@ def compute_features(snap: Snapshot, now: float | None = None) -> Features:
     for w in snap.early_wallets:
         if not w.funder:
             continue
-        if w.funder in creator_addrs or (creator_funder and w.funder == creator_funder and w.funder_busy is not True):
+        # a shared source with the dev counts only when the exchange check ran and said no (0.3.7): an unchecked
+        # or failed check must not raise FUNDER, which vetoes BLICK and GO
+        if w.funder in creator_addrs or (creator_funder and w.funder == creator_funder and w.funder_busy is False):
             funded_by_creator += 1
         elif not w.funder_busy:
             funders[w.funder] = funders.get(w.funder, 0) + 1
@@ -506,7 +508,9 @@ def compute_features(snap: Snapshot, now: float | None = None) -> Features:
         creator_dead=ch.dead if creator_known else None,
         creator_young=ch.young if creator_known else None,
         creator_history_source=ch.source if ch else "none",
-        creator_sample_capped=bool(ch and (ch.sample_capped or not ch.complete)),
+        # capped: the 1000-signature page did not hold the whole wallet (no scan can finish it); a shorter scan
+        # is not "capped" but "incomplete", which the fairness gate handles after the deep scan (0.3.7)
+        creator_sample_capped=bool(ch and ch.sample_capped),
         creator_history_complete=(ch.complete and not ch.sample_capped) if creator_known else None,
         creator_wallet_tx_count=cp.tx_count if cp else None,
         creator_wallet_age_s=creator_age,

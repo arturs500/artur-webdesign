@@ -155,7 +155,7 @@ class LiveConfig:
     def for_stufe(cls, stufe: int) -> tuple["LiveConfig", ScoringConfig]:
         if stufe <= 1:
             return cls(
-                stufe=1, blick_min_outside_buyers=8, blick_min_inflow_sol=1.0, max_bundle_share=0.05, creator_scan_min_buyers=8,
+                stufe=1, blick_min_outside_buyers=8, blick_min_inflow_sol=1.0, max_bundle_share=0.05, creator_scan_min_buyers=8, profiles_min_buyers=8,
                 blick_min_holder_rise=3, go_min_holder_rise=3, fair=FairConfig.for_stufe(1),
             ), ScoringConfig()
         if stufe >= 3:
@@ -657,12 +657,13 @@ class LiveEngine:
     # --- side tasks ---------------------------------------------------------------------------
     def _spawn(
         self, state: TokenState, name: str, fn: Callable[[], Any], apply: Callable[[TokenState, Any], None], delay: float = 0.0, group: str = "rpc"
-    ) -> None:
+    ) -> bool:
+        """Start a background task once per token and name. Returns False when nothing was started."""
         if self.run_side_task is None or name in state.pending or name in state.done:
-            return
+            return False
         if group == "rpc" and not self.rpc_budget_ok():
             self.stats["side_skipped_budget"] += 1
-            return
+            return False
         state.pending.add(name)
         self.stats["side_tasks"] += 1
 
@@ -680,6 +681,7 @@ class LiveEngine:
             state.dirty = True
 
         self.run_side_task(name, guarded, done, delay, group)
+        return True
 
     def _schedule_metadata(self, state: TokenState) -> None:
         if not state.create.uri:
@@ -820,6 +822,9 @@ class LiveEngine:
             st.creator_funder = creator_funder
         if st.creator_funder and st.creator_profile and not st.creator_profile.funder:
             st.creator_profile.funder = st.creator_funder
+        # the early-buyer profiles feed the FUNDER/FRISCH flags: a later round knows more (the dev's funder, the
+        # exchange check), so they take the fresher profile of the same wallet
+        st.early_wallets = [st.wallet_profiles.get(w.address, w) for w in st.early_wallets]
 
     @staticmethod
     def _dev_addresses(state: TokenState) -> set[str]:
@@ -846,7 +851,11 @@ class LiveEngine:
             return
         ch = state.creator_history
         if fair.require_complete_history and ch is not None and not ch.complete and "creator_tief" not in state.pending and "creator_tief" not in state.done:
-            if self.rpc_budget_ok():
+            if ch.sample_capped:
+                # the 1000-signature page does not hold the whole wallet: no scan can complete it, so the deep
+                # scan is pointless (about 120 units) and the gate judges the slice right away
+                state.done.add("creator_tief")
+            elif self.rpc_budget_ok():
                 state.deep_skipped = False
                 creator, mint, launch, scan_tx = state.creator, state.mint, int(state.created_at), self.cfg.creator_deep_scan_tx
 
@@ -856,18 +865,29 @@ class LiveEngine:
                     if st.creator_profile is not None and not st.creator_profile.funder:
                         st.creator_profile.funder = funder or st.creator_funder
 
-                self._spawn(state, "creator_tief", lambda: _creator_history(self.rpc, creator, mint, launch, scan_tx, self.cache), apply_deep)
+                if not self._spawn(state, "creator_tief", lambda: _creator_history(self.rpc, creator, mint, launch, scan_tx, self.cache), apply_deep):
+                    state.deep_skipped = True
             else:
                 state.deep_skipped = True
-        if fair.require_wallet_check and (state.wallet_task is None or state.wallet_task not in state.pending):
-            again = (
-                state.wallets_ok
-                and state.verbund is not None
-                and state.verbund.get("unchecked_share", 0.0) >= fair.max_verbund_share
-                and state.wallet_rounds < self.cfg.wallet_check_rounds
-            )
-            if state.wallet_rounds == 0 or again:
-                self._schedule_wallets(state)
+        if fair.require_wallet_check and not self._wallet_round_running(state) and self._wallet_round_due(state):
+            self._schedule_wallets(state)
+
+    def _wallet_round_running(self, state: TokenState) -> bool:
+        return state.wallet_task is not None and state.wallet_task in state.pending
+
+    def _wallet_round_due(self, state: TokenState) -> bool:
+        """Another round is due: none yet, the last one failed, or unchecked holders still decide the verdict.
+
+        The verbund is computed fresh here, not read from the last fairness check: that one ran before the round
+        came back, so it would always say "nothing unchecked" and the second round would come one tick too late.
+        """
+        if state.wallet_rounds >= self.cfg.wallet_check_rounds:
+            return False
+        if not state.wallets_ok:
+            return True
+        v = self._verbund(state) or {}
+        share, unchecked = float(v.get("share", 0.0)), float(v.get("unchecked_share", 0.0))
+        return unchecked > 0 and share < self.cfg.fair.max_verbund_share and share + unchecked >= self.cfg.fair.max_verbund_share
 
     def _schedule_wallets(self, state: TokenState) -> None:
         devs = self._dev_addresses(state)
@@ -877,10 +897,7 @@ class LiveEngine:
         if not self.rpc_budget_ok():
             state.wallet_skipped = True
             return
-        state.wallet_skipped = False
-        state.wallet_rounds += 1
-        name = f"wallets{state.wallet_rounds}"
-        state.wallet_task = name
+        name = f"wallets{state.wallet_rounds + 1}"
         launch, creator, first_sig = int(state.created_at), state.creator, state.creator_first_sig
 
         def apply(st: TokenState, res: Any) -> None:
@@ -888,18 +905,31 @@ class LiveEngine:
             st.wallets_ok = True
             self._take_profiles(st, profiles, creator_funder)
 
-        self._spawn(state, name, lambda: _early_wallets(self.rpc, top, launch, self.cache, creator, first_sig), apply)
+        # the round counts only once the task really started: _spawn may still skip it when worker threads spent
+        # the budget between the two checks, and a counted-but-never-run round would wait forever as "lädt"
+        if self._spawn(state, name, lambda: _early_wallets(self.rpc, top, launch, self.cache, creator, first_sig), apply):
+            state.wallet_skipped = False
+            state.wallet_rounds += 1
+            state.wallet_task = name
+        else:
+            state.wallet_skipped = True
 
     def _wallet_state(self, state: TokenState) -> str:
         if not (self.cfg.fair.require_wallet_check and self._creator_check_possible() and self.cfg.profiles_min_buyers <= 1000):
             return "ungeprüft"
-        if state.wallet_task is not None and state.wallet_task in state.pending:
+        if self._wallet_round_running(state):
             return "laedt"
         if state.wallets_ok:
             return "ok"
+        if state.wallet_skipped:
+            return "budget"
         if state.wallet_task is not None and state.wallet_task in state.done:
             return "fehler"
-        return "budget" if state.wallet_skipped else "offen"
+        return "offen"
+
+    def _wallet_final(self, state: TokenState) -> bool:
+        """No further wallet round can follow: what is unchecked now stays unchecked."""
+        return state.wallet_rounds >= self.cfg.wallet_check_rounds and not self._wallet_round_running(state)
 
     def _verbund(self, state: TokenState) -> dict[str, Any] | None:
         if not state.wallets_ok:
@@ -969,11 +999,9 @@ class LiveEngine:
         # side checks once the token shows real buyers
         if feats.unique_outside_buyers >= self.cfg.creator_scan_min_buyers:
             self._schedule_creator(state)
-        # the early-buyer profiles wait for a due creator scan (0.3.7): before, both started in the same tick, the
+        # the early-buyer profiles wait for the creator scan (0.3.7): before, both started in the same tick, the
         # profiles never saw the creator's first transaction and "funded from the dev's source" was never detected
-        if feats.unique_outside_buyers >= self.cfg.profiles_min_buyers and (
-            self._creator_settled(state) or feats.unique_outside_buyers < self.cfg.creator_scan_min_buyers
-        ):
+        if feats.unique_outside_buyers >= self.cfg.profiles_min_buyers and self._creator_settled(state):
             self._schedule_profiles(state)
         report.creator = state.creator or None
         self._alerts(state, report, feats, now)
@@ -1107,7 +1135,7 @@ class LiveEngine:
         elif "creator_tief" in state.done:
             deep = "fertig"
         else:
-            deep = "fehler" if state.deep_skipped else "offen"
+            deep = "budget" if state.deep_skipped else "offen"  # both retried on the next evaluation
         coverage = None
         if ch is not None and not ch.complete:
             coverage = f"{ch.scanned_tx} von {ch.ok_tx}{'+' if ch.sample_capped else ''} Tx"
@@ -1125,6 +1153,7 @@ class LiveEngine:
             creator_coverage=coverage,
             wallet_state=self._wallet_state(state),
             verbund=self._verbund(state),
+            wallet_final=self._wallet_final(state),
         )
         state.fair = res.to_dict()
         return res

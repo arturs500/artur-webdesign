@@ -247,7 +247,8 @@ def _creator(f: Features, cfg: ScoringConfig) -> FactorResult:
         pts = mx * 0.6
         value = "kein anderer Token dieses Creators gefunden"
         if f.creator_sample_capped:
-            # nothing found in a slice is not a clean history (0.3.7): as many points as an unknown creator
+            # nothing found in the newest 1000 of more signatures is not a clean history (0.3.7): as many points as
+            # an unknown creator. A shorter scan does not deduct here, the live gate deepens and then judges it.
             pts = mx * 0.3
             value = "kein anderer Token im geprüften Ausschnitt"
             comments.append("nur ein Ausschnitt der Creator-Historie geprüft")

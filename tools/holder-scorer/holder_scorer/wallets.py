@@ -53,8 +53,9 @@ def holder_verbund(
 
     A top holder is linked when (first match wins): it funded the dev; the dev funded it; it shares the dev's
     funder; another top holder funded it, or it funded another top holder; it shares a funder with at least one
-    other top holder. Funders that look like exchange hot wallets (``funder_busy is True``) never link. Unknown is
-    not clean: top holders without a profile are reported as ``unchecked_share``.
+    other top holder. A shared source links only when the exchange check ran and said "not an exchange"
+    (``funder_busy is False``). Unknown is not clean: top holders without a profile, without a loaded first
+    transaction, or with a shared source whose exchange check failed are reported as ``unchecked_share``.
     """
     holders = top_holders(balances, devs, top)
     supply = max(int(supply), 1)
@@ -62,39 +63,47 @@ def holder_verbund(
     groups: dict[str, list[str]] = {}
     for o, _ in holders:
         p = profiles.get(o)
-        if p is not None and p.funder and p.funder_busy is not True and p.funder not in devs:
+        if p is not None and p.funder and p.funder not in devs:
             groups.setdefault(p.funder, []).append(o)
     funded_others = {p.funder for o, _ in holders if (p := profiles.get(o)) is not None and p.funder in addrs}
 
     reasons: dict[str, str] = {}
+    unchecked: set[str] = set()
     for o, _ in holders:
         p = profiles.get(o)
-        if p is None:
+        if p is None or p.funder_unknown:
+            unchecked.add(o)
             continue
-        exchange = p.funder_busy is True
+        busy = p.funder_busy  # True: exchange, False: checked and not an exchange, None: not checked
         if creator_funder and o == creator_funder:
             reasons[o] = "finanzierte den Dev"
         elif p.funder and p.funder in devs:
             reasons[o] = "vom Dev finanziert"
-        elif creator_funder and p.funder == creator_funder and not exchange:
-            reasons[o] = "gleiche Quelle wie der Dev"
         elif p.funder and p.funder in addrs:
             reasons[o] = "von einem Top-Halter finanziert"
         elif o in funded_others:
             reasons[o] = "finanzierte einen Top-Halter"
-        elif p.funder and not exchange and len(groups.get(p.funder, [])) >= 2:
-            reasons[o] = f"gemeinsame Quelle mit {len(groups[p.funder]) - 1} Top-Halter(n)"
+        elif creator_funder and p.funder == creator_funder:
+            if busy is False:
+                reasons[o] = "gleiche Quelle wie der Dev"
+            elif busy is None:
+                unchecked.add(o)
+        elif p.funder and len(groups.get(p.funder, [])) >= 2:
+            if busy is False:
+                reasons[o] = f"gemeinsame Quelle mit {len(groups[p.funder]) - 1} Top-Halter(n)"
+            elif busy is None:
+                unchecked.add(o)
 
     linked = [
         {"wallet": o, "anteil": round(a / supply, 4), "grund": reasons[o]} for o, a in holders if o in reasons
     ]
-    checked = [(o, a) for o, a in holders if o in profiles]
+    checked = [(o, a) for o, a in holders if o not in unchecked]
     return VerbundResult(
         share=round(sum(a for o, a in holders if o in reasons) / supply, 4),
         wallets=len(linked),
         top=len(holders),
         checked=len(checked),
-        unchecked_share=round(sum(a for o, a in holders if o not in profiles) / supply, 4),
+        unchecked_share=round(sum(a for o, a in holders if o in unchecked) / supply, 4),
         fresh_share=round(sum(a for o, a in checked if profiles[o].is_fresh) / supply, 4),
         linked=linked,
     )

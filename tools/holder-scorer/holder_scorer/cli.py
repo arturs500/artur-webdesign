@@ -9,6 +9,7 @@ import time
 from . import make_rpc
 from .calibrate import append_prefilter_record, append_record, evaluate, update_outcomes
 from .collect import collect
+from .fair import FairConfig
 from .features import compute_features
 from .notify import format_legend, format_short, send_telegram, telegram_configured
 from .quick import QuickConfig, QuickReport, quick_check
@@ -155,6 +156,23 @@ def cmd_watch(args: argparse.Namespace) -> int:
     return 0
 
 
+def apply_fair_args(fair: FairConfig, args: argparse.Namespace) -> None:
+    """The --fair-* switches of ``live`` onto the fairness gate (fair.py): principles of docs/fair_launch.md as
+    conditions for BLICK and GO, plus the wallet check of the top holders (0.3.7, OQ-034)."""
+    fair.enabled = not getattr(args, "no_fair", False)
+    if getattr(args, "fair_dev_max", None) is not None:
+        fair.max_dev_share = args.fair_dev_max
+    if getattr(args, "fair_socials", None) is not None:
+        fair.min_socials = args.fair_socials
+    if getattr(args, "fair_ohne_historie", False):
+        fair.require_creator_check = False
+        fair.require_complete_history = False
+    if getattr(args, "fair_ohne_wallets", False):
+        fair.require_wallet_check = False
+    if getattr(args, "fair_verbund_max", None) is not None:
+        fair.max_verbund_share = args.fair_verbund_max
+
+
 def cmd_live(args: argparse.Namespace) -> int:
     from .live import LiveConfig, live
 
@@ -181,20 +199,7 @@ def cmd_live(args: argparse.Namespace) -> int:
         config.rpc_units_per_hour = args.budget
     tiers = tuple(t.strip().upper() for t in (args.tiers or "blick,go,widerruf,rug,gesperrt").split(",") if t.strip())
     notify_words = {w.strip().upper() for w in (args.notify or "blick,go,widerruf,rug").split(",") if w.strip()}
-    # fairness gate (fair.py): the principles of docs/fair_launch.md as conditions for BLICK and GO
-    config.fair.enabled = not getattr(args, "no_fair", False)
-    if getattr(args, "fair_dev_max", None) is not None:
-        config.fair.max_dev_share = args.fair_dev_max
-    if getattr(args, "fair_socials", None) is not None:
-        config.fair.min_socials = args.fair_socials
-    if getattr(args, "fair_ohne_historie", False):
-        config.fair.require_creator_check = False
-        config.fair.require_complete_history = False
-    # Wallet-Prüfung (0.3.7, OQ-034): Top-Halter am Dev oder aneinander, vor jedem GO
-    if getattr(args, "fair_ohne_wallets", False):
-        config.fair.require_wallet_check = False
-    if getattr(args, "fair_verbund_max", None) is not None:
-        config.fair.max_verbund_share = args.fair_verbund_max
+    apply_fair_args(config.fair, args)
     watch = tuple(w.strip() for w in (getattr(args, "beobachte", None) or "").split(",") if w.strip())
     config.watch_terms = watch
     if watch:
