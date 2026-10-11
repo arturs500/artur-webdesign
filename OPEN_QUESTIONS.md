@@ -556,3 +556,45 @@ steht hier mit Datum und im Outcome-Register des Experten mit Prüftermin.
   einer Zeitsplit-Prüfung.
 - Blockiert: keinen Freeze.
 - Status: `entschieden (Experte)` am 2026-10-04 auf Nutzerauftrag; Prüfpunkte (a)–(g) offen.
+
+## OQ-034 – Sniper 0.3.7 „Wallet-Prüfung": Wallets prüfen wie auf Solscan, weil fast nur Rugs gerufen werden
+
+- Datum: 2026-10-11
+- Kontext: Nutzerauftrag „der Bot soll über Solscan Wallets prüfen, baue es mit ein, weil der Bot fast ausschließlich
+  Rugpulls snipet". Die Beobachtung „fast nur Rugs" stammt vom Nutzer; Aufzeichnungen liegen weiter nicht vor (OQ-024).
+  Code-Prüfung am 2026-10-11 (fünf Prüfbereiche, jeder Befund gegengeprüft): Die vorhandenen Wallet-Prüfungen griffen im
+  Live-Modus teilweise nicht. Die Profile der ersten Käufer starteten im selben Tick wie die Creator-Abfrage und sahen nie
+  die erste Transaktion des Devs („aus derselben Quelle wie der Dev" wurde nie erkannt); eine fehlgeschlagene
+  Creator-Abfrage galt als leere, saubere Historie; die Creator-Historie sah nur 30 Transaktionen und meldete dabei
+  vollen Umfang; der Serien-K.-o. verlangte entgegen README 80 % tote Vor-Launches.
+- Solscan: Die Pro API ist ein Abo mit Schlüssel (Level 2 199 USD/Monat, `/account/transfer` 100 CU) [Snippet:
+  docs.solscan.io/api-access/solscan-pro-api-levels-and-details und docs.solscan.io/api-access/pro-api-endpoints,
+  2026-10-11; pro-api.solscan.io in der Arbeitsumgebung nicht auflösbar]. Abo und Schlüssel stehen auf der
+  Eskalationsliste (CLAUDE.md), Scraping der Website wäre ein ToS-Risiko. Solscan zeigt dieselben Chain-Daten, die der
+  Sniper über den vorhandenen RPC liest. Token-Seite `solscan.io/token/<mint>` [Snippet: Suchtreffer solscan.io/token/…pump,
+  2026-10-11]; Konto-Seite `solscan.io/account/<adresse>` NICHT VERIFIZIERT (kb.solscan.io/exploring-account-page beschreibt
+  die Konto-Seite, das URL-Muster stand nicht im Snippet).
+- Entschieden (Nutzeranweisung, umgesetzt vom Experten, wie E-011 messbar über GESPERRT): (1) Top-Halter-Verbund
+  (`wallets.py`): vor jedem GO die acht größten Halter ohne Dev profilieren (Finanzierer = Fee-Payer der ersten
+  Transaktion, Börsen-Check ab zwei Wallets mit gleicher Quelle und für die Quelle des Devs); Supply-Anteil in Wallets,
+  die den Dev finanzierten, vom Dev finanziert sind, die Quelle des Devs teilen, einen anderen Top-Halter finanzierten oder
+  von ihm finanziert sind oder eine Quelle mit einem anderen Top-Halter teilen; GO nur unter 5/10/20 % (Stufe 1/2/3,
+  Stufe 3 wartet nicht auf die Prüfung); ungeprüfte Top-Halter über der Grenze sperren ebenfalls; zweite Runde, wenn neue
+  große Halter ungeprüft sind. (2) Creator-Historie vollständig: `complete`, `ok_tx`; Ausschnitt → einmal tiefer Scan
+  (150) für GO-Kandidaten, danach `Historie unvollständig`; Lücke beim Cache-Refresh → Neuladen. (3) Fehlgeschlagene
+  Creator-Abfrage → `Historie nicht ladbar`. (4) Profile der ersten Käufer warten auf eine fällige Creator-Abfrage;
+  „vom Dev finanziert" zählt alle Dev-Adressen, auch ohne geladene Historie. (5) Serien-K.-o. und SERIE ab 5 toten
+  Vor-Launches ohne Graduation (README-Regel), Anteilsregel bleibt zusätzlich; „0 Vor-Launches" in einem Ausschnitt gibt
+  nur die Punkte eines unbekannten Creators. (6) Budget leer → `Wallets nicht geprüft (RPC-Budget)`, kein Bestehen.
+  (7) Solscan-Links (Token, Dev) in jeder Nachricht; `start.sh`/`start.bat` melden WIDERRUF (CLI-Standard war schon
+  `blick,go,widerruf,rug`).
+- Prüfpunkte: (a) Grenzen 5/10/20 % und Top 8 sind Richtung ohne Daten; (b) Börsen-Heuristik „≥ 50 Signaturen" lässt eine
+  Rug-Quelle mit vielen Transaktionen als Börse durchgehen – Vorschlag: Signaturrate (Spanne der letzten 50) aufzeichnen
+  und nach Daten entscheiden; (c) Finanzierer ist nur der Fee-Payer der ersten Transaktion, mehrstufige Finanzierung
+  (Zwischen-Wallets) bleibt unsichtbar; (d) `Historie unvollständig` sperrt auch aktive, ehrliche Dev-Wallets mit mehr als
+  150 erfolgreichen Transaktionen; (e) Latenz: GO wartet auf die Wallet-Runde (ein `getSignaturesForAddress` je neuem
+  Top-Halter plus ein Batch), Wartezeit im Betrieb messen; (f) `frisch_anteil` wird nur aufgezeichnet, kein Gate.
+- Default: so belassen bis zum ersten `tape report` mit ≥ 100 GO und ≥ 100 GESPERRT; GESPERRT-Gründe „Wallet-Verbund"
+  und „Historie unvollständig" getrennt auswerten; Lesart „Sperre unnötig" → Grenze lockern.
+- Blockiert: keinen Freeze.
+- Status: `entschieden (Experte)` am 2026-10-11 auf Nutzerauftrag; Prüfpunkte (a)–(f) offen.

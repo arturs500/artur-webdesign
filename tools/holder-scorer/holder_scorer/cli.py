@@ -189,6 +189,12 @@ def cmd_live(args: argparse.Namespace) -> int:
         config.fair.min_socials = args.fair_socials
     if getattr(args, "fair_ohne_historie", False):
         config.fair.require_creator_check = False
+        config.fair.require_complete_history = False
+    # Wallet-Prüfung (0.3.7, OQ-034): Top-Halter am Dev oder aneinander, vor jedem GO
+    if getattr(args, "fair_ohne_wallets", False):
+        config.fair.require_wallet_check = False
+    if getattr(args, "fair_verbund_max", None) is not None:
+        config.fair.max_verbund_share = args.fair_verbund_max
     watch = tuple(w.strip() for w in (getattr(args, "beobachte", None) or "").split(",") if w.strip())
     config.watch_terms = watch
     if watch:
@@ -562,7 +568,7 @@ def build_parser() -> argparse.ArgumentParser:
     lv.add_argument("--ws", help="Websocket-URL des RPC (Standard: aus der RPC-URL abgeleitet)")
     lv.add_argument("--no-side", action="store_true", help="keine Hintergrundabfragen (Creator, Wallets, Create-Transaktion): null RPC-Last, weniger Warnungen")
     lv.add_argument("--no-fetch", action="store_true", help="Logs ohne Event nicht per getTransaction nachladen")
-    lv.add_argument("--no-link", action="store_true", help="keine pump.fun-Link-Zeile in den Nachrichten")
+    lv.add_argument("--no-link", action="store_true", help="keine Link-Zeilen (pump.fun, Solscan) in den Nachrichten")
     lv.add_argument("--min-age", type=float, help="Mindestalter für GO in Sekunden")
     lv.add_argument("--yes-threshold", type=float, help="Score ab dem GO gilt (Notlösung gegen Fehlalarme: 75)")
     lv.add_argument("--blick-buyers", type=int, help="Außen-Käufer, ab denen BLICK kommt (Stufe: 8 / 5 / 3)")
@@ -576,7 +582,9 @@ def build_parser() -> argparse.ArgumentParser:
     lv.add_argument("--no-fair", action="store_true", help="Fairness-Gate ausschalten (Standard an: Dev-Anteil, Dev-Verkauf, Bundle-Wallets, Kopie, Historie, Bots, Metadaten als Bedingung für BLICK/GO)")
     lv.add_argument("--fair-dev-max", type=float, help="höchster Dev-Anteil an der Supply für einen Call (Stufe 1: 0,05, 2: 0,07, 3: 0,10)")
     lv.add_argument("--fair-socials", type=int, help="Mindestzahl Social-Links in den Metadaten für GO (Stufe 1/2: 2, 3: 1)")
-    lv.add_argument("--fair-ohne-historie", action="store_true", help="GO nicht auf die geladene Creator-Historie warten lassen")
+    lv.add_argument("--fair-ohne-historie", action="store_true", help="GO nicht auf die geladene (und vollständig gescannte) Creator-Historie warten lassen")
+    lv.add_argument("--fair-ohne-wallets", action="store_true", help="GO nicht auf die Wallet-Prüfung der Top-Halter warten lassen (spart etwa 10–20 RPC-Einheiten je GO-Kandidat)")
+    lv.add_argument("--fair-verbund-max", type=float, help="höchster Supply-Anteil in Top-Haltern, die am Dev oder aneinander hängen (Stufe 1: 0,05, 2: 0,10, 3: 0,20)")
     lv.add_argument("--paper", metavar="DATEI", help="Papier-Trading: alle Strategien handeln jeden Call ohne Geld, jede Entscheidung landet in dieser JSONL-Datei")
     lv.add_argument("--paper-size", type=float, default=0.08, help="SOL je Papier-Trade (Standard 0,08)")
     lv.add_argument("--paper-latency", type=float, default=2.0, help="Sekunden zwischen Entscheidung und Ausführung (Standard 2)")

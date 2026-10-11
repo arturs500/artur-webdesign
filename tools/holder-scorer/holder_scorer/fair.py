@@ -11,6 +11,9 @@ Dieses Gate macht die Prinzipien eines fairen Launches zur Pflicht für einen Ca
   (GO wartet darauf, solange ein RPC vorhanden ist).
 * **Metadaten**: Bild und Social-Links – erst prüfbar, wenn der Abruf da ist (GO wartet darauf, solange
   Nebenabfragen laufen).
+* **Wallets** (0.3.7, OQ-034): Die größten Halter dürfen nicht zu einem großen Teil am Dev oder aneinander hängen
+  (wallets.py, die Prüfung, die man sonst auf Solscan von Hand macht). Die Creator-Historie muss vollständig
+  gescannt sein, und eine fehlgeschlagene Creator-Abfrage ist ein Fehlen, kein Bestehen.
 
 Schnelle Prüfungen (Dev, Bundle, Kopie, Float, Bots) gelten schon für BLICK; die langsamen (Historie, Metadaten)
 erst für GO. Sagt der Score GO und ein Prinzip ist verletzt, geht einmal ⛔ GESPERRT heraus (Aufzeichnung, keine
@@ -42,15 +45,20 @@ class FairConfig:
     max_wash_share: float = 0.20
     max_bot_buy_share: float = 0.25
     max_hidden_float: float = 0.02
+    # Wallet-Prüfung (0.3.7, OQ-034): Startwerte ohne Daten, gemessen über GO gegen GESPERRT
+    require_complete_history: bool = True  # GO erst, wenn alle erfolgreichen Creator-Transaktionen gescannt sind
+    require_wallet_check: bool = True  # GO erst nach der Prüfung der Top-Halter (wallets.py)
+    max_verbund_share: float = 0.10  # Supply-Anteil in Top-Haltern, die am Dev oder aneinander hängen (Stufe 1: 5 %)
 
     @classmethod
     def for_stufe(cls, stufe: int) -> "FairConfig":
         if stufe <= 1:
-            return cls(max_dev_share=0.05, max_creation_buyers=3)
+            return cls(max_dev_share=0.05, max_creation_buyers=3, max_verbund_share=0.05)
         if stufe >= 3:
             return cls(
                 max_dev_share=0.10, max_dev_sold=0.10, max_creation_buyers=8, block_copycat=False, require_creator_check=False,
                 allow_fresh_creator=True, require_metadata=False, min_socials=1, require_image=False, max_wash_share=0.30, max_bot_buy_share=0.30,
+                require_complete_history=False, require_wallet_check=False, max_verbund_share=0.20,
             )
         return cls()
 
@@ -61,7 +69,9 @@ class FairConfig:
         if self.block_copycat:
             parts.append("Kopie gesperrt")
         if self.require_creator_check:
-            parts.append("Historie Pflicht")
+            parts.append("Historie Pflicht" + (" (vollständig)" if self.require_complete_history else ""))
+        if self.require_wallet_check:
+            parts.append(f"Wallet-Verbund < {self.max_verbund_share:.0%}")
         if self.require_metadata:
             parts.append(f"Socials ≥ {self.min_socials}" + (" + Bild" if self.require_image else ""))
         return ", ".join(parts)
@@ -90,6 +100,11 @@ def fair_check(
     creator_possible: bool,
     metadata_state: str,  # ok | fehlt | fehler | laedt
     checks_possible: bool,
+    creator_failed: bool = False,  # die Creator-Abfrage ist fertig, aber ohne Ergebnis (RPC-Fehler)
+    creator_deep: str = "fertig",  # tiefer Scan einer unvollständigen Historie: offen | laedt | fertig | fehler
+    creator_coverage: str | None = None,  # z. B. "150 von 640 Tx" für die Begründung
+    wallet_state: str = "ungeprüft",  # Top-Halter-Prüfung: ok | offen | laedt | fehler | budget | ungeprüft
+    verbund: dict[str, Any] | None = None,  # wallets.VerbundResult.to_dict()
 ) -> FairResult:
     """Alle Prinzipien gegen die aktuellen Merkmale prüfen. Unbekannt zählt nicht als sauber."""
     if not cfg.enabled:
@@ -134,6 +149,11 @@ def fair_check(
             v["historie"] = "lädt"
             if cfg.require_creator_check:
                 pending.append("Historie")
+        elif creator_failed:
+            # before 0.3.7 a failed lookup counted as an empty, clean history: a serial deployer got GO under RPC load
+            v["historie"] = "fehler"
+            if cfg.require_creator_check:
+                slow.append("Historie nicht ladbar")
         else:
             prior = int(getattr(feats, "creator_prior_tokens", 0) or 0)
             dead = int(getattr(feats, "creator_dead", 0) or 0)
@@ -143,8 +163,38 @@ def fair_check(
                 slow.append("frisches Dev-Wallet")
             if prior >= 3 and dead / prior >= cfg.max_dead_share:
                 slow.append(f"Historie {dead}/{prior} tot")
+            complete = getattr(feats, "creator_history_complete", None)
+            v["historie_vollstaendig"] = complete
+            if creator_coverage:
+                v["historie_umfang"] = creator_coverage
+            if cfg.require_complete_history and complete is False:
+                if creator_deep in ("offen", "laedt"):
+                    pending.append("Historie")
+                else:
+                    slow.append("Historie unvollständig" + (f" ({creator_coverage})" if creator_coverage else ""))
     else:
         v["historie"] = "ungeprüft"
+
+    if cfg.require_wallet_check and wallet_state != "ungeprüft":
+        v["wallets"] = wallet_state
+        if wallet_state in ("offen", "laedt"):
+            pending.append("Wallets")
+        elif wallet_state == "ok" and verbund is not None:
+            share = float(verbund.get("share", 0.0))
+            unchecked = float(verbund.get("unchecked_share", 0.0))
+            v["verbund"] = share
+            v["verbund_wallets"] = int(verbund.get("wallets", 0))
+            v["verbund_geprueft"] = f"{verbund.get('checked', 0)}/{verbund.get('top', 0)}"
+            v["frisch_anteil"] = verbund.get("fresh_share")
+            v["verbund_details"] = list(verbund.get("linked", []))[:5]
+            if share >= cfg.max_verbund_share:
+                slow.append(f"Wallet-Verbund {share * 100:.0f} % in {v['verbund_wallets']} Wallets")
+            if unchecked >= cfg.max_verbund_share:
+                slow.append(f"{unchecked * 100:.0f} % bei ungeprüften Top-Haltern")
+        else:
+            slow.append("Wallets nicht geprüft" + (" (RPC-Budget)" if wallet_state == "budget" else ""))
+    else:
+        v["wallets"] = "ungeprüft"
 
     if checks_possible and cfg.require_metadata:
         v["metadaten"] = metadata_state
@@ -180,6 +230,8 @@ def fair_line(res: FairResult | None) -> str | None:
             parts.append(f"Bundle {v['bundle'] * 100:.0f} %/{v.get('bundle_wallets') if v.get('bundle_wallets') is not None else '?'}")
         if v.get("historie") not in (None, "ungeprüft"):
             parts.append(f"Historie {v['historie']}")
+        if v.get("verbund") is not None:
+            parts.append(f"Verbund {v['verbund'] * 100:.0f} %")
         if "socials" in v:
             parts.append(f"{v['socials']} Links" + ("+Bild" if v.get("bild") else ""))
         text = "✓ " + " · ".join(parts)

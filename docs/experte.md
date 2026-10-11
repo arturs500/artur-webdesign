@@ -133,6 +133,7 @@ geöffnet und die Entscheidung mit Datum revidiert.
 | E-011 | 2026-10-04 | Fairness-Gate (fair.py) auf Anweisung des Nutzers sofort aktiv; messbar über GESPERRT-Records (OQ-031) | weniger GO auf unfaire Launches; `tape report` GO vs. GESPERRT zeigt den Effekt | erster `tape report` mit ≥ 100 GO und ≥ 100 GESPERRT | – | – |
 | E-012 | 2026-10-04 | Abstimmung 0.3.5: Dev-Faktor monoton, WIDERRUF nach GO, Papier-Filter, Gate-Prüfung GO/GESPERRT, Startbefehl mit gesperrt (OQ-032) | keine Regel belohnt, was eine andere sperrt; Verschärfung ist mit `tape report` prüfbar | erster `tape report` mit ≥ 100 GO und ≥ 100 GESPERRT | – | – |
 | E-013 | 2026-10-04 | Außenquellen 0.3.6 record-only: PumpPortal-Migrationsfeed als externe Labels und Referenz-Coins, DexScreener-Nachlauf (+1 h/+24 h), Rugcheck opt-in; kein Gate (OQ-033) | externe Graduation- und Überlebensrate je Tier und für Kontrollen liegt mit Intervall vor; Profil aus Coins, die der Sniper nie gerufen hat; Kontroll-Stichprobe gegen die Grundrate 0,26–1,4 % geprüft | erster `tape report --extern` mit ≥ 100 GO und 24 h Feed-Reife | – | – |
+| E-014 | 2026-10-11 | Wallet-Prüfung 0.3.7 auf Anweisung des Nutzers: Top-Halter-Verbund vor GO, vollständige Creator-Historie, fehlgeschlagene Abfrage sperrt, Profile nach Creator-Abfrage, Serien-Regel laut README, Solscan-Links (OQ-034) | weniger GO auf Coins, deren Float am Dev hängt; GESPERRT „Wallet-Verbund" rentiert schlechter als GO | erster `tape report` mit ≥ 100 GO und ≥ 100 GESPERRT | – | – |
 
 ---
 
@@ -208,6 +209,18 @@ Rugcheck (Nutzen je Aufwand, null RPC). E-005 bleibt für Narrativ-Quellen beste
 für Outcome-Quellen. Revisionsauslöser: Feed liefert nach 30 Minuten Betrieb keine Graduierung oder der Nachlauf zeigt bei
 Kurven-Coins nur `fehlt` → Prüfpunkte (a)/(e) in OQ-033, GeckoTerminal als Ersatz; Rugcheck trennt bei ≥ 20 GO je Hälfte →
 Zeitsplit-Prüfung vor jedem Gate.
+
+
+**E-014 Wallet-Prüfung (OQ-034).** Auftrag „über Solscan Wallets prüfen, der Bot snipet fast ausschließlich Rugpulls".
+Outcome-Maß: Rendite und Überleben der GO-Coins gegen die mit „Wallet-Verbund" gesperrten. Optionen: Solscan Pro API
+(Abo und Schlüssel: Eskalationspunkte 1 und 2); Solscan-Website auslesen (ToS: Eskalationspunkt 7); dieselben Chain-Daten
+über den vorhandenen RPC; nichts tun. Evidenz: Stufe 5 (Mechanik des Rugs auf der Kurve: Dev und Sniper-Wallets aus
+einer Hand verkaufen in die Käufer), dazu die Code-Prüfung vom 2026-10-11, nach der die vorhandenen Wallet-Prüfungen im
+Live-Modus teilweise nicht griffen. Entscheidung: zuerst die vorhandenen Prüfungen reparieren, dann den Verbund der
+Top-Halter vor jedem GO, alles über den RPC und nur für GO-Kandidaten (OQ-025); Solscan als Links für die Prüfung von
+Hand. Die Nutzeranweisung macht die Sperre sofort wirksam (wie E-011); R2 bleibt gewahrt, weil jede Sperre als GESPERRT
+mit Gründen und Verbundwerten aufgezeichnet wird. Revisionsauslöser: „Sperre unnötig" in der Gate-Prüfung → Grenze
+lockern; mehr als die Hälfte der GO-Kandidaten mit „Historie unvollständig" → Prüfpunkt (d) in OQ-034 entscheiden.
 
 Nicht entscheidbar (bleiben `offen`, Eskalation): OQ-001 (Datei fehlt), OQ-002 (Abgleich mit dem Prereg-Text
 braucht die Datei), OQ-008 (Veröffentlichung im Pages-Repo = Eskalationspunkt 5), OQ-020 (Kauf), OQ-021

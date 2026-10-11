@@ -122,7 +122,11 @@ def test_blick_then_go_then_rug():
     tiers = [a.tier for a in alerts]
     assert tiers == ["BLICK"], (tiers, engine.evaluate(state, T0 + 12).to_dict()["flags"], engine.evaluate(state, T0 + 12).verdict.features.organic_net_flow_120s_sol)
     assert alerts[0].report.word == "BLICK" and alerts[0].text.startswith("👀 BLICK")
-    assert alerts[0].text.splitlines()[-1] == f"pump.fun/coin/{b58encode(mint)}"
+    assert alerts[0].text.splitlines()[-3:] == [
+        f"pump.fun/coin/{b58encode(mint)}",
+        f"solscan.io/token/{b58encode(mint)}",
+        f"Dev solscan.io/account/{b58encode(creator)}",
+    ]
     # more buyers: the scorer's own gates are met at ~25 s
     feed_buyers(engine, mint, creator, 10, T0 + 14, 1.0)
     engine.tick(T0 + 26)

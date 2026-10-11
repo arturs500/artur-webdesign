@@ -162,6 +162,10 @@ def format_short(r: "QuickReport", suffix: str | None = None, link: bool = False
     lines.append("⚠️   " + (" · ".join(r.flags) if r.flags else "–"))
     if link:
         lines.append(f"pump.fun/coin/{r.mint}")
+        # Solscan für die Prüfung von Hand (0.3.7): Halter und Transfers des Tokens, Herkunft und Historie des Devs
+        lines.append(f"solscan.io/token/{r.mint}")
+        if r.creator:
+            lines.append(f"Dev solscan.io/account/{r.creator}")
     return "\n".join(lines)
 
 

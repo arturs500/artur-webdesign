@@ -90,6 +90,7 @@ from .pump import (
 from .quick import QuickReport, go_blockers, report_from_features
 from .rpc import RpcError, SolanaRpc
 from .scoring import ScoringConfig, score_features
+from .wallets import holder_verbund, top_holders
 from .watch import PUMPPORTAL_WS, accept_launch
 
 PROGRAM_DATA = "Program data: "
@@ -120,6 +121,9 @@ class LiveConfig:
     creator_scan_min_buyers: int = 5
     profiles_min_buyers: int = 5
     creator_scan_tx: int = 30
+    creator_deep_scan_tx: int = 150  # GO candidate with an incomplete creator history: scan this deep once (0.3.7)
+    wallet_check_top: int = 8  # GO candidate: profile so many of the largest non-dev holders (wallets.py, 0.3.7)
+    wallet_check_rounds: int = 2  # a second round when new large holders appeared after the first one
     max_side_tasks: int = 4
     max_http_tasks: int = 6
     rpc_units_per_hour: float = 4000.0  # budget for background RPC work (about 100 000 Helius credits a day)
@@ -194,6 +198,15 @@ class TokenState:
     creator_profile: WalletProfile | None = None
     creator_first_sig: str | None = None
     early_wallets: list[WalletProfile] = field(default_factory=list)
+    # Wallet-Prüfung (0.3.7, wallets.py): profiles of early buyers and top holders, the dev's funder, the last result
+    wallet_profiles: dict[str, WalletProfile] = field(default_factory=dict)
+    creator_funder: str | None = None
+    wallets_ok: bool = False  # at least one top-holder round came back
+    wallet_rounds: int = 0
+    wallet_task: str | None = None
+    wallet_skipped: bool = False  # the RPC budget was exhausted when the check was due
+    deep_skipped: bool = False
+    verbund: dict[str, Any] | None = None
     metadata: dict[str, Any] | None = None
     metadata_ok: bool = False
     pending: set[str] = field(default_factory=set)
@@ -771,6 +784,8 @@ class LiveEngine:
 
         def apply(st: TokenState, res: Any) -> None:
             st.creator_history, st.creator_profile, st.creator_first_sig = res
+            if st.creator_funder and st.creator_profile is not None and not st.creator_profile.funder:
+                st.creator_profile.funder = st.creator_funder  # found earlier by a wallet round
 
         self._spawn(state, "creator", lambda: _creator_history(self.rpc, creator, mint, launch, scan_tx, self.cache), apply)
 
@@ -792,10 +807,114 @@ class LiveEngine:
         def apply(st: TokenState, res: Any) -> None:
             profiles, creator_funder, _notes = res
             st.early_wallets = profiles
-            if creator_funder and st.creator_profile:
-                st.creator_profile.funder = creator_funder
+            self._take_profiles(st, profiles, creator_funder)
 
         self._spawn(state, "profiles", lambda: _early_wallets(self.rpc, wallets, launch, self.cache, creator, first_sig), apply)
+
+    # --- Wallet-Prüfung (0.3.7, OQ-034) ---------------------------------------------------------------------
+    @staticmethod
+    def _take_profiles(st: TokenState, profiles: list[WalletProfile], creator_funder: str | None) -> None:
+        for p in profiles:
+            st.wallet_profiles[p.address] = p
+        if creator_funder:
+            st.creator_funder = creator_funder
+        if st.creator_funder and st.creator_profile and not st.creator_profile.funder:
+            st.creator_profile.funder = st.creator_funder
+
+    @staticmethod
+    def _dev_addresses(state: TokenState) -> set[str]:
+        devs = {state.creator, state.create.user, state.create.creator}
+        if state.curve is not None and state.curve.creator:
+            devs.add(state.curve.creator)
+        return {d for d in devs if d}
+
+    def _creator_check_possible(self) -> bool:
+        return self.run_side_task is not None and self.rpc is not None and self.cfg.creator_scan_min_buyers <= 1000
+
+    def _creator_settled(self, state: TokenState) -> bool:
+        """The creator scan has come back (or cannot run): the dev's first transaction, and with it its funder, is known."""
+        return "creator" in state.done or not self._creator_check_possible() or not state.creator
+
+    def _schedule_go_checks(self, state: TokenState) -> None:
+        """The scorer says GO: deepen an incomplete creator history once and profile the top holders.
+
+        Both cost RPC only for GO candidates (a few per hour), not for every launch (OQ-025). Without budget the
+        check is marked as skipped, and the fairness gate treats that as unknown, not as clean.
+        """
+        fair = self.cfg.fair
+        if not fair.enabled or not self._creator_check_possible() or not self._creator_settled(state):
+            return
+        ch = state.creator_history
+        if fair.require_complete_history and ch is not None and not ch.complete and "creator_tief" not in state.pending and "creator_tief" not in state.done:
+            if self.rpc_budget_ok():
+                state.deep_skipped = False
+                creator, mint, launch, scan_tx = state.creator, state.mint, int(state.created_at), self.cfg.creator_deep_scan_tx
+
+                def apply_deep(st: TokenState, res: Any) -> None:
+                    funder = st.creator_profile.funder if st.creator_profile else None
+                    st.creator_history, st.creator_profile, st.creator_first_sig = res
+                    if st.creator_profile is not None and not st.creator_profile.funder:
+                        st.creator_profile.funder = funder or st.creator_funder
+
+                self._spawn(state, "creator_tief", lambda: _creator_history(self.rpc, creator, mint, launch, scan_tx, self.cache), apply_deep)
+            else:
+                state.deep_skipped = True
+        if fair.require_wallet_check and (state.wallet_task is None or state.wallet_task not in state.pending):
+            again = (
+                state.wallets_ok
+                and state.verbund is not None
+                and state.verbund.get("unchecked_share", 0.0) >= fair.max_verbund_share
+                and state.wallet_rounds < self.cfg.wallet_check_rounds
+            )
+            if state.wallet_rounds == 0 or again:
+                self._schedule_wallets(state)
+
+    def _schedule_wallets(self, state: TokenState) -> None:
+        devs = self._dev_addresses(state)
+        top = [o for o, _ in top_holders(derive_balances(state.trades), devs, self.cfg.wallet_check_top)]
+        if not top:
+            return
+        if not self.rpc_budget_ok():
+            state.wallet_skipped = True
+            return
+        state.wallet_skipped = False
+        state.wallet_rounds += 1
+        name = f"wallets{state.wallet_rounds}"
+        state.wallet_task = name
+        launch, creator, first_sig = int(state.created_at), state.creator, state.creator_first_sig
+
+        def apply(st: TokenState, res: Any) -> None:
+            profiles, creator_funder, _notes = res
+            st.wallets_ok = True
+            self._take_profiles(st, profiles, creator_funder)
+
+        self._spawn(state, name, lambda: _early_wallets(self.rpc, top, launch, self.cache, creator, first_sig), apply)
+
+    def _wallet_state(self, state: TokenState) -> str:
+        if not (self.cfg.fair.require_wallet_check and self._creator_check_possible() and self.cfg.profiles_min_buyers <= 1000):
+            return "ungeprüft"
+        if state.wallet_task is not None and state.wallet_task in state.pending:
+            return "laedt"
+        if state.wallets_ok:
+            return "ok"
+        if state.wallet_task is not None and state.wallet_task in state.done:
+            return "fehler"
+        return "budget" if state.wallet_skipped else "offen"
+
+    def _verbund(self, state: TokenState) -> dict[str, Any] | None:
+        if not state.wallets_ok:
+            return None
+        supply = state.curve.token_total_supply if state.curve is not None and state.curve.token_total_supply else TOKEN_TOTAL_SUPPLY
+        res = holder_verbund(
+            derive_balances(state.trades),
+            supply,
+            state.wallet_profiles,
+            devs=self._dev_addresses(state),
+            creator_funder=state.creator_funder,
+            top=self.cfg.wallet_check_top,
+        )
+        state.verbund = res.to_dict()
+        return state.verbund
 
     # --- evaluation ---------------------------------------------------------------------------
     def snapshot(self, state: TokenState, now: float) -> Snapshot:
@@ -824,13 +943,25 @@ class LiveEngine:
         )
         return snap
 
-    def evaluate(self, state: TokenState, now: float | None = None) -> QuickReport:
-        now = now if now is not None else time.time()
+    def _score(self, state: TokenState, now: float) -> tuple[QuickReport, Any]:
         snap = self.snapshot(state, now)
         feats = compute_features(snap, now)
         verdict = score_features(feats, self.scoring)
         price = self.price_hint() if self.price_hint else None
         report = report_from_features(state.mint, feats, verdict, self.scoring, None, price, state.create.name or None, state.create.symbol or None, "curve")
+        return report, feats
+
+    def evaluate(self, state: TokenState, now: float | None = None) -> QuickReport:
+        now = now if now is not None else time.time()
+        report, feats = self._score(state, now)
+        if report.word == "GO" and "GO" not in state.tiers_sent:
+            # GO candidate: deeper creator scan and top-holder wallets (0.3.7). A runner that answers at once must not
+            # leave the gate judging the features from before the answer, so score once more on the fresh data
+            before = (state.creator_history, state.wallets_ok, len(state.wallet_profiles), state.creator_funder)
+            self._schedule_go_checks(state)
+            after = (state.creator_history, state.wallets_ok, len(state.wallet_profiles), state.creator_funder)
+            if after != before:
+                report, feats = self._score(state, now)
         report.theme = theme_line(self._theme_check(state, now))
         state.last_eval = now
         state.dirty = False
@@ -838,8 +969,13 @@ class LiveEngine:
         # side checks once the token shows real buyers
         if feats.unique_outside_buyers >= self.cfg.creator_scan_min_buyers:
             self._schedule_creator(state)
-        if feats.unique_outside_buyers >= self.cfg.profiles_min_buyers:
+        # the early-buyer profiles wait for a due creator scan (0.3.7): before, both started in the same tick, the
+        # profiles never saw the creator's first transaction and "funded from the dev's source" was never detected
+        if feats.unique_outside_buyers >= self.cfg.profiles_min_buyers and (
+            self._creator_settled(state) or feats.unique_outside_buyers < self.cfg.creator_scan_min_buyers
+        ):
             self._schedule_profiles(state)
+        report.creator = state.creator or None
         self._alerts(state, report, feats, now)
         if self.on_evaluate is not None:
             try:
@@ -965,15 +1101,30 @@ class LiveEngine:
         else:
             meta = "laedt"
         checks_possible = self.run_side_task is not None
+        ch = state.creator_history
+        if "creator_tief" in state.pending:
+            deep = "laedt"
+        elif "creator_tief" in state.done:
+            deep = "fertig"
+        else:
+            deep = "fehler" if state.deep_skipped else "offen"
+        coverage = None
+        if ch is not None and not ch.complete:
+            coverage = f"{ch.scanned_tx} von {ch.ok_tx}{'+' if ch.sample_capped else ''} Tx"
         res = fair_check(
             feats,
             cfg.fair,
             bundle_limit=cfg.max_bundle_share,
             copycat=self.names.is_copycat(state.mint, state.create.name, state.create.symbol, now),
-            creator_done=state.creator_history is not None or "creator" in state.done,
-            creator_possible=checks_possible and self.rpc is not None and cfg.creator_scan_min_buyers <= 1000,
+            creator_done=ch is not None or "creator" in state.done,
+            creator_possible=self._creator_check_possible(),
             metadata_state=meta,
             checks_possible=checks_possible,
+            creator_failed=ch is None and "creator" in state.done,
+            creator_deep=deep,
+            creator_coverage=coverage,
+            wallet_state=self._wallet_state(state),
+            verbund=self._verbund(state),
         )
         state.fair = res.to_dict()
         return res

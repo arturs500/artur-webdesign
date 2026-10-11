@@ -127,6 +127,32 @@ python -m holder_scorer tape report live.jsonl live_tape.jsonl --extern aussen.j
 python -m holder_scorer profil bauen --tape live_tape.jsonl --extern aussen.jsonl --rpc URL --max-mints 20 --out profil.json
 ```
 
+**Wallet-Prüfung (0.3.7, OQ-034):** Vor jedem GO prüft der Sniper die Wallets so, wie man es sonst auf Solscan von
+Hand macht. Er profiliert die acht größten Halter ohne Dev (Finanzierer der ersten Transaktion, frisch oder nicht,
+Börsen-Check bei gemeinsamer Quelle) und rechnet aus, welcher Anteil der Supply in Wallets liegt, die am Dev oder
+aneinander hängen: vom Dev finanziert, aus derselben Quelle wie der Dev, von einem anderen Top-Halter finanziert oder
+mit gemeinsamer Quelle. Liegt dieser Verbund über der Stufengrenze (5/10/20 Prozent), wird aus dem GO ein
+⛔ GESPERRT mit dem Grund, etwa `Wallet-Verbund 18 % in 3 Wallets`. Die Werte stehen in jeder Aufzeichnung unter
+`fair.values` (`verbund`, `verbund_details`, `frisch_anteil`). Außerdem:
+
+- Die Creator-Historie muss vollständig gescannt sein. Ein GO-Kandidat mit einem Ausschnitt bekommt einmal einen tiefen
+  Scan (150 Transaktionen); bleibt es ein Ausschnitt, ist das ein Grund für GESPERRT (`Historie unvollständig`). Vorher
+  galt ein Serien-Deployer mit mehr als 30 neueren Transaktionen als Creator ohne Vor-Launches.
+- Eine fehlgeschlagene Creator-Abfrage sperrt GO (`Historie nicht ladbar`), statt als leere, saubere Historie zu gelten.
+- Die Profile der ersten Käufer warten auf die Creator-Abfrage. Vorher liefen beide im selben Moment los, und
+  „aus derselben Quelle wie der Dev" wurde im Live-Modus nie erkannt.
+- Serien-Deployer wie dokumentiert: 5 tote Vor-Launches ohne Graduation reichen für NEIN und die Warnung SERIE, auch
+  wenn daneben lebende stehen.
+- Die Nachricht trägt Solscan-Links für den Token und das Dev-Wallet; `start.sh`/`start.bat` schicken WIDERRUF jetzt
+  aufs Handy.
+
+Kosten: nur GO-Kandidaten, etwa 10 bis 20 RPC-Einheiten je Kandidat (frühe Käufer kommen aus dem Cache), der tiefe
+Scan bis 120 Einheiten. Ist das Stundenbudget leer, gilt die Prüfung als nicht gemacht (`Wallets nicht geprüft
+(RPC-Budget)`), nicht als bestanden. `--fair-ohne-wallets` schaltet die Prüfung ab, `--fair-verbund-max` stellt die
+Grenze ein. Börsen-Hot-Wallets erkennt der Sniper an mindestens 50 Transaktionen; eine Rug-Quelle mit vielen
+Transaktionen kann deshalb als Börse durchgehen (Prüfpunkt in OQ-034). Die Grenzen sind Startwerte ohne Daten: ob die
+Sperren richtig sind, zeigt `tape report` mit GO gegen GESPERRT.
+
 **Launch-Rechner (OQ-029, `docs/fair_launch.md`):** `python -m holder_scorer launch rechner` zeigt aus der
 geprüften Kurvenmathematik, welchen Supply-Anteil ein Dev-Kauf ergibt, wie viel Fremdzufluss bis zur Graduation
 fehlt, was die Dev-Position dann wert ist, was ein Teilverkauf netto bringt und wie stark er den Kurs drückt,
