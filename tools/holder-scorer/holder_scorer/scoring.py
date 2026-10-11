@@ -153,11 +153,16 @@ def hard_fail_reasons(f: Features, cfg: ScoringConfig) -> list[str]:
         reasons.append(f"größter Nicht-Dev-Holder hält {_pct(f.largest_float_share)} der bisher verkauften Token")
     if f.creation_window_share is not None and f.creation_window_share >= cfg.max_creation_window_share:
         reasons.append(f"{_pct(f.creation_window_share)} des Supplys in den ersten Slots gekauft (Bundle)")
+    # README: "Serien-Deployer mit 5+ toten Token ohne Graduation". Before 0.3.7 only the dead share counted, so
+    # five dead tokens next to five live ones passed; now five dead tokens are enough, the share rule stays for the rest
     if (
         f.creator_prior_tokens is not None
         and f.creator_prior_tokens >= cfg.serial_creator_min_tokens
         and (f.creator_graduated or 0) == 0
-        and (f.creator_dead or 0) / max(f.creator_prior_tokens, 1) >= cfg.serial_creator_dead_share
+        and (
+            (f.creator_dead or 0) >= cfg.serial_creator_min_tokens
+            or (f.creator_dead or 0) / max(f.creator_prior_tokens, 1) >= cfg.serial_creator_dead_share
+        )
     ):
         reasons.append(
             f"Creator hat {f.creator_prior_tokens} frühere Token, {f.creator_dead} davon tot, 0 graduiert (Serien-Deployer)"
@@ -242,6 +247,10 @@ def _creator(f: Features, cfg: ScoringConfig) -> FactorResult:
         pts = mx * 0.6
         value = "kein anderer Token dieses Creators gefunden"
         if f.creator_sample_capped:
+            # nothing found in the newest 1000 of more signatures is not a clean history (0.3.7): as many points as
+            # an unknown creator. A shorter scan does not deduct here, the live gate deepens and then judges it.
+            pts = mx * 0.3
+            value = "kein anderer Token im geprüften Ausschnitt"
             comments.append("nur ein Ausschnitt der Creator-Historie geprüft")
     else:
         rated = max(prior - (f.creator_young or 0), 0)
@@ -371,7 +380,8 @@ def short_flags(f: Features, cfg: ScoringConfig) -> list[str]:
             flags.append(f"DEV-GROSS {pct(f.dev_holds_share)}")
     if f.creator_prior_tokens:
         dead_rate = (f.creator_dead or 0) / f.creator_prior_tokens
-        if f.creator_prior_tokens >= 3 and (f.creator_graduated or 0) == 0 and dead_rate >= 0.6:
+        many_dead = (f.creator_dead or 0) >= cfg.serial_creator_min_tokens  # same rule as the K.-o. (0.3.7): BLICK vetoes it too
+        if f.creator_prior_tokens >= 3 and (f.creator_graduated or 0) == 0 and (dead_rate >= 0.6 or many_dead):
             flags.append(f"SERIE {f.creator_prior_tokens}/{f.creator_graduated or 0}/{f.creator_dead or 0}")
     if (f.creator_seconds_since_prev_launch is not None and f.creator_seconds_since_prev_launch < 600) or (
         f.creator_launch_rate_per_h is not None and f.creator_launch_rate_per_h >= 3

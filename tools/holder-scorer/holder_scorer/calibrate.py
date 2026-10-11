@@ -221,7 +221,10 @@ def update_outcomes(path: str, rpc: SolanaRpc, horizon_s: float = 900.0, growth_
     return checked
 
 
-RECORD_ONLY_FIELDS = ("tape_path", "tape_sample", "extern_path", "rugcheck")  # file names and record-only switches change no rule
+RECORD_ONLY_FIELDS = (  # file names and record-only switches change no rule
+    "tape_path", "tape_sample", "extern_path", "rugcheck",
+    "follow_path", "follow_hash", "folge_keep_s", "folge_min_sol", "folge_max_logs_h",  # Wallet-Folge (0.3.8): record-only
+)
 
 
 def rules_hash(live_config: Any, scoring: Any, version: str) -> str:
@@ -261,7 +264,8 @@ def alert_record_extra(alert: Any, stufe: int, rules: str, version: str, live_co
         "live_config": dataclasses.asdict(live_config) if dataclasses.is_dataclass(live_config) else None,
         "scoring_config": dataclasses.asdict(scoring) if dataclasses.is_dataclass(scoring) else None,
         "alert_at": time.time(),
-        "launch_received_at": st.created_at,
+        "launch_received_at": None if getattr(st, "spaet", False) else st.created_at,  # a late coin's launch was not seen
+        "seen_at": st.created_at,
         "slot": st.curve_slot,
         "create_slot": getattr(create, "slot", None),
         "create_slot_known": st.create_slot_known,
@@ -289,6 +293,8 @@ def alert_record_extra(alert: Any, stufe: int, rules: str, version: str, live_co
         "profil": getattr(st, "profil", None),  # holder rise, similarity, checkpoint vectors (profile.py); input for `profil bauen`
         "narrativ": getattr(st, "narrativ", None),  # theme wave: term, launches, devs, baseline, rank by inflow, shared source (OQ-028)
         "fair": getattr(st, "fair", None),  # fairness gate result: ok, hard_ok, fails, pending, values (OQ-031)
+        "folge": getattr(st, "folge", None),  # watched wallet that bought: wallet, tag, stats, SOL, slot, later buys (OQ-035)
+        "spaet": bool(getattr(st, "spaet", False)),  # coin seen through a wallet, not its launch: age and history unknown
         "history_note": "nur ab Abonnement gesehene Trades; Käufe im Create-Slot können fehlen (UNSICHTBAR)",
     }
 

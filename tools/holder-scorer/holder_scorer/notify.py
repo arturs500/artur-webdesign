@@ -22,6 +22,7 @@ WORDS = {
     "GO": ("🟢", "kaufbar: kein Warnsignal, genug echte Käufer, gerade Zulauf"),
     "WIDERRUF": ("↩️", "der Call gilt nicht mehr: nach BLICK ein Warnsignal (kein GO zu erwarten), nach GO ein verletztes Fairness-Prinzip (z. B. Dev verkauft)"),
     "WATCH": ("👁️", "Launch mit einem Begriff von der Beobachtungsliste (--beobachte), noch kein Urteil"),
+    "FOLGE": ("🐋", "ein beobachtetes Wallet (--wallets) hat gekauft: Tag, Quelle, Trefferquote, Thema und Kurvenstand prüfen, dann selbst entscheiden; kein Kaufsignal"),
     "GESPERRT": ("⛔", "der Score sagt GO, aber ein Fairness-Prinzip ist verletzt (Dev-Anteil, Dev-Verkauf, Bundle, Kopie, Historie, Bots, Metadaten) oder das Profil passt nicht; nur Aufzeichnung"),
     "WARTE": ("🟡", "unklar oder Mindestmengen fehlen: nochmal prüfen, nicht kaufen"),
     "FRÜH": ("⏳", "zu jung für ein Urteil (unter dem Mindestalter)"),
@@ -162,6 +163,12 @@ def format_short(r: "QuickReport", suffix: str | None = None, link: bool = False
     lines.append("⚠️   " + (" · ".join(r.flags) if r.flags else "–"))
     if link:
         lines.append(f"pump.fun/coin/{r.mint}")
+        # Solscan für die Prüfung von Hand (0.3.7): Halter und Transfers des Tokens, Herkunft und Historie des Devs
+        lines.append(f"solscan.io/token/{r.mint}")
+        if r.creator:
+            lines.append(f"Dev solscan.io/account/{r.creator}")
+        if r.folge_wallet:
+            lines.append(f"Wallet solscan.io/account/{r.folge_wallet}")
     return "\n".join(lines)
 
 

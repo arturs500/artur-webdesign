@@ -111,6 +111,8 @@ class QuickReport:
     elapsed_s: float = 0.0
     theme: str | None = None  # Narrativ-Welle aus dem Launch-Strom (live, 0.3.3): Thema, Launches, Devs, Rang, Quelle
     fair: str | None = None  # Fairness-Gate (live, 0.3.4): ✓ mit Werten oder ✗ mit verletzten Prinzipien
+    creator: str | None = None  # Dev-Wallet (live, 0.3.7): für den Solscan-Link in der Nachricht
+    folge_wallet: str | None = None  # beobachtetes Wallet, das gekauft hat (live, 0.3.8): Solscan-Link in der Nachricht
 
     @property
     def buy_signal(self) -> bool:

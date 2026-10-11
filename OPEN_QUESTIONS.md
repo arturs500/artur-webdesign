@@ -556,3 +556,123 @@ steht hier mit Datum und im Outcome-Register des Experten mit Prüftermin.
   einer Zeitsplit-Prüfung.
 - Blockiert: keinen Freeze.
 - Status: `entschieden (Experte)` am 2026-10-04 auf Nutzerauftrag; Prüfpunkte (a)–(g) offen.
+
+## OQ-034 – Sniper 0.3.7 „Wallet-Prüfung": Wallets prüfen wie auf Solscan, weil fast nur Rugs gerufen werden
+
+- Datum: 2026-10-11
+- Kontext: Nutzerauftrag „der Bot soll über Solscan Wallets prüfen, baue es mit ein, weil der Bot fast ausschließlich
+  Rugpulls snipet". Die Beobachtung „fast nur Rugs" stammt vom Nutzer; Aufzeichnungen liegen weiter nicht vor (OQ-024).
+  Code-Prüfung am 2026-10-11 (fünf Prüfbereiche, jeder Befund gegengeprüft): Die vorhandenen Wallet-Prüfungen griffen im
+  Live-Modus teilweise nicht. Die Profile der ersten Käufer starteten im selben Tick wie die Creator-Abfrage und sahen nie
+  die erste Transaktion des Devs („aus derselben Quelle wie der Dev" wurde nie erkannt); eine fehlgeschlagene
+  Creator-Abfrage galt als leere, saubere Historie; die Creator-Historie sah nur 30 Transaktionen und meldete dabei
+  vollen Umfang; der Serien-K.-o. verlangte entgegen README 80 % tote Vor-Launches.
+- Solscan: Die Pro API ist ein Abo mit Schlüssel (Level 2 199 USD/Monat, `/account/transfer` 100 CU) [Snippet:
+  docs.solscan.io/api-access/solscan-pro-api-levels-and-details und docs.solscan.io/api-access/pro-api-endpoints,
+  2026-10-11; pro-api.solscan.io in der Arbeitsumgebung nicht auflösbar]. Abo und Schlüssel stehen auf der
+  Eskalationsliste (CLAUDE.md), Scraping der Website wäre ein ToS-Risiko. Solscan zeigt dieselben Chain-Daten, die der
+  Sniper über den vorhandenen RPC liest. Token-Seite `solscan.io/token/<mint>` [Snippet: Suchtreffer solscan.io/token/…pump,
+  2026-10-11]; Konto-Seite `solscan.io/account/<adresse>` NICHT VERIFIZIERT (kb.solscan.io/exploring-account-page beschreibt
+  die Konto-Seite, das URL-Muster stand nicht im Snippet).
+- Entschieden (Nutzeranweisung, umgesetzt vom Experten, wie E-011 messbar über GESPERRT): (1) Top-Halter-Verbund
+  (`wallets.py`): vor jedem GO die acht größten Halter ohne Dev profilieren (Finanzierer = Fee-Payer der ersten
+  Transaktion, Börsen-Check ab zwei Wallets mit gleicher Quelle und für die Quelle des Devs); Supply-Anteil in Wallets,
+  die den Dev finanzierten, vom Dev finanziert sind, die Quelle des Devs teilen, einen anderen Top-Halter finanzierten oder
+  von ihm finanziert sind oder eine Quelle mit einem anderen Top-Halter teilen; GO nur unter 5/10/20 % (Stufe 1/2/3,
+  Stufe 3 wartet nicht auf die Prüfung); ungeprüfte Top-Halter über der Grenze sperren ebenfalls; zweite Runde, wenn neue
+  große Halter ungeprüft sind. (2) Creator-Historie vollständig: `complete`, `ok_tx`; Ausschnitt → einmal tiefer Scan
+  (150) für GO-Kandidaten, danach `Historie unvollständig`; Lücke beim Cache-Refresh → Neuladen. (3) Fehlgeschlagene
+  Creator-Abfrage → `Historie nicht ladbar`. (4) Profile der ersten Käufer warten auf eine fällige Creator-Abfrage;
+  „vom Dev finanziert" zählt alle Dev-Adressen, auch ohne geladene Historie. (5) Serien-K.-o. und SERIE ab 5 toten
+  Vor-Launches ohne Graduation (README-Regel), Anteilsregel bleibt zusätzlich; „0 Vor-Launches" in einem Ausschnitt gibt
+  nur die Punkte eines unbekannten Creators. (6) Budget leer → `Wallets nicht geprüft (RPC-Budget)`, kein Bestehen.
+  (7) Solscan-Links (Token, Dev) in jeder Nachricht; `start.sh`/`start.bat` melden WIDERRUF (CLI-Standard war schon
+  `blick,go,widerruf,rug`).
+- Prüfpunkte: (a) Grenzen 5/10/20 % und Top 8 sind Richtung ohne Daten; (b) Börsen-Heuristik „≥ 50 Signaturen" lässt eine
+  Rug-Quelle mit vielen Transaktionen als Börse durchgehen – Vorschlag: Signaturrate (Spanne der letzten 50) aufzeichnen
+  und nach Daten entscheiden; (c) Finanzierer ist nur der Fee-Payer der ersten Transaktion, mehrstufige Finanzierung
+  (Zwischen-Wallets) bleibt unsichtbar; (d) `Historie unvollständig` sperrt auch aktive, ehrliche Dev-Wallets mit mehr als
+  150 erfolgreichen Transaktionen; (e) Latenz: GO wartet auf die Wallet-Runde (ein `getSignaturesForAddress` je neuem
+  Top-Halter plus ein Batch), Wartezeit im Betrieb messen; (f) `frisch_anteil` wird nur aufgezeichnet, kein Gate.
+- Default: so belassen bis zum ersten `tape report` mit ≥ 100 GO und ≥ 100 GESPERRT; GESPERRT-Gründe „Wallet-Verbund"
+  und „Historie unvollständig" getrennt auswerten; Lesart „Sperre unnötig" → Grenze lockern.
+- Blockiert: keinen Freeze.
+- Status: `entschieden (Experte)` am 2026-10-11 auf Nutzerauftrag; Prüfpunkte (a)–(f) offen.
+- Nachtrag 2026-10-11 (Code-Prüfung der Umsetzung, drei Blickwinkel, 15 bestätigte Befunde): (1) Die zweite Wallet-Runde
+  kam einen Tick zu spät, dazwischen ging ein GESPERRT „bei ungeprüften Top-Haltern" heraus und danach ein GO für denselben
+  Coin, was die Messung GO gegen GESPERRT verfälscht hätte; jetzt wird der Verbund vor der Rundenentscheidung frisch
+  gerechnet, und Ungeprüftes ist bis zur letzten möglichen Runde „lädt". (2) Verbund und Ungeprüftes zählen zusammen gegen
+  die Grenze („Unbekannt zählt nicht als sauber" galt vorher nur je Teil). (3) Leeres Budget, übersprungener tiefer Scan und
+  eine vom Budget still übersprungene Runde sind „lädt", nicht GESPERRT; eine Runde zählt erst, wenn sie wirklich startet.
+  (4) Fehlende Erst-Transaktionen werden einmal nachgeladen, sonst ist der Finanzierer unbekannt (`funder_unknown`,
+  nicht gecacht, zählt als ungeprüft); ein ausgefallener Börsen-Check lässt die Quelle unbekannt statt „keine Börse".
+  (5) Vom Batch verlorene Creator-Transaktionen zählen nicht als gescannt (lückenloser Präfix), beim Neuladen wegen Lücke
+  bleiben bekannte Launches erhalten (Regression gegenüber 0.3.6 behoben), die Launch-Rate zählt nur Launches in der
+  gescannten Spanne. (6) Der Score-Abzug für einen Ausschnitt gilt nur noch für die gekappte 1000er-Seite; ein kürzerer
+  Scan hätte sonst Kandidaten knapp über der Schwelle unter GO gedrückt, und der tiefe Scan, der nur für GO-Kandidaten
+  läuft, wäre nie gekommen (tote Zone). Bei 1000er-Seite kein tiefer Scan (kann nie vollständig werden). (7) Profile der
+  ersten Käufer warten in jeder Stufe auf die Creator-Abfrage (Stufe 1 startet beide ab 8 Käufern); spätere Runden
+  aktualisieren die frühen Profile. (8) Stufe 3 prüft die Wallets ohne zu warten (`wait_for_wallets`), die dokumentierte
+  20-%-Grenze wirkt damit. Tests für alle Punkte in `tests/test_wallets.py`. Neuer Prüfpunkt (g): die Wartezeit auf die
+  Wallet-Runde vor GO im Betrieb messen (eine Signaturseite je neuem Top-Halter plus ein Batch), siehe (e).
+
+## OQ-035 – Sniper 0.3.8 „Wallet-Folge": beobachtete Wallets, 🐋 FOLGE, eigene Funde, Halten bis zum nächsten Tag
+
+- Datum: 2026-10-11
+- Kontext: Nutzerauftrag „der Bot muss zusätzlich die Informationen von internen Wallets (Solscan, DexScreener, eigene
+  Funde) nutzen, die frühe Narrative kaufen, die auf Twitter viral gehen; kauft so ein Wallet, prüfen wir wieso und
+  entscheiden, ob wir nachkaufen; manche Coins muss man halten, weil sie am nächsten Tag hochgehen". Kartierung der
+  Integrationspunkte (vier Leser, 2026-10-11), `docs/experte.md` E-015.
+- Entschieden (Nutzeranweisung, Umsetzung Experte, record-only, R2/R5): (1) Wallet-Liste als Textdatei (`--wallets`,
+  Zeile `<Adresse> [Tag] [k/n] # Notiz`), Adressen von Hand (keine Solscan-API: Abo und Schlüssel, Eskalationspunkte 1
+  und 2) oder aus `wallets scout`; Datei-Hash im Record, Pfad und Schalter in `RECORD_ONLY_FIELDS`. (2) Ein
+  `logsSubscribe` je Wallet auf dem vorhandenen Stream (Reconnect inklusive), Verteiler nach Schlüssel; nur pump.fun-
+  Trade-Events mit `user == wallet` zählen, alles andere wird ohne Nachladen verworfen (der missing-Pfad läuft am Budget
+  vorbei). (3) Coins außerhalb des Blicks bekommen einen Stand aus dem Trade (`spaet`, Alter/Create-Slot/Bundle/Historie
+  unbekannt): nie BLICK/GO/RUG, keine Nebenabfragen, nur FOLGE; Coins im Blick nehmen denselben Hook in `_add_trade`
+  (Dedupe über `seen_sigs` und `folge_sigs`, Dev-Adressen ausgeschlossen). (4) 🐋 FOLGE einmal je Coin mit dem
+  gescorten Report (Record mit Kurve, Slot, Features), Kopfzeile mit Tag, Quelle, Trefferquote, Kaufgröße, Create-Block-
+  Marker, „spät gesehen", „nach GO/RUG"; weitere Käufe im Record (`folge.weitere`); `--folge-min-sol`;
+  `TIER_RANK["FOLGE"] = 0`, damit ein Coin mit GO und FOLGE in der GO-Gruppe bleibt. (5) FOLGE-Coins bleiben
+  `folge_keep_s` (1800, gedeckelt durch `max_keep_alive_s`) im Blick und werden getapet. (6) Wallet mit mehr als
+  `folge_max_logs_h` (600) Benachrichtigungen je Stunde wird stummgeschaltet (Bot/Börse, Bytes). (7) Papier-Strategien
+  `FOLGE-halten`, `FOLGE-trail`, `FOLGE-2x` (30 min, ohne Urteil und Fair-Gate als Filter, `Strategy.folge`); Halten
+  bis zum nächsten Tag nicht im Papierhandel (Engine-Kappe, Graduation beendet die Kurve), sondern aus dem Nachlauf.
+  (8) `wallets scout`: frühe Käufer je getapetem Coin (ohne Dev, ohne ersten Slot, ≤ 60 s), Label Graduation/Paar
+  außerhalb der Kurve/Liquidität ≥ 1 000 USD nach 24 h (fehlt = nicht beurteilbar), Bots = früh in > 20 % aller Coins,
+  Kandidat = Wilson-Untergrenze über der Wilson-Obergrenze der Kontrollgruppe (ab 20 beurteilbaren Kontrollen, sonst
+  Grundrate aller getapeten Coins) bei ≥ 3 beurteilbaren Coins. (9) `wallets report`: je Wallet Alarme, Graduation,
+  Überleben und Vielfaches `preis_native(+h) / Kurvenpreis beim Alarm` mit Gebühr 1,25 % je Seite, ohne Impact,
+  konservativ fehlt/unverkäuflich = 0x; Mindest-n 10 vor jeder Lesart.
+- Twitter/X: Mitlesen braucht API-Zugang (Abo) oder Scraping (ToS, Eskalationspunkt 7) – nicht gebaut (E-005 bleibt);
+  virale Begriffe über `--narratives` und die Thema-Welle.
+- Prüfpunkte: (a) `user` bei Käufen über Router oder PDA-Signer NICHT VERIFIZIERT – erste FOLGE-Zeilen gegen Solscan
+  prüfen; (b) Websocket-Kosten je Wallet (README: ~20 Credits je MB, NICHT VERIFIZIERT, OQ-025) – Statuszeile zählt
+  Wallet-Logs, Deckel 600/h ist Annahme; (c) Mehrfach-`mentions` je Abonnement nicht genutzt, N Wallets = N Abos;
+  (d) `preis_native` als SOL je Token [Snippet] – Vielfache erst nach Stichprobe gegen Solscan-Trades lesen;
+  (e) Scout-Stichprobe = Tape (Alarm-Coins + Kontroll-Anteil), Fundmenge überschätzt sich (Selektion) – Zeitsplit und
+  Vorwärtsmessung über FOLGE; (f) mehrstufige Finanzierung und Zwischen-Wallets unsichtbar; (g) `max_tracked` 400 gilt
+  auch für späte Coins (`dropped_full` beobachten); (h) ein FOLGE-Coin ohne SOL-Kurve (USDC) wird aufgezeichnet, aber
+  nicht papiergehandelt.
+- Default: record-only; keine Regel aus FOLGE vor einem `wallets report` mit ≥ 10 beurteilbaren Alarmen je Wallet und
+  24 h Feed-Reife; Grenzen (60 s, 20 %, 600/h, 30 min) bleiben bis dahin.
+- Blockiert: keinen Freeze.
+- Status: `entschieden (Experte)` am 2026-10-11 auf Nutzerauftrag; Prüfpunkte (a)–(h) offen.
+- Nachtrag 2026-10-11 (Code-Prüfung der Umsetzung, drei Blickwinkel, 16 bestätigte Befunde): (1) Kam der Launch-Frame
+  nach dem Wallet-Kauf, blieb der Coin für immer „spät gesehen" (kein BLICK/GO, kein Name): jetzt übernimmt der Coin den
+  Frame nachträglich. (2) Das Wallet-Log trug die Signatur als gesehen ein, wandte aber nur den Kauf an; Complete-Event,
+  Create und Verkauf derselben Transaktion gingen verloren, wenn das Mint-Log später kam: jetzt läuft die Transaktion
+  für den Mint über `on_logs`. (3) FOLGE nach RUG kam nie (finale Coins wurden nicht mehr bewertet), der finale Coin
+  blieb aber 30 min im Blick: jetzt einmalige Bewertung für den FOLGE, Keep-Regel nur für nicht-finale Coins.
+  (4) Spät gesehene Coins trugen ein erfundenes Alter (Sekunden seit dem Kauf) und wurden Kontroll-Coins mit t0 =
+  Kaufzeit; der Scout zählte ihre Nachkäufer als Frühkäufer: Alter jetzt unbekannt (Features ohne Launch, kein
+  Create-Fenster), Tape-Zeile mit `spaet`, keine Kontroll-Stichprobe, Scout überspringt sie, `control_groups` und
+  `tape report` schließen sie aus, Record mit `launch_received_at` None und `seen_at`. (5) Scout-Vergleichswert war die
+  Kontroll-Obergrenze, die Coins eines Wallets sind aber fast nur Alarm-Coins mit viel höherer Rate: jetzt gruppengleiche
+  Erwartung je Wallet. (6) Report: USDC-Kurven und Paare gegen USDC liefern kein Vielfaches (`quote` in der
+  Nachlauf-Zeile), Nachlauf-Zeilen eines früheren Alarms des Coins zählen nicht (t_ref-Bindung), „über 1x" über alle
+  Alarme statt nur Überlebende. (7) GO-Prüfungen (Wallet-Runde, RPC) für späte Coins ausdrücklich gesperrt, Nachladen
+  für späte Coins aus. (8) FOLGE-Coins bleiben 10 s länger als das Papier-Haltefenster, damit ZEIT vor ENDE greift.
+  (9) Tests mit Nebenabfragen-Rekorder statt leerer Zusicherung. Offen bleiben (a)–(h); neu (i): der Keep-Regel-Puffer
+  von 10 s ist Annahme (Papier-Latenz 2 s plus Tick).
+

@@ -104,6 +104,8 @@ def snapshot_row(pair: dict[str, Any] | None, mint: str, now: float, event_id: s
         {
             "paar": pair.get("pairAddress"),
             "dex": pair.get("dexId"),
+            "quote": (pair.get("quoteToken") or {}).get("address"),  # priceNative is in this token (SOL expected)
+
             "preis_usd": _num(pair.get("priceUsd")),
             "preis_native": _num(pair.get("priceNative")),
             "liq_usd": _num((pair.get("liquidity") or {}).get("usd")),

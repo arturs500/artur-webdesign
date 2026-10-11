@@ -9,6 +9,7 @@ import time
 from . import make_rpc
 from .calibrate import append_prefilter_record, append_record, evaluate, update_outcomes
 from .collect import collect
+from .fair import FairConfig
 from .features import compute_features
 from .notify import format_legend, format_short, send_telegram, telegram_configured
 from .quick import QuickConfig, QuickReport, quick_check
@@ -155,6 +156,23 @@ def cmd_watch(args: argparse.Namespace) -> int:
     return 0
 
 
+def apply_fair_args(fair: FairConfig, args: argparse.Namespace) -> None:
+    """The --fair-* switches of ``live`` onto the fairness gate (fair.py): principles of docs/fair_launch.md as
+    conditions for BLICK and GO, plus the wallet check of the top holders (0.3.7, OQ-034)."""
+    fair.enabled = not getattr(args, "no_fair", False)
+    if getattr(args, "fair_dev_max", None) is not None:
+        fair.max_dev_share = args.fair_dev_max
+    if getattr(args, "fair_socials", None) is not None:
+        fair.min_socials = args.fair_socials
+    if getattr(args, "fair_ohne_historie", False):
+        fair.require_creator_check = False
+        fair.require_complete_history = False
+    if getattr(args, "fair_ohne_wallets", False):
+        fair.require_wallet_check = False
+    if getattr(args, "fair_verbund_max", None) is not None:
+        fair.max_verbund_share = args.fair_verbund_max
+
+
 def cmd_live(args: argparse.Namespace) -> int:
     from .live import LiveConfig, live
 
@@ -181,20 +199,35 @@ def cmd_live(args: argparse.Namespace) -> int:
         config.rpc_units_per_hour = args.budget
     tiers = tuple(t.strip().upper() for t in (args.tiers or "blick,go,widerruf,rug,gesperrt").split(",") if t.strip())
     notify_words = {w.strip().upper() for w in (args.notify or "blick,go,widerruf,rug").split(",") if w.strip()}
-    # fairness gate (fair.py): the principles of docs/fair_launch.md as conditions for BLICK and GO
-    config.fair.enabled = not getattr(args, "no_fair", False)
-    if getattr(args, "fair_dev_max", None) is not None:
-        config.fair.max_dev_share = args.fair_dev_max
-    if getattr(args, "fair_socials", None) is not None:
-        config.fair.min_socials = args.fair_socials
-    if getattr(args, "fair_ohne_historie", False):
-        config.fair.require_creator_check = False
+    apply_fair_args(config.fair, args)
     watch = tuple(w.strip() for w in (getattr(args, "beobachte", None) or "").split(",") if w.strip())
     config.watch_terms = watch
     if watch:
         # an explicit watch list always alerts and always notifies, whatever the tier selection says
         tiers = tiers if "WATCH" in tiers else tiers + ("WATCH",)
         notify_words.add("WATCH")
+    # Wallet-Folge (folge.py, 0.3.8, OQ-035): a watched wallet's buy always alerts and notifies, like the watch list
+    follow_line = ""
+    if getattr(args, "wallets", None):
+        from .folge import parse_wallets_file, wallets_file_hash
+
+        try:
+            follow = parse_wallets_file(args.wallets)
+            config.follow_hash = wallets_file_hash(args.wallets)
+        except OSError as exc:
+            print(f"Wallet-Liste nicht ladbar: {exc}", file=sys.stderr)
+            return 2
+        if not follow:
+            print(f"Wallet-Liste {args.wallets} enthält keine gültige Adresse (Zeile: <Adresse> [Tag] [k/n] # Notiz)", file=sys.stderr)
+            return 2
+        config.follow_path = args.wallets
+        tiers = tiers if "FOLGE" in tiers else tiers + ("FOLGE",)
+        notify_words.add("FOLGE")
+        follow_line = f" · Wallets: {len(follow)} aus {args.wallets} ({config.follow_hash})"
+    if getattr(args, "folge_min_sol", None) is not None:
+        config.folge_min_sol = args.folge_min_sol
+    if getattr(args, "folge_halten", None) is not None:
+        config.folge_keep_s = args.folge_halten
     config.tiers = tiers
     # Außenquellen (extern.py, 0.3.6): Migrationsfeed immer abonniert, protokolliert nur mit --extern; Rugcheck opt-in
     config.extern_path = getattr(args, "extern", None)
@@ -253,6 +286,7 @@ def cmd_live(args: argparse.Namespace) -> int:
         + f" · Halter-Anstieg ≥ {config.go_min_holder_rise} in {config.holder_rise_window_s:.0f} s"
         + profile_line
         + (f" · Beobachtungsliste: {', '.join(watch)}" if watch else "")
+        + follow_line
         + f" · Fair-Gate: {config.fair.summary()}"
         + (f" · Außenquellen {config.extern_path}" + (" + Rugcheck" if config.rugcheck else "") if config.extern_path else "")
     )
@@ -433,6 +467,38 @@ def cmd_dex(args: argparse.Namespace) -> int:
     return 2
 
 
+def cmd_wallets(args: argparse.Namespace) -> int:
+    from .extern import load_extern
+    from .folge import format_wallet_line, format_wallet_report, parse_wallets_file, scout, scout_lines, wallet_report
+
+    if args.wallets_cmd == "zeigen":
+        wallets = parse_wallets_file(args.file)
+        print(f"{len(wallets)} Wallets in {args.file}")
+        for e in wallets.values():
+            print("  " + format_wallet_line(e))
+        return 0
+    if args.wallets_cmd == "scout":
+        res = scout(args.tape, load_extern(args.extern), frueh_s=args.frueh_s, min_coins=args.min_coins, max_anteil=args.max_anteil)
+        lines = scout_lines(res)
+        print("\n".join(lines))
+        print(f"{len(res.kandidaten)} Kandidaten")
+        if args.out and res.kandidaten:
+            with open(args.out, "a", encoding="utf-8") as fh:
+                fh.write("\n".join(lines) + "\n")
+            print(f"angehängt an {args.out}")
+        return 0
+    if args.wallets_cmd == "report":
+        from .calibrate import load_records
+
+        wallets = parse_wallets_file(args.wallets) if args.wallets else None
+        kwargs = {}
+        if args.horizonte:
+            kwargs["horizons"] = tuple(float(x) for x in args.horizonte.split(",") if x.strip())
+        print(format_wallet_report(wallet_report(load_records(args.records), load_extern(args.extern), wallets, **kwargs)))
+        return 0
+    return 2
+
+
 def cmd_quellen(args: argparse.Namespace) -> int:
     from .extern import describe_extern, format_nachlauf_stats, load_extern, nachlauf_fetch
 
@@ -562,7 +628,7 @@ def build_parser() -> argparse.ArgumentParser:
     lv.add_argument("--ws", help="Websocket-URL des RPC (Standard: aus der RPC-URL abgeleitet)")
     lv.add_argument("--no-side", action="store_true", help="keine Hintergrundabfragen (Creator, Wallets, Create-Transaktion): null RPC-Last, weniger Warnungen")
     lv.add_argument("--no-fetch", action="store_true", help="Logs ohne Event nicht per getTransaction nachladen")
-    lv.add_argument("--no-link", action="store_true", help="keine pump.fun-Link-Zeile in den Nachrichten")
+    lv.add_argument("--no-link", action="store_true", help="keine Link-Zeilen (pump.fun, Solscan) in den Nachrichten")
     lv.add_argument("--min-age", type=float, help="Mindestalter für GO in Sekunden")
     lv.add_argument("--yes-threshold", type=float, help="Score ab dem GO gilt (Notlösung gegen Fehlalarme: 75)")
     lv.add_argument("--blick-buyers", type=int, help="Außen-Käufer, ab denen BLICK kommt (Stufe: 8 / 5 / 3)")
@@ -573,10 +639,15 @@ def build_parser() -> argparse.ArgumentParser:
     lv.add_argument("--profil-pflicht", action="store_true", help="ohne nutzbares Profil kein GO")
     lv.add_argument("--holder-anstieg", type=int, help="neue Halter (ohne Dev) in den letzten 15 s, die BLICK und GO brauchen (Stufe 1: 3, sonst 2)")
     lv.add_argument("--beobachte", metavar="BEGRIFFE", help="Beobachtungsliste, kommagetrennt (z. B. TIFFANY): sofort 👁️ WATCH, wenn Name, Symbol oder Beschreibung eines Launches den Begriff enthält; unabhängig von --tiers/--notify")
+    lv.add_argument("--wallets", metavar="DATEI", help="beobachtete Wallets (Zeile: <Adresse> [Tag] [k/n] # Notiz; von Solscan/DexScreener von Hand oder aus 'wallets scout'): ein Log-Abo je Wallet, 🐋 FOLGE bei jedem pump.fun-Kauf, auch bei Coins außerhalb des Blicks; null RPC, nur Aufzeichnung")
+    lv.add_argument("--folge-min-sol", type=float, help="Käufe beobachteter Wallets unter dieser Größe in SOL ignorieren (Standard 0)")
+    lv.add_argument("--folge-halten", type=float, help="Sekunden, die ein von einem Wallet gekaufter Coin im Blick bleibt (Standard 1800, höchstens 1800)")
     lv.add_argument("--no-fair", action="store_true", help="Fairness-Gate ausschalten (Standard an: Dev-Anteil, Dev-Verkauf, Bundle-Wallets, Kopie, Historie, Bots, Metadaten als Bedingung für BLICK/GO)")
     lv.add_argument("--fair-dev-max", type=float, help="höchster Dev-Anteil an der Supply für einen Call (Stufe 1: 0,05, 2: 0,07, 3: 0,10)")
     lv.add_argument("--fair-socials", type=int, help="Mindestzahl Social-Links in den Metadaten für GO (Stufe 1/2: 2, 3: 1)")
-    lv.add_argument("--fair-ohne-historie", action="store_true", help="GO nicht auf die geladene Creator-Historie warten lassen")
+    lv.add_argument("--fair-ohne-historie", action="store_true", help="GO nicht auf die geladene (und vollständig gescannte) Creator-Historie warten lassen")
+    lv.add_argument("--fair-ohne-wallets", action="store_true", help="GO nicht auf die Wallet-Prüfung der Top-Halter warten lassen (spart etwa 10–20 RPC-Einheiten je GO-Kandidat)")
+    lv.add_argument("--fair-verbund-max", type=float, help="höchster Supply-Anteil in Top-Haltern, die am Dev oder aneinander hängen (Stufe 1: 0,05, 2: 0,10, 3: 0,20)")
     lv.add_argument("--paper", metavar="DATEI", help="Papier-Trading: alle Strategien handeln jeden Call ohne Geld, jede Entscheidung landet in dieser JSONL-Datei")
     lv.add_argument("--paper-size", type=float, default=0.08, help="SOL je Papier-Trade (Standard 0,08)")
     lv.add_argument("--paper-latency", type=float, default=2.0, help="Sekunden zwischen Entscheidung und Ausführung (Standard 2)")
@@ -675,6 +746,26 @@ def build_parser() -> argparse.ArgumentParser:
     qz = qus.add_parser("zeigen", help="Zähler, Feed-Laufzeit und Trennungen, letzte Graduierungen mit Alarm-Markierung, Rugcheck-Abdeckung")
     qz.add_argument("file")
     qz.set_defaults(func=cmd_quellen)
+
+    wl = sub.add_parser("wallets", help="beobachtete Wallets (0.3.8, record-only, kein RPC): aus eigenen Aufzeichnungen finden, auswerten, anzeigen")
+    wls = wl.add_subparsers(dest="wallets_cmd", required=True)
+    ws = wls.add_parser("scout", help="Wallets, die früh in Coins waren, die graduierten oder nach 24 h noch lebten (Tape × Außenquellen)")
+    ws.add_argument("tape", help="Tape aus 'live --tape' (mit --tape-sample für die Kontrollgruppe)")
+    ws.add_argument("--extern", required=True, metavar="DATEI", help="Außenquellen-Protokoll (Migrationsfeed, 'quellen nachlauf')")
+    ws.add_argument("--frueh-s", type=float, default=60.0, help="Kauf gilt als früh bis so viele Sekunden nach dem Launch (Standard 60)")
+    ws.add_argument("--min-coins", type=int, default=3, help="Mindestzahl beurteilbarer Coins je Wallet (Standard 3)")
+    ws.add_argument("--max-anteil", type=float, default=0.2, help="Wallets, die früh in mehr als diesem Anteil aller Coins sind, gelten als Bots (Standard 0,2)")
+    ws.add_argument("--out", metavar="DATEI", help="Kandidaten im Listenformat anhängen (direkt als 'live --wallets' nutzbar)")
+    ws.set_defaults(func=cmd_wallets)
+    wr = wls.add_parser("report", help="je Wallet: FOLGE-Alarme, Graduation, Überleben und Kurs-Vielfaches nach 1 h/24 h")
+    wr.add_argument("records", help="Aufzeichnung aus 'live --record'")
+    wr.add_argument("--extern", required=True, metavar="DATEI", help="Außenquellen-Protokoll mit Nachlauf-Zeilen")
+    wr.add_argument("--wallets", metavar="DATEI", help="Wallet-Liste für Tags und Listen-Statistik")
+    wr.add_argument("--horizonte", help="Sekunden, kommagetrennt (Standard 3600,86400; muss zu 'quellen nachlauf' passen)")
+    wr.set_defaults(func=cmd_wallets)
+    wz = wls.add_parser("zeigen", help="eine Wallet-Liste prüfen und anzeigen")
+    wz.add_argument("file")
+    wz.set_defaults(func=cmd_wallets)
 
     la = sub.add_parser("launch", help="Launch-Rechner: Dev-Anteil, nötiger Fremdzufluss, Wert bei Graduation, Teilverkauf und Kursimpact (Kurvenmathematik, kein Kauf)")
     las = la.add_subparsers(dest="launch_cmd", required=True)

@@ -22,6 +22,7 @@ from __future__ import annotations
 import concurrent.futures
 import threading
 import time
+import dataclasses
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any
@@ -63,8 +64,9 @@ class WalletProfile:
     capped: bool = False
     first_seen: int | None = None  # unix time of first known tx (lower bound when capped)
     funder: str | None = None
-    funder_busy: bool | None = None  # funder looks like an exchange hot wallet
+    funder_busy: bool | None = None  # funder looks like an exchange hot wallet; None: not checked (or the check failed)
     is_fresh: bool = False
+    funder_unknown: bool = False  # the first transaction could not be loaded, so the funder is unknown, not absent (0.3.7)
 
     def with_launch(self, launch_time: int | None) -> "WalletProfile":
         """Copy with ``is_fresh`` evaluated against the given launch time."""
@@ -75,7 +77,7 @@ class WalletProfile:
             and self.tx_count <= FRESH_WALLET_TX
             and self.first_seen >= launch_time - FRESH_WALLET_AGE_S
         )
-        return WalletProfile(self.address, self.tx_count, self.capped, self.first_seen, self.funder, self.funder_busy, fresh)
+        return dataclasses.replace(self, is_fresh=fresh)
 
 
 @dataclass
@@ -88,7 +90,9 @@ class CreatorHistory:
     young: int = 0
     source: str = "none"  # rpc | rpc(partial) | none
     coverage_note: str = ""
-    scanned_tx: int = 0
+    scanned_tx: int = 0  # successful transactions scanned for creates, newest first
+    ok_tx: int = 0  # successful transactions on the fetched signature page
+    complete: bool = True  # every successful transaction of the page was scanned and the page is not capped (0.3.7)
     sample_capped: bool = False
     prev_launch_ts: int | None = None
     launches_in_scan: int = 0
@@ -103,7 +107,7 @@ class _CreatorRaw:
     created: dict[str, int | None]  # created mint -> block time, including any token scored so far
     first_sig: str | None
     sample_capped: bool
-    scanned_tx: int
+    scanned_tx: int  # the newest ``scanned_tx`` successful signatures of ``sigs`` were scanned for creates
 
 
 class ProfileCache:
@@ -337,19 +341,38 @@ def _fetch_holders(
     return holders, "largest", notes
 
 
-def _scan_creates(rpc: SolanaRpc, sigs: list[dict[str, Any]]) -> dict[str, int | None]:
+def _fetch_with_retry(rpc: SolanaRpc, signatures: list[str]) -> dict[str, Any]:
+    """getTransaction for all signatures; the ones a batch dropped (None) are asked for once more."""
+    txs = rpc.get_transactions(signatures) if signatures else {}
+    missing = [s for s in signatures if txs.get(s) is None]
+    if missing:
+        txs.update(rpc.get_transactions(missing))
+    return txs
+
+
+def _scan_creates(rpc: SolanaRpc, sigs: list[dict[str, Any]]) -> tuple[dict[str, int | None], int]:
+    """Created mints in the given transactions (newest first) and the length of the gapless loaded prefix.
+
+    A batch may drop transactions (5xx, transport error): those count as not scanned. Creates found behind a
+    gap are still facts and are returned, but only the prefix before the first gap counts as covered (0.3.7).
+    """
     created: dict[str, int | None] = {}
     if not sigs:
-        return created
-    txs = rpc.get_transactions([s["signature"] for s in sigs])
-    for s in sigs:
-        parsed = parse_transaction(s["signature"], txs.get(s["signature"]))
+        return created, 0
+    txs = _fetch_with_retry(rpc, [s["signature"] for s in sigs])
+    prefix = len(sigs)
+    for i, s in enumerate(sigs):
+        tx = txs.get(s["signature"])
+        if tx is None:
+            prefix = min(prefix, i)
+            continue
+        parsed = parse_transaction(s["signature"], tx)
         if not parsed:
             continue
         for m in parsed.created_mints:
             if m not in created:
                 created[m] = parsed.block_time
-    return created
+    return created, prefix
 
 
 def _creator_history(
@@ -361,38 +384,69 @@ def _creator_history(
     incrementally; the per-token fields are derived fresh on every call.
     """
     raw: _CreatorRaw | None = cache.get("creator", creator) if cache else None
+    known_created: dict[str, int | None] = dict(raw.created) if raw is not None else {}
+    if raw is not None:
+        # refresh: only transactions newer than the cached page are fetched; copy on write, because
+        # two threads may refresh the same creator at once (serial deployers launch in parallel)
+        known = {s["signature"] for s in raw.sigs}
+        limit = max(1, min(1000, scan_tx))
+        fresh = rpc.get_signatures(creator, limit=limit)
+        new = []
+        reached = False
+        for s in fresh:
+            if s["signature"] in known:
+                reached = True
+                break
+            new.append(s)
+        if not reached and len(fresh) >= limit:
+            # more new transactions than one page: what lies between is unknown, so reload instead of
+            # silently treating the gap as scanned (0.3.7); the creates found so far stay known facts
+            raw = None
+        elif new:
+            new_ok = [s for s in new if s.get("err") is None]
+            found, prefix = _scan_creates(rpc, new_ok)
+            created = dict(raw.created)
+            created.update(found)
+            # the covered range is the gapless prefix: a dropped transaction among the new ones cuts it there
+            scanned = raw.scanned_tx + len(new_ok) if prefix == len(new_ok) else prefix
+            raw = _CreatorRaw(sigs=new + raw.sigs, created=created, first_sig=raw.first_sig, sample_capped=raw.sample_capped, scanned_tx=scanned)
     if raw is None:
         sigs = rpc.get_signatures(creator, limit=1000)
         _, first_sig = _profile_from_sigs(creator, sigs, 1000)
         scan = [s for s in sigs if s.get("err") is None][:scan_tx]
-        raw = _CreatorRaw(sigs=sigs, created=_scan_creates(rpc, scan), first_sig=first_sig, sample_capped=len(sigs) >= 1000, scanned_tx=len(scan))
-    else:
-        # refresh: only transactions newer than the cached page are fetched; copy on write, because
-        # two threads may refresh the same creator at once (serial deployers launch in parallel)
-        known = {s["signature"] for s in raw.sigs}
-        fresh = rpc.get_signatures(creator, limit=max(1, min(1000, scan_tx)))
-        new = []
-        for s in fresh:
-            if s["signature"] in known:
-                break
-            new.append(s)
-        if new:
-            created = dict(raw.created)
-            created.update(_scan_creates(rpc, [s for s in new if s.get("err") is None]))
-            raw = _CreatorRaw(sigs=new + raw.sigs, created=created, first_sig=raw.first_sig, sample_capped=raw.sample_capped, scanned_tx=raw.scanned_tx + len(new))
+        found, prefix = _scan_creates(rpc, scan)
+        created = dict(known_created)
+        created.update(found)
+        raw = _CreatorRaw(sigs=sigs, created=created, first_sig=first_sig, sample_capped=len(sigs) >= 1000, scanned_tx=prefix)
+    ok_sigs = [s for s in raw.sigs if s.get("err") is None]
+    if raw.scanned_tx < min(scan_tx, len(ok_sigs)):
+        # a deeper scan than the cached one (GO candidate, 0.3.7): the next older successful transactions
+        more = ok_sigs[raw.scanned_tx : scan_tx]
+        found, prefix = _scan_creates(rpc, more)
+        created = dict(raw.created)
+        for m, t in found.items():
+            created.setdefault(m, t)
+        raw = _CreatorRaw(sigs=raw.sigs, created=created, first_sig=raw.first_sig, sample_capped=raw.sample_capped, scanned_tx=raw.scanned_tx + prefix)
     if cache:
         cache.put("creator", creator, raw)
 
     profile, _ = _profile_from_sigs(creator, raw.sigs, 1000)
     profile = profile.with_launch(launch_time)
-    history = CreatorHistory(address=creator, sample_capped=raw.sample_capped, scanned_tx=raw.scanned_tx)
-    scan_times = [s.get("blockTime") for s in raw.sigs[: max(raw.scanned_tx, 1)] if s.get("blockTime")]
+    history = CreatorHistory(address=creator, sample_capped=raw.sample_capped, scanned_tx=raw.scanned_tx, ok_tx=len(ok_sigs))
+    # complete only when every successful transaction of the page was scanned and the page holds the whole wallet
+    history.complete = raw.scanned_tx >= len(ok_sigs) and not raw.sample_capped
+    scan_times = [s.get("blockTime") for s in ok_sigs[: max(raw.scanned_tx, 1)] if s.get("blockTime")]
     if len(scan_times) >= 2:
         history.scan_span_s = float(max(scan_times) - min(scan_times))
-    history.source = "rpc(partial)" if raw.sample_capped else "rpc"
-    history.coverage_note = f"last {raw.scanned_tx} creator transactions scanned"
+    history.source = "rpc" if history.complete else "rpc(partial)"
+    history.coverage_note = f"last {raw.scanned_tx} of {len(ok_sigs)} successful creator transactions scanned" + (
+        " (signature page capped at 1000)" if raw.sample_capped else ""
+    )
     created = {m: t for m, t in raw.created.items() if m != mint}
-    history.launches_in_scan = len(created)
+    # the launch rate counts only creates inside the scanned span; older ones (kept from an earlier scan) are facts
+    # for the series rule, but would stretch the rate over a span the scan did not see
+    span_lo = min(scan_times) if scan_times else None
+    history.launches_in_scan = sum(1 for t in created.values() if span_lo is None or (t is not None and t >= span_lo))
     if launch_time:
         before = [t for t in created.values() if t and t < launch_time]
         history.prev_launch_ts = max(before) if before else None
@@ -455,9 +509,16 @@ def _early_wallets(
     creator_funder = None
     if first_sigs:
         addrs = list(first_sigs)
-        ftxs = rpc.get_transactions([first_sigs[a] for a in addrs])
+        ftxs = _fetch_with_retry(rpc, [first_sigs[a] for a in addrs])
         for addr in addrs:
-            parsed = parse_transaction(first_sigs[addr], ftxs.get(first_sigs[addr]))
+            tx = ftxs.get(first_sigs[addr])
+            if tx is None:
+                # still missing after the retry: the funder is unknown, which is not the same as "no funder" (0.3.7)
+                if addr in profiles:
+                    profiles[addr].funder_unknown = True
+                    notes.append(f"first transaction of {addr[:8]} not loaded")
+                continue
+            parsed = parse_transaction(first_sigs[addr], tx)
             if parsed and parsed.fee_payer and parsed.fee_payer != addr:
                 if addr in profiles:
                     profiles[addr].funder = parsed.fee_payer
@@ -469,22 +530,26 @@ def _early_wallets(
         if p.funder:
             funder_count[p.funder] = funder_count.get(p.funder, 0) + 1
     for funder, n in funder_count.items():
-        if n < 2 or funder == creator or funder == creator_funder:
+        # the dev's own funder is checked as soon as one wallet shares it (0.3.7): a dev paid out by an exchange
+        # must not tie every holder with a withdrawal from the same hot wallet to the dev
+        if funder == creator or (n < 2 and funder != creator_funder):
             continue
         busy = cache.get("busy", funder) if cache else None
         if busy is None:
             try:
                 busy = len(rpc.get_signatures(funder, limit=50)) >= 50
             except RpcError:
-                busy = None
+                busy = None  # stays unknown: neither "exchange" nor "not an exchange" (0.3.7)
             if cache and busy is not None:
                 cache.put("busy", funder, busy)
+        if busy is None:
+            continue
         for p in profiles.values():
             if p.funder == funder:
-                p.funder_busy = bool(busy)
+                p.funder_busy = busy
     for p in profiles.values():
-        if cache:
-            cache.put("wallet", p.address, p)
+        if cache and not p.funder_unknown:
+            cache.put("wallet", p.address, p)  # a profile without its first transaction is not worth 30 minutes
     return [profiles[a].with_launch(launch_time) for a in wallets if a in profiles], creator_funder, notes
 
 

@@ -119,13 +119,15 @@ def plan_dev_share(share: float) -> list[str]:
     return engine.tokens[b58encode(mint)].fair["fails"]
 
 
-def _side_factory(history=None, profile=None, metadata=None, skip_metadata=False):
+def _side_factory(history=None, profile=None, metadata=None, skip_metadata=False, wallets=([], None, [])):
     def side(name, fn, done, delay=0.0, group="rpc"):
         if name == "creator":
             done((history, profile, None))
         elif name == "metadata":
             if not skip_metadata:
                 done(metadata)
+        elif name.startswith("wallets"):
+            done(wallets)  # Wallet-Prüfung (0.3.7): profiles of the top holders, the dev's funder, notes
         else:
             done(None)
 
@@ -168,7 +170,7 @@ def test_go_waits_for_history_and_metadata_and_rejects_fresh_dev_or_missing_soci
     _standard_flow(engine4, m4, c4, _with_meta(m4, c4))
     st4 = engine4.tokens[b58encode(m4)]
     assert [a.tier for a in alerts4] == ["BLICK"] and st4.fair["pending"] == ["Metadaten"] and engine4.stats.get("gesperrt", 0) == 0
-    assert "(Metadaten lädt)" in alerts4[0].text
+    assert "(Wallets, Metadaten lädt)" in alerts4[0].text  # GO waits for the top-holder check as well (0.3.7)
     # Stufe 3 verlangt weder Historie noch Metadaten
     engine5, alerts5 = make_engine(stufe=3, tiers=TIERS, side=_side_factory(hist, WalletProfile(address="c", tx_count=2, is_fresh=True), None, skip_metadata=True))
     engine5.rpc = object()
